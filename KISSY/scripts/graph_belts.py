@@ -192,8 +192,13 @@ def interpolate_2d(target_x, target_y, source_x, source_y, source_data):
             # and ensure we don't exceed array bounds
             x_indices = np.searchsorted(source_x, x) - 1
             y_indices = np.searchsorted(source_y, y) - 1
-            x_indices = max(0, min(len(source_x) - 2, x_indices))
-            y_indices = max(0, min(len(source_y) - 2, y_indices))
+            x_indices = max(0, min(len(source_x) - 1, x_indices))
+            y_indices = max(0, min(len(source_y) - 1, y_indices))
+
+            if x_indices == len(source_x) - 2:
+                x_indices -= 1
+            if y_indices == len(source_y) - 2:
+                y_indices -= 1
             
             x1, x2 = source_x[x_indices], source_x[x_indices + 1]
             y1, y2 = source_y[y_indices], source_y[y_indices + 1]

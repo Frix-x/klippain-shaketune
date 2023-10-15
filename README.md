@@ -21,7 +21,7 @@ If needed, refer to [my IS graphs documentation](./docs/input_shaper.md) for tip
 
 | Belts graphs | X graphs | Y graphs | Vibrations measurement |
 |:----------------:|:------------:|:------------:|:---------------------:|
-| ![](./docs/images/resonances_belts_example.png) | ![](./docs/images/resonances_x_example.png) | ![](./docs/images/resonances_y_example.png) | ![](./docs/images/vibrations_example.png) |
+| ![](./docs/images/belts_example.png) | ![](./docs/images/X_example.png) | ![](./docs/images/Y_example.png) | ![](./docs/images/vibrations_example.png) |
 
 ## Installation
 
