@@ -294,8 +294,13 @@ def shaper_calibration(lognames, klipperdir="~/klipper", max_smoothing=None, max
     gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=[4, 3])
     ax1 = fig.add_subplot(gs[0])
     ax2 = fig.add_subplot(gs[1])
-    fig.suptitle("\n".join(wrap(
-        "Input Shaper calibration (%s)" % (', '.join(lognames)), MAX_TITLE_LENGTH)), fontsize=16)
+    # fig.suptitle("\n".join(wrap(
+        # "Input Shaper calibration (%s)" % (', '.join(lognames)), MAX_TITLE_LENGTH)), fontsize=16)
+    
+    title_line1 = "Input Shaper calibration"
+    title_line2 = ', '.join(lognames)
+    fig.text(0.5, 0.975, title_line1, ha='center', va='bottom', fontsize=16)
+    fig.text(0.5, 0.975, title_line2, ha='center', va='top', fontsize=12)
 
     peaks = plot_freq_response_with_damping(ax1, calibration_data, shapers, selected_shaper, fr, zeta, max_freq)
     plot_spectrogram(ax2, datas[0], peaks, max_freq)
