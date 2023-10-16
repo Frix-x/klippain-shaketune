@@ -9,13 +9,9 @@ It operates in two steps:
   1. Utilizing specially tailored Klipper macros, it initiates tests on either the belts or the printer X/Y axis to measure the machine axes behavior. This is basically an automated call to the Klipper `TEST_RESONANCES` macro with custom parameters.
   
   2. Then a custom Python script is called to: 
-     a. Generate insightful and improved graphs, aiding in parameter tuning for the Klipper `[input_shaper]` system (including best shaper choice, resonant frequency and damping ratio) or diagnosing and rectifying mechanical issues (like belt tension, defective bearings, etc..)
-     b. Relocates the graphs and associated CSV files to your Klipper config folder for easy access via Mainsail/Fluidd to eliminate the need for SSH.
-     c. Manages the folder by retaining only the most recent results (default setting of keeping the latest three sets).
-
-> **Note**:
-> 
-> This module is part of the [Klippain](https://github.com/Frix-x/klippain) ecosystem. If you already have a full Klippain installation on your machine, no additional installation is required for you!
+     1. Generate insightful and improved graphs, aiding in parameter tuning for the Klipper `[input_shaper]` system (including best shaper choice, resonant frequency and damping ratio) or diagnosing and rectifying mechanical issues (like belt tension, defective bearings, etc..)
+     2. Relocates the graphs and associated CSV files to your Klipper config folder for easy access via Mainsail/Fluidd to eliminate the need for SSH.
+     3. Manages the folder by retaining only the most recent results (default setting of keeping the latest three sets).
 
 If needed, refer to [my IS graphs documentation](./docs/input_shaper.md) for tips on interpreting the generated graphs.
 
@@ -26,18 +22,24 @@ If needed, refer to [my IS graphs documentation](./docs/input_shaper.md) for tip
 ## Installation
 
 For those not using the full [Klippain](https://github.com/Frix-x/klippain), follow these steps to integrate this Shake&Tune module in your setup:
-  1. Add the [K-ShakeTune folder](./K-ShakeTune/) and its contents to the root of your config directory (e.g., `~/printer_data/config/`).
-  2. Ensure the `gcode_shell_command.py` Klipper extension is installed. Use the advanced section of [KIAUH](https://github.com/dw-0/kiauh) for a straightforward installation.
-  3. Make the scripts executable via SSH within the folder (`cd ~/printer_data/config/K-ShakeTune/scripts`):
+  1. Run the install script over SSH on your printer:
      ```bash
-     chmod +x ./is_workflow.py
-     chmod +x ./graph_belts.py
-     chmod +x ./graph_shaper.py
-     chmod +x ./graph_vibrations.py
+     wget -O - https://raw.githubusercontent.com/Frix-x/klippain-shaketune/main/install.sh | bash
      ```
-  4. Append the following to your `printer.cfg` file:
+  2. Append the following to your `printer.cfg` file:
      ```
      [include K-ShakeTune/*.cfg]
+     ```
+  3. If you want to get automatic updates, add the following to your `moonraker.cfg` file:
+     ```
+     [update_manager Klippain-ShakeTune]
+     type: git_repo
+     path: ~/klippain_shaketune
+     channel: beta
+     origin: https://github.com/Frix-x/klippain-shaketune.git
+     primary_branch: main
+     managed_services: klipper
+     install_script: install.sh
      ```
 
 ## Usage
