@@ -35,7 +35,7 @@ import tarfile
 from datetime import datetime
 
 #################################################################################################################
-RESULTS_FOLDER = os.path.expanduser('~/printer_data/config/KISSY_results')
+RESULTS_FOLDER = os.path.expanduser('~/printer_data/config/K-ShakeTune_results')
 KLIPPER_FOLDER = os.path.expanduser('~/klipper')
 STORE_RESULTS = 3
 #################################################################################################################

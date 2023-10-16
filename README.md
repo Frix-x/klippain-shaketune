@@ -1,8 +1,8 @@
-# KISSY: Klippain Input Shaper SYstem
+# Klippain Shake&Tune Module
 
-KISSY *Klippain Input Shaper System* is a module from the [Klippain](https://github.com/Frix-x/klippain) ecosystem, designed to automate and calibrate the input shaper system on your Klipper 3D printer with a streamlined workflow and insightful vizualisations.
+This Klippain "Shake&Tune" repository is a standalone module from the [Klippain](https://github.com/Frix-x/klippain) ecosystem, designed to automate and calibrate the input shaper system on your Klipper 3D printer with a streamlined workflow and insightful vizualisations.
 
-![KISSY](./docs/kissy.png)
+![logo banner](./docs/banner.png)
 
 It operates in two steps:
 
@@ -15,7 +15,7 @@ It operates in two steps:
 
 > **Note**:
 > 
-> KISSY is part of the [Klippain](https://github.com/Frix-x/klippain) ecosystem. If you already have a full Klippain installation on your machine, no additional installation is required for you!
+> This module is part of the [Klippain](https://github.com/Frix-x/klippain) ecosystem. If you already have a full Klippain installation on your machine, no additional installation is required for you!
 
 If needed, refer to [my IS graphs documentation](./docs/input_shaper.md) for tips on interpreting the generated graphs.
 
@@ -25,10 +25,10 @@ If needed, refer to [my IS graphs documentation](./docs/input_shaper.md) for tip
 
 ## Installation
 
-For those not using the full [Klippain](https://github.com/Frix-x/klippain), follow these steps to integrate KISSY in your setup:
-  1. Add the [KISSY folder](./KISSY/) and its contents to the root of your config directory (e.g., `~/printer_data/config/`).
+For those not using the full [Klippain](https://github.com/Frix-x/klippain), follow these steps to integrate this Shake&Tune module in your setup:
+  1. Add the [K-ShakeTune folder](./K-ShakeTune/) and its contents to the root of your config directory (e.g., `~/printer_data/config/`).
   2. Ensure the `gcode_shell_command.py` Klipper extension is installed. Use the advanced section of [KIAUH](https://github.com/dw-0/kiauh) for a straightforward installation.
-  3. Make the scripts executable via SSH within the folder (`cd ~/printer_data/config/KISSY/scripts`):
+  3. Make the scripts executable via SSH within the folder (`cd ~/printer_data/config/K-ShakeTune/scripts`):
      ```bash
      chmod +x ./is_workflow.py
      chmod +x ./graph_belts.py
@@ -37,7 +37,7 @@ For those not using the full [Klippain](https://github.com/Frix-x/klippain), fol
      ```
   4. Append the following to your `printer.cfg` file:
      ```
-     [include KISSY/*.cfg]
+     [include K-ShakeTune/*.cfg]
      ```
 
 ## Usage
