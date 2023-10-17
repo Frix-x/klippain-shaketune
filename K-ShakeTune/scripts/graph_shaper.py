@@ -30,13 +30,27 @@ from textwrap import wrap
 import numpy as np
 import matplotlib.pyplot, matplotlib.dates, matplotlib.font_manager
 import matplotlib.ticker, matplotlib.gridspec
+import locale
+from datetime import datetime
 
 matplotlib.use('Agg')
+try:
+    locale.setlocale(locale.LC_TIME, locale.getdefaultlocale())
+except locale.Error:
+    locale.setlocale(locale.LC_TIME, 'C')
 
-MAX_TITLE_LENGTH=65
-PEAKS_DETECTION_THRESHOLD=0.05
-PEAKS_EFFECT_THRESHOLD=0.12
-SPECTROGRAM_LOW_PERCENTILE_FILTER=5
+
+MAX_TITLE_LENGTH = 65
+
+PEAKS_DETECTION_THRESHOLD = 0.05
+PEAKS_EFFECT_THRESHOLD = 0.12
+SPECTROGRAM_LOW_PERCENTILE_FILTER = 5
+
+KLIPPAIN_COLORS = {
+    "purple": "#70088C",
+    "dark_purple": "#150140",
+    "dark_orange": "#F24130"
+}
 
 
 ######################################################################
@@ -219,7 +233,7 @@ def plot_freq_response_with_damping(ax, calibration_data, shapers, selected_shap
     ax2.plot([], [], ' ', label="Estimated damping ratio (ζ): %.3f" % (zeta))
 
     # Add the main resonant frequency and damping ratio of the axis to the graph title
-    ax.set_title("Axis Frequency Profile (ω0=%.1fHz, ζ=%.3f)" % (fr, zeta), fontsize=14)
+    ax.set_title("Axis Frequency Profile (ω0=%.1fHz, ζ=%.3f)" % (fr, zeta), fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.legend(loc='upper left', prop=fontP)
     ax2.legend(loc='upper right', prop=fontP)
 
@@ -237,7 +251,7 @@ def plot_spectrogram(ax, data, peaks, max_freq):
     # So we need to filter out the lower part of the data (ie. find the proper vmin for LogNorm)
     vmin_value = np.percentile(pdata, SPECTROGRAM_LOW_PERCENTILE_FILTER)
 
-    ax.set_title("Time-Frequency Spectrogram", fontsize=14)
+    ax.set_title("Time-Frequency Spectrogram", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.pcolormesh(bins, t, pdata.T, norm=matplotlib.colors.LogNorm(vmin=vmin_value),
                   cmap='inferno', shading='gouraud')
 
@@ -294,20 +308,20 @@ def shaper_calibration(lognames, klipperdir="~/klipper", max_smoothing=None, max
     gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=[4, 3])
     ax1 = fig.add_subplot(gs[0])
     ax2 = fig.add_subplot(gs[1])
-    # fig.suptitle("\n".join(wrap(
-        # "Input Shaper calibration (%s)" % (', '.join(lognames)), MAX_TITLE_LENGTH)), fontsize=16)
     
-    title_line1 = "Input Shaper calibration"
-    title_line2 = ', '.join(lognames)
-    fig.text(0.5, 0.975, title_line1, ha='center', va='bottom', fontsize=16)
-    fig.text(0.5, 0.975, title_line2, ha='center', va='top', fontsize=12)
+    filename_parts = (lognames[0].split('/')[-1]).split('_')
+    dt = datetime.strptime(f"{filename_parts[3]} {filename_parts[4].split('.')[0]}", "%Y%m%d %H%M%S")
+    title_line1 = "INPUT SHAPER CALIBRATION TOOL"
+    title_line2 = filename_parts[2].upper() + ' axis - ' + dt.strftime('%x %X')
+    fig.text(0.88, 0.965, title_line1, ha='right', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold')
+    fig.text(0.88, 0.957, title_line2, ha='right', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     peaks = plot_freq_response_with_damping(ax1, calibration_data, shapers, selected_shaper, fr, zeta, max_freq)
     plot_spectrogram(ax2, datas[0], peaks, max_freq)
 
-    fig.set_size_inches(10, 12)
+    fig.set_size_inches(10, 13)
     fig.tight_layout()
-    fig.subplots_adjust(top=0.93)
+    fig.subplots_adjust(top=0.90)
 
     return fig
 
@@ -333,6 +347,12 @@ def main():
         opts.error("Too small max_smoothing specified (must be at least 0.05)")
 
     fig = shaper_calibration(args, options.klipperdir, options.max_smoothing, options.max_freq)
+
+    # Adding a small Klippain logo to the top left corner of the figure
+    ax_logo = fig.add_axes([0.899, 0.899, 0.1, 0.1], anchor='NE', zorder=-1)
+    ax_logo.imshow(matplotlib.pyplot.imread(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'klippain.png')))
+    ax_logo.axis('off')
+
     fig.savefig(options.output)
 
 

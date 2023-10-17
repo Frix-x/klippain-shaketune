@@ -21,12 +21,12 @@ Then, call the `BELTS_SHAPER_CALIBRATION` macro and look for the graphs in the r
 
 ## Analysis of the results
 
-On these graphs, you want both curves to look similar and overlap to form a single curve. Try to make them fit as closely as possible. It's acceptable to have "noise" around the main peak, but it should be present on both curves with a comparable amplitude. Keep in mind that when you tighten a belt, its main peak should move diagonally toward the upper right corner, changing significantly in amplitude and slightly in frequency. Additionally, the magnitude order of the main peaks *should typically* range from ~100k to ~1M on most machines.
+On these graphs, **you want both curves to look similar and overlap to form a single curve**: try to make them fit as closely as possible in frequency **and** in amplitude. Usually a belt graph is composed of one or two main peaks and more peaks can hint about mechanical problems. However, it's acceptable to have "noise" around the main peaks, but it should be present on both curves with a comparable amplitude. Keep in mind that when you tighten a belt, its peaks should move diagonally toward the upper right corner, changing significantly in amplitude and slightly in frequency. Additionally, the magnitude order of the main peaks *should typically* range from ~100k to ~1M on most machines.
 
-The resonant frequency/amplitude of the curves depends primarily on three parameters (and the actual tension):
-  - the *mass of the toolhead*, which is identical for both belts and has no effect here
+The resonant frequency/amplitude of the curves depends primarily on three parameters (and the actual belt tension):
+  - the *mass of the toolhead*, which is identical on CoreXY machines for both belts and has no effect here
   - the *belt "elasticity"*, which changes over time as the belt wears. Ensure that you use the **same belt brand and type** for both A and B belts and that they were **installed at the same time**
-  - the *belt path length*, which is why they must have the **exact same number of teeth** so that one belt path is not longer than the other when tightened at the same tension
+  - the *belt path length*, which is why they must have the **exact same number of teeth** so that one belt path is not longer than the other when tightened at the same tension. This specific point is very important: A single tooth difference is enough to prevent you from having a good superposition of the curves. Moreover, it is even one of the main causes of problems found in Discord resonance testing channels.
 
 **If these three parameters are met, there is no way that the curves could be different** or you can be sure that there is an underlying problem in at least one of the belt paths. Also, if the belt graphs have low amplitude curves (no distinct peaks) and a lot of noise, you will probably also have poor input shaper graphs. So before you continue, ensure that you have good belt graphs or fix your belt paths. Start by checking the belt tension, bearings, gantry screws, alignment of the belts on the idlers, and so on.
 

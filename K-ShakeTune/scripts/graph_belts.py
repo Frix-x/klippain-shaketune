@@ -23,8 +23,15 @@ import numpy as np
 import matplotlib.pyplot, matplotlib.dates, matplotlib.font_manager
 import matplotlib.ticker, matplotlib.gridspec, matplotlib.colors
 import matplotlib.patches
+import locale
+from datetime import datetime
 
 matplotlib.use('Agg')
+try:
+    locale.setlocale(locale.LC_TIME, locale.getdefaultlocale())
+except locale.Error:
+    locale.setlocale(locale.LC_TIME, 'C')
+
 
 MAX_TITLE_LENGTH = 65
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" # For paired peaks names
@@ -37,6 +44,14 @@ DC_MAX_UNPAIRED_PEAKS_ALLOWED = 4
 
 # Define the SignalData namedtuple
 SignalData = namedtuple('CalibrationData', ['freqs', 'psd', 'peaks', 'paired_peaks', 'unpaired_peaks'])
+
+KLIPPAIN_COLORS = {
+    "purple": "#70088C",
+    "orange": "#FF8D32",
+    "dark_purple": "#150140",
+    "dark_orange": "#F24130",
+    "red_pink": "#F2055C"
+}
 
 
 ######################################################################
@@ -140,7 +155,7 @@ def pair_peaks(peaks1, freqs1, psd1, peaks2, freqs2, psd2):
 # Computation of a basic signal spectrogram
 ######################################################################
 
-def calc_specgram(data):
+def compute_spectrogram(data):
     N = data.shape[0]
     Fs = N / (data[-1,0] - data[0,0])
     # Round up to a power of 2 for faster FFT
@@ -265,8 +280,8 @@ def shift_data_in_time(data, shift_amount):
 # the time lag and realigning them. Finally this function combine (by substracting signals) the aligned spectrograms in a new one.
 # This result of a mostly zero-ed new spectrogram with some colored zones highlighting differences in the belts paths.
 def combined_spectrogram(data1, data2):
-    pdata1, bins1, t1 = calc_specgram(data1)
-    pdata2, _, _ = calc_specgram(data2)
+    pdata1, bins1, t1 = compute_spectrogram(data1)
+    pdata2, _, _ = compute_spectrogram(data2)
 
     # Detect ridges
     ridge1 = detect_ridge(pdata1)
@@ -314,9 +329,22 @@ def compute_comi(combined_data, similarity_coefficient, num_unpaired_peaks):
 ######################################################################
 
 def plot_compare_frequency(ax, lognames, signal1, signal2, max_freq):
+    # Get the belt name for the legend to avoid putting the full file name
+    signal1_belt = (lognames[0].split('/')[-1]).split('_')[-1][0]
+    signal2_belt = (lognames[1].split('/')[-1]).split('_')[-1][0]
+
+    if signal1_belt == 'A' and signal2_belt == 'B':
+        signal1_belt += " (axis 1,-1)"
+        signal2_belt += " (axis 1, 1)"
+    elif signal1_belt == 'B' and signal2_belt == 'A':
+        signal1_belt += " (axis 1, 1)"
+        signal2_belt += " (axis 1,-1)"
+    else:
+        print("Warning: belts doesn't seem to have the correct name A and B (extracted from the filename.csv)")
+
     # Plot the two belts PSD signals
-    ax.plot(signal1.freqs, signal1.psd, label="\n".join(wrap(lognames[0], 60)), alpha=0.6)
-    ax.plot(signal2.freqs, signal2.psd, label="\n".join(wrap(lognames[1], 60)), alpha=0.6)
+    ax.plot(signal1.freqs, signal1.psd, label="Belt " + signal1_belt, color=KLIPPAIN_COLORS['purple'])
+    ax.plot(signal2.freqs, signal2.psd, label="Belt " + signal2_belt, color=KLIPPAIN_COLORS['orange'])
 
     # Trace the "relax region" (also used as a threshold to filter and detect the peaks)
     psd_lowest_max = min(signal1.psd.max(), signal2.psd.max())
@@ -362,8 +390,10 @@ def plot_compare_frequency(ax, lognames, signal1, signal2, max_freq):
         unpaired_peak_count += 1
 
     # Compute the similarity (using cross-correlation of the PSD signals)
+    ax2 = ax.twinx() # To split the legends in two box
     similarity_factor = compute_curve_similarity_factor(signal1, signal2)
-    ax.plot([], [], ' ', label=f'Estimated similarity: {similarity_factor:.1f}% ({unpaired_peak_count} unpaired peaks)')
+    ax2.plot([], [], ' ', label=f'Estimated similarity: {similarity_factor:.1f}%')
+    ax2.plot([], [], ' ', label=f'Number of unpaired peaks: {unpaired_peak_count}')
     print(f"Belts estimated similarity: {similarity_factor:.1f}%")
 
     # Setting axis parameters, grid and graph title
@@ -380,13 +410,12 @@ def plot_compare_frequency(ax, lognames, signal1, signal2, max_freq):
     ax.grid(which='minor', color='lightgrey')
     fontP = matplotlib.font_manager.FontProperties()
     fontP.set_size('small')
-    ax.set_title('Belts Frequency Profiles (estimated similarity: {:.1f}%)'.format(similarity_factor), fontsize=14)
-    ax.legend(loc='best', prop=fontP)
+    ax.set_title('Belts Frequency Profiles (estimated similarity: {:.1f}%)'.format(similarity_factor), fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
 
     # Print the table of offsets ontop of the graph below the original legend (upper right)
     if len(offsets_table_data) > 0:
         columns = ["", "Frequency delta", "Amplitude delta", ]
-        offset_table = ax.table(cellText=offsets_table_data, colLabels=columns, bbox=[0.67, 0.60, 0.3, 0.2], loc='upper right', cellLoc='center')
+        offset_table = ax.table(cellText=offsets_table_data, colLabels=columns, bbox=[0.67, 0.70, 0.3, 0.2], loc='upper right', cellLoc='center')
         offset_table.auto_set_font_size(False)
         offset_table.set_fontsize(8)
         offset_table.auto_set_column_width([0, 1, 2])
@@ -395,6 +424,9 @@ def plot_compare_frequency(ax, lognames, signal1, signal2, max_freq):
         for cell in cells:
             offset_table[cell].set_facecolor('white')
             offset_table[cell].set_alpha(0.6)
+
+    ax.legend(loc='upper left', prop=fontP)
+    ax2.legend(loc='upper right', prop=fontP)
 
     return similarity_factor, unpaired_peak_count
 
@@ -407,7 +439,7 @@ def plot_difference_spectrogram(ax, data1, data2, signal1, signal2, similarity_f
     # Be careful, this value is highly opinionated and is pretty experimental!
     comi = compute_comi(combined_data, similarity_factor, len(signal1.unpaired_peaks) + len(signal2.unpaired_peaks))
     print(f"Chances of mechanical issues: {comi:.1f}%")
-    ax.set_title(f"Differential Spectrogram (COMI: {comi:.1f}%)", fontsize=14)
+    ax.set_title(f"Differential Spectrogram (COMI: {comi:.1f}%)", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.plot([], [], ' ', label=f'Chances of mechanical issues (COMI): {comi:.1f}%')
     
     # Draw the differential spectrogram with a specific norm to get light grey zero values and red for max values (vmin to vcenter is not used)
@@ -443,11 +475,11 @@ def plot_difference_spectrogram(ax, data1, data2, signal1, signal2, similarity_f
         label = ALPHABET[idx]
         x_min = min(peak1[1], peak2[1])
         x_max = max(peak1[1], peak2[1])
-        ax.axvline(x_min, color='blue', linestyle='dotted', linewidth=1.5)
-        ax.axvline(x_max, color='blue', linestyle='dotted', linewidth=1.5)
-        ax.fill_between([x_min, x_max], 0, np.max(combined_data), color='blue', alpha=0.3)
+        ax.axvline(x_min, color=KLIPPAIN_COLORS['purple'], linestyle='dotted', linewidth=1.5)
+        ax.axvline(x_max, color=KLIPPAIN_COLORS['purple'], linestyle='dotted', linewidth=1.5)
+        ax.fill_between([x_min, x_max], 0, np.max(combined_data), color=KLIPPAIN_COLORS['purple'], alpha=0.3)
         ax.annotate(f"Peaks {label}", (x_min, t[-1]*0.05),
-                textcoords="data", color='blue', rotation=90, fontsize=10,
+                textcoords="data", color=KLIPPAIN_COLORS['purple'], rotation=90, fontsize=10,
                 verticalalignment='bottom', horizontalalignment='right')
 
     return
@@ -517,14 +549,20 @@ def belts_calibration(lognames, klipperdir="~/klipper", max_freq=200.):
     gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=[4, 3])
     ax1 = fig.add_subplot(gs[0])
     ax2 = fig.add_subplot(gs[1])
-    fig.suptitle("CoreXY relative belt calibration tool", fontsize=16)
+
+    filename = lognames[0].split('/')[-1]
+    dt = datetime.strptime(f"{filename.split('_')[1]} {filename.split('_')[2]}", "%Y%m%d %H%M%S")
+    title_line1 = "RELATIVE BELT CALIBRATION TOOL"
+    title_line2 = dt.strftime('%x %X')
+    fig.text(0.88, 0.965, title_line1, ha='right', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold')
+    fig.text(0.88, 0.957, title_line2, ha='right', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     similarity_factor, _ = plot_compare_frequency(ax1, lognames, signal1, signal2, max_freq)
     plot_difference_spectrogram(ax2, datas[0], datas[1], signal1, signal2, similarity_factor, max_freq)
 
-    fig.set_size_inches(10, 12)
+    fig.set_size_inches(10, 13)
     fig.tight_layout()
-    fig.subplots_adjust(top=0.93)
+    fig.subplots_adjust(top=0.90)
     
     return fig
 
@@ -546,6 +584,12 @@ def main():
         opts.error("You must specify an output file.png to use the script (option -o)")
 
     fig = belts_calibration(args, options.klipperdir, options.max_freq)
+
+    # Adding a small Klippain logo to the top left corner of the figure
+    ax_logo = fig.add_axes([0.899, 0.899, 0.1, 0.1], anchor='NE', zorder=-1)
+    ax_logo.imshow(matplotlib.pyplot.imread(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'klippain.png')))
+    ax_logo.axis('off')
+
     fig.savefig(options.output)
 
 
