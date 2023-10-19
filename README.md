@@ -11,9 +11,11 @@ It operates in two steps:
      2. Relocates the graphs and associated CSV files to your Klipper config folder for easy access via Mainsail/Fluidd to eliminate the need for SSH.
      3. Manages the folder by retaining only the most recent results (default setting of keeping the latest three sets).
 
-| Belts graphs | X graphs | Y graphs | Vibrations measurement |
-|:----------------:|:------------:|:------------:|:---------------------:|
-| ![](./docs/images/belts_example.png) | ![](./docs/images/X_example.png) | ![](./docs/images/Y_example.png) | ![](./docs/images/vibrations_example.png) |
+The [detailed documentation is here](./docs/README.md).
+
+| Belts graphs | Axis graphs | Vibrations measurement |
+|:----------------:|:------------:|:---------------------:|
+| ![](./docs/images/belts_example.png) | ![](./docs/images/axis_example.png) | ![](./docs/images/vibrations_example.png) |
 
 ## Installation
 
@@ -46,4 +48,4 @@ Ensure your machine is homed, then invoke one of the following macros as needed:
   - `VIBRATIONS_CALIBRATION` for machine vibration graphs to optimize your slicer speed profiles.
   - `EXCITATE_AXIS_AT_FREQ` to sustain a specific excitation frequency, useful to let you inspect and find out what is resonating.
 
-For further insights on the usage of the macros and the generated graphs, refer to the [K-Shake&Tune module documentation](./docs/k_shaketune.md).
+For further insights on the usage of the macros and the generated graphs, refer to the [K-Shake&Tune module documentation](./docs/README.md).

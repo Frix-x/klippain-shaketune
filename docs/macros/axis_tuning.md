@@ -5,7 +5,7 @@ The `AXES_SHAPER_CALIBRATION` macro is used to measure and plot the axis behavio
 
 ## Usage
 
-**Before starting, ensure that the belts are properly tensioned** and that you already have good and clear belt graphs (see the previous section).
+**Before starting, ensure that the belts are properly tensioned** and that you already have good and clear belt graphs (see [the previous section](./belts_tuning.md)).
 
 Then, call the `AXES_SHAPER_CALIBRATION` macro and look for the graphs in the results folder. Here are the parameters available:
 
@@ -20,57 +20,132 @@ Then, call the `AXES_SHAPER_CALIBRATION` macro and look for the graphs in the re
 
 ## Graphs description
 
+![](../images/shaper_graphs/shaper_graph_explanation.png)
+
 ## Analysis of the results
 
-#### Generalities
+### Generalities
 
 To effectively analyze input shaper graphs, there is no one-size-fits-all approach due to the variety of factors that can impact the 3D printer's performance or input shaper measurements. However, here are some hints on reading the graphs:
-  - A graph with a **single and thin peak** well detached from the background noise is ideal, as it can be easily filtered by input shaping. But depending on the machine and its mechanical configuration, it's not always possible to obtain this shape. The key to getting better graphs is a clean mechanical assembly with a special focus on the rigidity and stiffness of everything, from the table under the printer through the frame of the printer to the toolhead.
-  - As for the belt graphs, **focus on the shape of the graphs, not the exact frequency and energy value**. Indeed, the energy value doesn't provide much useful information. Use it only to compare two of your own graphs and to measure the impact of your mechanical changes between two consecutive tests, but never use it to compare against graphs from other people or other machines.
+  - A graph with a **single and thin peak** well detached from the background noise is ideal, as it can be easily filtered by input shaping. But depending on the machine and its mechanical configuration, it's not always possible to obtain this shape. The key to getting better graphs is a clean mechanical assembly with a special focus on the rigidity and stiffness of everything, from the table the printer sits on to the frame and the toolhead.
+  - As for the belt graphs, **focus on the shape of the graphs, not the values**. Indeed, the energy value doesn't provide much useful information. Use it only to compare two of your own graphs and to measure the impact of your mechanical changes between two consecutive tests, but never use it to compare against graphs from other people or other machines.
 
-When you are satisfied with your graphs, you will need to use the auto-computed values at the top to set the Input Shaping filters in your Klipper configuration.
+![](../images/shaper_graphs/shaper_recommandations.png)
 
-![](./images/IS_docs/shaper_graphs/shaper_reco.png)
-
-Here is some info to help you understand them:
-  - These data are automatically computed by a specific Klipper algorithm. This algorithm works pretty well if the graphs are clean enough. But **if your graphs are junk, it can't do magic and will give you pretty bad recommendations**: they will do nothing or even make the ringing worse, so do not use the values and fix your printer first!
-  - The recommended acceleration values (`accel<=...`) are not meant to be read alone. You need to also look at the `vibr` and `sm` values. They will give you the percentage of remaining vibrations and the smoothing after Input Shaping, if you use the recommended acceleration.
-  - Nothing will prevent you from using higher acceleration values; they are not a limit. However, if you do so, expect more vibrations and smoothing. Also, Input Shaping may find its limits and not be able to suppress all the ringing on your parts.
-  - The remaining vibrations `vibr` value is highly linked to ringing. So try to choose a filter with a very low value or even 0% if possible.
-  - High acceleration values are not useful at all if there is still a high level of remaining vibrations. You should address any mechanical issues before continuing.
-  - Each line represents the name of a different filtering algorithm. Each of them has its pros and cons:
+For setting your Input Shaping filters, rely on the auto-computed values displayed in the top right corner of the graph. Here's a breakdown of the legend for a better grasp:
+  - **Filtering algortihms**: Klipper automatically computes these lines. This computation works pretty well if the graphs are clean enough. But if your graphs are junk, it can't do magic and will give you pretty bad recommendations. It's better to address the mechanical issues first before continuing. Each shapers has its pro and cons:
     * `ZV` is a pretty light filter and usually has some remaining vibrations. My recommendation would be to use it only if you want to do speed benchies and get the highest acceleration values while maintaining a low amount of smoothing on your parts. If you have "perfect" graphs and do not care that much about some remaining ringing, you can try it. 
-    * `MZV` is most of the time the best filter on a well-tuned machine. It's a good compromise for low remaining vibrations while still allowing pretty good acceleration values. Keep in mind, `MZV` is only recommended by the algorithm on good graphs.
-    * `EI` works "ok" if you are not able to get better graphs. But first, try to fix your mechanical issues as best as you can before using it: almost every printer should be able to run `MZV` instead.
-    * `2HUMP_EI` and `3HUMP_EI` are not recommended and should be used only as a last resort. Usually, they lead to a high level of smoothing in order to suppress the ringing while also using relatively low acceleration values. If you get these algorithms recommended, you can almost be sure that you have mechanical problems under the hood (that lead to pretty bad or "wide" graphs).
+    * `MZV` is usually the top pick for well-adjusted machines. It's a good compromise for low remaining vibrations while still allowing pretty good acceleration values. Keep in mind, `MZV` is only recommended by Klipper on good graphs.
+    * `EI` can be used as a fallback for challenging graphs. But first, try to fix your mechanical issues before using it: almost every printer should be able to run `MZV` instead.
+    * `2HUMP_EI` and `3HUMP_EI` are last-resort choices. Usually, they lead to a high level of smoothing in order to suppress the ringing while also using relatively low acceleration values. If they pop up as suggestions, it's likely your machine has underlying mechanical issues (that lead to pretty bad or "wide" graphs).
+  - **Recommended Acceleration** (`accel<=...`): This isn't a standalone figure. It's essential to also consider the `vibr` and `sm` values as it's a compromise between the three. They will give you the percentage of remaining vibrations and the smoothing after Input Shaping, when using the recommended acceleration. Nothing will prevent you from using higher acceleration values; they are not a limit. However, when doing so, Input Shaping may not be able to suppress all the ringing on your parts. Finally, keep in mind that high acceleration values are not useful at all if there is still a high level of remaining vibrations: you should address any mechanical issues first.
+  - **The remaining vibrations** (`vibr`): This directly correlates with ringing. It correspond to the total value of the blue "after shaper" signal. Ideally, you want a filter with minimal or zero vibrations.
+  - **Shaper recommendations**: This script will give you two recommandation. Pick the one that suit your needs:
+    * The first is Klipper's original suggestion, for best performance and acceleration on your machine while also allowing a little bit of remaining vibrations.
+    * The second aims for no remaining vibration to ensure the best print quality.
+  - The final line provides the estimated damping ratio for the axis. This value is generated automatically and is only accurate if the graph displays a clear and well detached single peak.
+  - **Damping Ratio**: Displayed at the end, this estimatation is only reliable when the graph shows a distinct, standalone and clean peak. On a well tuned machine, setting the damping ratio (instead of Klipper's 0.1 default value) can further reduce the ringing at high accelerations and with higher square corner velocities.
 
-Then, just add to your configuration:
+Then, add to your configuration:
 ```
 [input_shaper]
 shaper_freq_x: ... # center frequency for the X axis filter
 shaper_type_x: ... # filter type for the X axis
 shaper_freq_y: ... # center frequency for the Y axis filter
 shaper_type_y: ... # filter type for the Y axis
+damping_ratio_x: ... # damping ratio for the X axis
+damping_ratio_y: ... # damping ratio for the Y axis
 ```
 
-#### Useful facts and myths debunking
+### Useful facts and myths debunking
 
-Sometimes people advise limiting the data to 100 Hz by manually editing the resulting .csv file because excitation does not go that high and these values should be ignored and considered wrong. This is a misconception and a bad idea because the excitation frequency is very different from the response frequency of the system, and they are not correlated at all. Indeed, it's plausible to get higher vibration frequencies, and editing the file manually will just "ignore" them and make them invisible even if they are still there on your printer. While higher frequency vibrations may not have a substantial effect on print quality, they can still indicate other issues within the system, likely noise and wear to the mechanical parts. Instead, focus on addressing the mechanical issues causing these problems.
+Some people suggest to cap data at 100 Hz by manually editing the .csv file, thinking values beyond that are wrong. But this can be misleading. The excitation and system's response frequencies differ, and aren't directly linked. You might see vibrations beyond the excitation range, and removing them from the file just hides potential issues. Though these high-frequency vibrations might not always affect print quality, they could signal mechanical problems. Instead of hiding them, look into resolving these issues.
 
-Another point is that I do not recommend using an extra-light X-beam (aluminum or carbon) on your machine, as it can negatively impact the printer's performance and Input Shaping results. Indeed, there is more than just mass at play (see the [theory behind it](#theory-behind-it)): lower mass also means more flexibility and more prone to wobble under high accelerations. This will impact negatively the Y axis graphs as the X-beam will flex under high accelerations.
+Regarding printer components, I do not recommend using an extra-light X-beam (aluminum or carbon). They might seem ideal due to their weight, but there's more to consider than just mass such as the rigidity (see the [theory behind it](../is_tuning_generalities.md#theory-behind-it)). These light beams can be more flexible and will impact negatively the Y axis graphs as they will flex under high accelerations.
 
 Finally, keep in mind that each axis has its own properties, such as mass and geometry, which will lead to different behaviors for each of them and will require different filters. Using the same input shaping settings for both axes is only valid if both axes are similar mechanically: this may be true for some machines, mainly Cross gantry configurations such as [CroXY](https://github.com/CroXY3D/CroXY) or [Annex-Engineering](https://github.com/Annex-Engineering) printers, but not for others.
 
 
 ## Examples of graphs
 
-In the following examples, the graphs are random graphs found online or sent to me for analysis. They are not necessarily to be read in pairs: the two graph columns are here to illustrate the comment with more than one example.
+In this section, I'll walk you through some random graphs sourced online or shared with me for analysis. My aim is to highlight the good and the not-so-good, offering insights to help you refine your printer's Input Shaping settings.
 
-| Comment | Example 1 | Example 2 |
-| --- | --- | --- |
-| **These two graphs are considered good**. As you can see, there is only one thin peak, well separated from the background noise | ![](./images/IS_docs/shaper_graphs/reso_good_x.png) | ![](./images/IS_docs/shaper_graphs/reso_good_y.png) |
-| **These two graphs are really bad**: there is a lot of noise all over the spectrum. Something is really wrong and you should check all moving parts and screws. You should also check the belt tension and proper geometry of the gantry (racking) | ![](./images/IS_docs/shaper_graphs/insane_accels.png) | ![](./images/IS_docs/shaper_graphs/insane_accels2.png) |
-| These two graphs have some **low frequency energy**. This usually means that there is some binding or grinding in the kinematics: something isn't moving freely. Check the belt alignment on the idlers, bearings, etc... | ![](./images/IS_docs/shaper_graphs/low_freq_bad.png) | ![](./images/IS_docs/shaper_graphs/low_freq_bad2.png) |
-| These two graphs show **the TAP wobble problem**: check that the TAP MGN rail has the correct preload for stiffness and that the magnets are correct N52. Also pay attention to the assembly to make sure that everything is properly tightened | ![](./images/IS_docs/shaper_graphs/TAP_125hz.png) | ![](./images/IS_docs/shaper_graphs/TAP_125hz_2.png) |
-| Here you can see **the effect of an unbalanced fan**: even if you should let the fan off during the final IS tuning, you can use this test to validate their correct behavior: an unbalanced fan usually add some very thin peak around 100-150Hz that disapear when the fan is off during the measurement | ![](./images/IS_docs/shaper_graphs/fan-on.png) | ![](./images/IS_docs/shaper_graphs/fan-off.png) |
-| The graph on the left shows **a CANbus problem** (problem solved on the right): although the general shape looks good, the graph is not smooth but spiky. There is also usually some low frequency energy. This happens when the bus speed is too low: set it to 1M to solve the problem | ![](./images/IS_docs/shaper_graphs/low_canbus.png) | ![](./images/IS_docs/shaper_graphs/low_canbus_solved.png) |
+That said, interpreting Input Shaper graphs isn't an exact science. While we can make educated guesses and highlight potential issues from these graphs, pinpointing exact causes isn't always feasible. So, consider the upcoming graphs and their comments as pointers on your input shaping journey, rather than hard truths.
+
+### Good graphs
+
+These two graphs are considered good and is what you're aiming for. They each display a single, distinct peak that stands out clearly against the background noise. Note that the main frequencies of the X and Y graph peaks differ. This variance is expected and normal, as explained in the last point of the [useful facts and myths debunking](#useful-facts-and-myths-debunking) section.
+
+| Good X graph | Good Y graph |
+| --- | --- |
+| ![](../images/shaper_graphs/low_canbus_solved.png) | ![](../images/shaper_graphs/reso_good_y.png) |
+
+### Low frequency energy
+
+These graphs have some low frequency energy (signal near 0 Hz) on a rather low maximum amplitude (around 1e2 or 1e3). This means that there is some binding, rubbing or grinding during movements: basically, something isn't moving freely. Minor low frequency energy in the graphs might be due to a lot of issues such as a faulty idler/bearing or an overly tightened carriage screw that prevent it to move freely on its linear rail, ... However, major low frequency energy suggest more important problems like improper belt routing (the most common), or defective motor, ...
+
+Here's how to troubleshoot the issue:
+  1. **Belts Examination**:
+     - Ensure your belts are properly routed.
+     - Check for correct alignment of the belts on all bearing flanges during movement (check them during a print).
+     - Belt dust is often a sign of misalignment or wear.
+  2. **Toolhead behavior on CoreXY printers**: With motors off and the toolhead centered, gently push the Y-axis front-to-back. The toolhead shouldn't move left or right. If it does, one of the belts might be obstructed and requires inspection to find out the problem.
+  3. **Gantry Squareness**:
+     - Ensure your gantry is perfectly parallel and square. You can refer to [Nero3D's de-racking video](https://youtu.be/cOn6u9kXvy0?si=ZCSdWU6br3Y9rGsy) for guidance.
+     - After removing the belts, test the toolhead's movement by hand across all positions. Movement should be smooth with no hard points or areas of resistance.
+
+| Small binding | Heavy binding |
+| --- | --- |
+| ![](../images/shaper_graphs/binding.png) | ![](../images/shaper_graphs/binding2.png) |
+
+### Double peaks or wide peaks
+
+Such graph patterns can arise from various factors, and there isn't a one-size-fits-all solution. To address them:
+  1. A wobbly table can be the cause. So first thing to do is to try with the printer directly on the floor.
+  2. Ensure optimal belt tension using the [`BELTS_SHAPER_CALIBRATION` macro](./belts_tuning.md).
+  3. If problems persist, it might be due to an improperly squared gantry. For correction, refer to [Nero3D's de-racking video](https://youtu.be/cOn6u9kXvy0?si=ZCSdWU6br3Y9rGsy).
+  4. If it's still there... you will need to find out what is resonating to fix it. You can use the `EXCITATE_AXIS_AT_FREQ` macro to help you find it.
+
+| Two peaks | Single wide peak |
+| --- | --- |
+| ![](../images/shaper_graphs/bad_racking.png) | ![](../images/shaper_graphs/bad_racking2.png) |
+
+### Problematic CANBUS speed
+
+Using CANBUS toolheads with an integrated ADXL chip can sometimes pose challenges if the CANBUS speed is set too low. While users might lower the bus speed to fix Klipper's timing errors, this change will also affect input shaping measurements. An example outcome of a low bus speed is the following graph that, though generally well-shaped, appears jagged and spiky throughout. Additional low-frequency energy might also be present. For optimal ADXL board operation on your CANBUS toolhead, a speed setting of 500k is the minimum, but 1M is advisable.
+
+| CANBUS problem present | CANBUS problem solved |
+| --- | --- |
+| ![](../images/shaper_graphs/low_canbus.png) | ![](../images/shaper_graphs/low_canbus_solved.png) |
+
+### Toolhead or TAP wobble
+
+The [Voron TAP](https://github.com/VoronDesign/Voron-Tap) can introduce anomalies to input shaper graphs, notably on the X graph. Its design with an internal MGN rail introduces a separate and decoupled mass, leading to its own resonance, typically around 125Hz. Combatting this can be pretty challenging, but using premium components and a careful assembly can help mitigate the issue. Ensure you employ a good quality and well-preloaded TAP MGN rail for optimal assembly stiffness, coupled with genuine and strong N52 magnets (avoid lower-quality N35 or N45 substitutes often found on chinese marketplaces). Prioritize careful assembly and consider using the TAP Rev8 version or above.
+
+Additionally, without a Voron TAP, small 125hz peaks can sometimes tie back to the toolhead itself. Common culprits include loosely fitted screws or a bad quality X linear MGN axis that can have some play in the carriage, leading to slight toolhead wobbling. This is often represented as a Z component in the graphs.
+
+If your graph shows this kind of anomalies, begin by disassembling the toolhead up to the X carriage. Check for any looseness, then reassemble, ensuring everything is tightened properly for a rigid assembly. Also, don't forget to check your extruder and validate its assembly as well. Finally, ensure you have some filament loaded during measurements to prevent extruder gear vibrations.
+
+| TAP wobble problem | TAP wobble problem partially mitigated<br/>Or toolhead wobbling |
+| --- | --- |
+| ![](../images/shaper_graphs/TAP_125hz.png) | ![](../images/shaper_graphs/TAP_125hz_2.png) |
+
+### Unbalanced fan
+
+The presence of an unbalanced or badly running fan can be directly observed in the graphs. While you should let the toolhead fans off during the final IS tuning, you can use this test to validate their correct behavior: an unbalanced fan usually add some very thin peak around 100-150Hz that disapear when the fan is off. Also please note that an unbalanced fan constant frequency is manifested as a vertical line on the bottom spectrogram.
+
+| Unbalanced fan running | Unbalanced fan off |
+| --- | --- |
+| ![](../images/shaper_graphs/unbalanced_fan_on.png) | ![](../images/shaper_graphs/unbalanced_fan_off.png) |
+
+### Crazy graphs and miscs
+
+The depicted graphs are challenging to analyze due to the overwhelming noise across the spectrum. Such patterns are often associated with an improperly assembled and non-squared mechanical structure. To address this:
+  1. Refer to the [Low frequency energy](#low-frequency-energy) section for troubleshooting steps.
+  2. If unresolved, consider disassembling the entire gantry, inspect the printed and mechanical components, and ensure meticulous reassembly. A thorough and careful assembly should help alleviate the issue. Measure again post-assembly for changes.
+
+Also please note that for this kind of graphs, as they are mainly consisting of noise, Klipper's algorithm recommendations must not be used and will not help with ringing. You will need to fix your mechanical issues instead!
+
+| Crazy X | Crazy Y |
+| --- | --- |
+| ![](../images/shaper_graphs/chaos_x.png) | ![](../images/shaper_graphs/chaos_y.png) |

@@ -4,9 +4,10 @@
 ######## CoreXY BELTS CALIBRATION SCRIPT ########
 #################################################
 # Written by Frix_x#0161 #
-# @version: 1.0
+# @version: 2.0
 
 # CHANGELOG:
+#   v2.0: updated the script to align it to the new K-Shake&Tune module
 #   v1.0: first version of this tool for enhanced vizualisation of belt graphs
 
 
@@ -33,7 +34,6 @@ except locale.Error:
     locale.setlocale(locale.LC_TIME, 'C')
 
 
-MAX_TITLE_LENGTH = 65
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" # For paired peaks names
 
 PEAKS_DETECTION_THRESHOLD = 0.20
@@ -91,7 +91,9 @@ def compute_curve_similarity_factor(signal1, signal2):
 def detect_peaks(psd, freqs, window_size=5, vicinity=3):
     # Smooth the curve using a moving average to avoid catching peaks everywhere in noisy signals
     kernel = np.ones(window_size) / window_size
-    smoothed_psd = np.convolve(psd, kernel, mode='same')
+    smoothed_psd = np.convolve(psd, kernel, mode='valid')
+    mean_pad = [np.mean(psd[:window_size])] * (window_size // 2)
+    smoothed_psd = np.concatenate((mean_pad, smoothed_psd))
     
     # Find peaks on the smoothed curve
     smoothed_peaks = np.where((smoothed_psd[:-2] < smoothed_psd[1:-1]) & (smoothed_psd[1:-1] > smoothed_psd[2:]))[0] + 1
@@ -297,12 +299,12 @@ def combined_spectrogram(data1, data2):
     return combined_data, bins1, t1
 
 
-# Compute a composite and highly subjective value indicating the "chance of mechanical issues on the printer (0 to 100%)"
-# that is based on the differential spectrogram sum of gradient salted with a bit of the estimated similarity cross-correlation
-# from compute_curve_similarity_factor() and with a bit of the number of unpaired peaks.
+# Compute a composite and highly subjective value indicating the "mechanical health of the printer (0 to 100%)" that represent the
+# likelihood of mechanical issues on the printer. It is based on the differential spectrogram sum of gradient, salted with a bit
+# of the estimated similarity cross-correlation from compute_curve_similarity_factor() and with a bit of the number of unpaired peaks.
 # This result in a percentage value quantifying the machine behavior around the main resonances that give an hint if only touching belt tension
 # will give good graphs or if there is a chance of mechanical issues in the background (above 50% should be considered as probably problematic)
-def compute_comi(combined_data, similarity_coefficient, num_unpaired_peaks):
+def compute_mhi(combined_data, similarity_coefficient, num_unpaired_peaks):
     filtered_data = combined_data[combined_data > 100]
 
     # First compute a "total variability metric" based on the sum of the gradient that sum the magnitude of will emphasize regions of the
@@ -321,7 +323,23 @@ def compute_comi(combined_data, similarity_coefficient, num_unpaired_peaks):
     # Ensure the result lies between 0 and 100 by clipping the computed value
     final_percentage = np.clip(final_percentage, 0, 100)
     
-    return final_percentage
+    return final_percentage, mhi_lut(final_percentage)
+
+
+# LUT to transform the MHI into a textual value easy to understand for the users of the script
+def mhi_lut(mhi):
+    if 0 <= mhi <= 30:
+        return "Excellent mechanical health"
+    elif 31 <= mhi <= 45:
+        return "Good mechanical health"
+    elif 46 <= mhi <= 55:
+        return "Acceptable mechanical health"
+    elif 56 <= mhi <= 70:
+        return "Potential signs of a mechanical issue"
+    elif 71 <= mhi <= 85:
+        return "Likely a mechanical issue"
+    elif 86 <= mhi <= 100:
+        return "Mechanical issue detected"
 
 
 ######################################################################
@@ -361,7 +379,7 @@ def plot_compare_frequency(ax, lognames, signal1, signal2, max_freq):
         label = ALPHABET[paired_peak_count]
         amplitude_offset = abs(((signal2.psd[peak2[0]] - signal1.psd[peak1[0]]) / max(signal1.psd[peak1[0]], signal2.psd[peak2[0]])) * 100)
         frequency_offset = abs(signal2.freqs[peak2[0]] - signal1.freqs[peak1[0]])
-        offsets_table_data.append([f"Peaks {label}", f"{frequency_offset:.2f} Hz", f"{amplitude_offset:.2f} %"])
+        offsets_table_data.append([f"Peaks {label}", f"{frequency_offset:.1f} Hz", f"{amplitude_offset:.1f} %"])
         
         ax.plot(signal1.freqs[peak1[0]], signal1.psd[peak1[0]], "x", color='black')
         ax.plot(signal2.freqs[peak2[0]], signal2.psd[peak2[0]], "x", color='black')
@@ -369,28 +387,29 @@ def plot_compare_frequency(ax, lognames, signal1, signal2, max_freq):
         
         ax.annotate(label + "1", (signal1.freqs[peak1[0]], signal1.psd[peak1[0]]),
                     textcoords="offset points", xytext=(8, 5),
-                    ha='left', fontsize=14, color='black')
+                    ha='left', fontsize=13, color='black')
         ax.annotate(label + "2", (signal2.freqs[peak2[0]], signal2.psd[peak2[0]]),
                     textcoords="offset points", xytext=(8, 5),
-                    ha='left', fontsize=14, color='black')
+                    ha='left', fontsize=13, color='black')
         paired_peak_count += 1
 
     for peak in signal1.unpaired_peaks:
         ax.plot(signal1.freqs[peak], signal1.psd[peak], "x", color='black')
         ax.annotate(str(unpaired_peak_count + 1), (signal1.freqs[peak], signal1.psd[peak]),
                     textcoords="offset points", xytext=(8, 5),
-                    ha='left', fontsize=14, color='red', weight='bold')
+                    ha='left', fontsize=13, color='red', weight='bold')
         unpaired_peak_count += 1
 
     for peak in signal2.unpaired_peaks:
         ax.plot(signal2.freqs[peak], signal2.psd[peak], "x", color='black')
         ax.annotate(str(unpaired_peak_count + 1), (signal2.freqs[peak], signal2.psd[peak]),
                     textcoords="offset points", xytext=(8, 5),
-                    ha='left', fontsize=14, color='red', weight='bold')
+                    ha='left', fontsize=13, color='red', weight='bold')
         unpaired_peak_count += 1
 
     # Compute the similarity (using cross-correlation of the PSD signals)
     ax2 = ax.twinx() # To split the legends in two box
+    ax2.yaxis.set_visible(False)
     similarity_factor = compute_curve_similarity_factor(signal1, signal2)
     ax2.plot([], [], ' ', label=f'Estimated similarity: {similarity_factor:.1f}%')
     ax2.plot([], [], ' ', label=f'Number of unpaired peaks: {unpaired_peak_count}')
@@ -415,7 +434,7 @@ def plot_compare_frequency(ax, lognames, signal1, signal2, max_freq):
     # Print the table of offsets ontop of the graph below the original legend (upper right)
     if len(offsets_table_data) > 0:
         columns = ["", "Frequency delta", "Amplitude delta", ]
-        offset_table = ax.table(cellText=offsets_table_data, colLabels=columns, bbox=[0.67, 0.70, 0.3, 0.2], loc='upper right', cellLoc='center')
+        offset_table = ax.table(cellText=offsets_table_data, colLabels=columns, bbox=[0.66, 0.75, 0.33, 0.15], loc='upper right', cellLoc='center')
         offset_table.auto_set_font_size(False)
         offset_table.set_fontsize(8)
         offset_table.auto_set_column_width([0, 1, 2])
@@ -434,13 +453,13 @@ def plot_compare_frequency(ax, lognames, signal1, signal2, max_freq):
 def plot_difference_spectrogram(ax, data1, data2, signal1, signal2, similarity_factor, max_freq):
     combined_data, bins, t = combined_spectrogram(data1, data2)
 
-    # Compute the COMI value from the differential spectrogram sum of gradient, salted with
+    # Compute the MHI value from the differential spectrogram sum of gradient, salted with
     # the similarity factor and the number or unpaired peaks from the belts frequency profile
     # Be careful, this value is highly opinionated and is pretty experimental!
-    comi = compute_comi(combined_data, similarity_factor, len(signal1.unpaired_peaks) + len(signal2.unpaired_peaks))
-    print(f"Chances of mechanical issues: {comi:.1f}%")
-    ax.set_title(f"Differential Spectrogram (COMI: {comi:.1f}%)", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
-    ax.plot([], [], ' ', label=f'Chances of mechanical issues (COMI): {comi:.1f}%')
+    mhi, textual_mhi = compute_mhi(combined_data, similarity_factor, len(signal1.unpaired_peaks) + len(signal2.unpaired_peaks))
+    print(f"[experimental] Mechanical Health Indicator: {textual_mhi.lower()} ({mhi:.1f}%)")
+    ax.set_title(f"Differential Spectrogram", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
+    ax.plot([], [], ' ', label=f'{textual_mhi} (experimental)')
     
     # Draw the differential spectrogram with a specific norm to get light grey zero values and red for max values (vmin to vcenter is not used)
     norm = matplotlib.colors.TwoSlopeNorm(vcenter=np.min(combined_data), vmax=np.max(combined_data))
@@ -550,19 +569,26 @@ def belts_calibration(lognames, klipperdir="~/klipper", max_freq=200.):
     ax1 = fig.add_subplot(gs[0])
     ax2 = fig.add_subplot(gs[1])
 
+    # Add title
     filename = lognames[0].split('/')[-1]
     dt = datetime.strptime(f"{filename.split('_')[1]} {filename.split('_')[2]}", "%Y%m%d %H%M%S")
     title_line1 = "RELATIVE BELT CALIBRATION TOOL"
     title_line2 = dt.strftime('%x %X')
-    fig.text(0.88, 0.965, title_line1, ha='right', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold')
-    fig.text(0.88, 0.957, title_line2, ha='right', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
+    fig.text(0.12, 0.965, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold')
+    fig.text(0.12, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
+    # Plot the graphs
     similarity_factor, _ = plot_compare_frequency(ax1, lognames, signal1, signal2, max_freq)
     plot_difference_spectrogram(ax2, datas[0], datas[1], signal1, signal2, similarity_factor, max_freq)
 
-    fig.set_size_inches(10, 13)
+    fig.set_size_inches(8.3, 11.6)
     fig.tight_layout()
-    fig.subplots_adjust(top=0.90)
+    fig.subplots_adjust(top=0.89)
+    
+    # Adding a small Klippain logo to the top left corner of the figure
+    ax_logo = fig.add_axes([0.001, 0.899, 0.1, 0.1], anchor='NW', zorder=-1)
+    ax_logo.imshow(matplotlib.pyplot.imread(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'klippain.png')))
+    ax_logo.axis('off')
     
     return fig
 
@@ -584,12 +610,6 @@ def main():
         opts.error("You must specify an output file.png to use the script (option -o)")
 
     fig = belts_calibration(args, options.klipperdir, options.max_freq)
-
-    # Adding a small Klippain logo to the top left corner of the figure
-    ax_logo = fig.add_axes([0.899, 0.899, 0.1, 0.1], anchor='NE', zorder=-1)
-    ax_logo.imshow(matplotlib.pyplot.imread(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'klippain.png')))
-    ax_logo.axis('off')
-
     fig.savefig(options.output)
 
 
