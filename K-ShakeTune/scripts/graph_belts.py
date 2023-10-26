@@ -570,11 +570,15 @@ def belts_calibration(lognames, klipperdir="~/klipper", max_freq=200.):
     ax2 = fig.add_subplot(gs[1])
 
     # Add title
-    filename = lognames[0].split('/')[-1]
-    dt = datetime.strptime(f"{filename.split('_')[1]} {filename.split('_')[2]}", "%Y%m%d %H%M%S")
     title_line1 = "RELATIVE BELT CALIBRATION TOOL"
-    title_line2 = dt.strftime('%x %X')
     fig.text(0.12, 0.965, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold')
+    try:
+        filename = lognames[0].split('/')[-1]
+        dt = datetime.strptime(f"{filename.split('_')[1]} {filename.split('_')[2]}", "%Y%m%d %H%M%S")
+        title_line2 = dt.strftime('%x %X')
+    except:
+        print("Warning: CSV filenames look to be different than expected (%s , %s)" % (lognames[0], lognames[1]))
+        title_line2 = lognames[0].split('/')[-1] + " / " +  lognames[1].split('/')[-1]
     fig.text(0.12, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     # Plot the graphs
