@@ -330,15 +330,15 @@ def compute_mhi(combined_data, similarity_coefficient, num_unpaired_peaks):
 def mhi_lut(mhi):
     if 0 <= mhi <= 30:
         return "Excellent mechanical health"
-    elif 31 <= mhi <= 45:
+    elif 30 < mhi <= 45:
         return "Good mechanical health"
-    elif 46 <= mhi <= 55:
+    elif 45 < mhi <= 55:
         return "Acceptable mechanical health"
-    elif 56 <= mhi <= 70:
+    elif 55 < mhi <= 70:
         return "Potential signs of a mechanical issue"
-    elif 71 <= mhi <= 85:
+    elif 70 < mhi <= 85:
         return "Likely a mechanical issue"
-    elif 86 <= mhi <= 100:
+    elif 85 < mhi <= 100:
         return "Mechanical issue detected"
 
 
