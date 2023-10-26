@@ -315,8 +315,8 @@ def shaper_calibration(lognames, klipperdir="~/klipper", max_smoothing=None, max
     fig.text(0.12, 0.965, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold')
     try:
         filename_parts = (lognames[0].split('/')[-1]).split('_')
-        dt = datetime.strptime(f"{filename_parts[3]} {filename_parts[4].split('.')[0]}", "%Y%m%d %H%M%S")
-        title_line2 = dt.strftime('%x %X') + ' -- ' + filename_parts[2].upper() + ' axis'
+        dt = datetime.strptime(f"{filename_parts[1]} {filename_parts[2]}", "%Y%m%d %H%M%S")
+        title_line2 = dt.strftime('%x %X') + ' -- ' + filename_parts[3].upper().split('.')[0] + ' axis'
     except:
         print("Warning: CSV filename look to be different than expected (%s)" % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]

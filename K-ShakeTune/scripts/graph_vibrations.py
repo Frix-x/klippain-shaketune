@@ -348,7 +348,7 @@ def setup_klipper_import(kdir):
     shaper_calibrate = importlib.import_module('.shaper_calibrate', 'extras')
 
 
-def vibrations_calibration(lognames, klipperdir="~/klipper", axisname=None, max_freq=200., remove=0):
+def vibrations_calibration(lognames, klipperdir="~/klipper", axisname=None, max_freq=1000., remove=0):
     setup_klipper_import(klipperdir)
 
     # Parse the raw data and get them ready for analysis

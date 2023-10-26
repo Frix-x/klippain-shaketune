@@ -39,12 +39,16 @@ For those not using the full [Klippain](https://github.com/Frix-x/klippain), fol
      managed_services: klipper
      install_script: install.sh
      ```
+   
+   > **Note**:
+   >
+   > If already using my old IS workflow scripts, please remove everything before installing this new module. This include the macros, the Python scripts, the `plot_graph.sh` and the `[gcode_shell_command plot_graph]` section.
 
 ## Usage
 
 Ensure your machine is homed, then invoke one of the following macros as needed:
   - `BELTS_SHAPER_CALIBRATION` for belt resonance graphs, useful for verifying belt tension and differential belt paths behavior.
-  - `AXES_SHAPER_CALIBRATION` for input shaper graphs to mitigate ringing/ghosting by tuning Klipper's `[input_shaper]` system.
+  - `AXES_SHAPER_CALIBRATION` for input shaper graphs to mitigate ringing/ghosting by tuning Klipper's input shaper system.
   - `VIBRATIONS_CALIBRATION` for machine vibration graphs to optimize your slicer speed profiles.
   - `EXCITATE_AXIS_AT_FREQ` to sustain a specific excitation frequency, useful to let you inspect and find out what is resonating.
 
