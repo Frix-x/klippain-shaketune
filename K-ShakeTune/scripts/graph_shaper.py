@@ -35,10 +35,6 @@ import locale
 from datetime import datetime
 
 matplotlib.use('Agg')
-try:
-    locale.setlocale(locale.LC_TIME, locale.getdefaultlocale())
-except locale.Error:
-    locale.setlocale(locale.LC_TIME, 'C')
 
 
 PEAKS_DETECTION_THRESHOLD = 0.05
@@ -50,6 +46,22 @@ KLIPPAIN_COLORS = {
     "dark_purple": "#150140",
     "dark_orange": "#F24130"
 }
+
+
+# Set the best locale for time and date formating (generation of the titles)
+try:
+    locale.setlocale(locale.LC_TIME, locale.getdefaultlocale())
+except locale.Error:
+    locale.setlocale(locale.LC_TIME, 'C')
+
+# Override the built-in print function to avoid problem in Klipper due to locale settings
+original_print = print
+def print_with_c_locale(*args, **kwargs):
+    original_locale = locale.setlocale(locale.LC_ALL, None)
+    locale.setlocale(locale.LC_ALL, 'C')
+    original_print(*args, **kwargs)
+    locale.setlocale(locale.LC_ALL, original_locale)
+print = print_with_c_locale
 
 
 ######################################################################
