@@ -40,6 +40,7 @@ matplotlib.use('Agg')
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_EFFECT_THRESHOLD = 0.12
 SPECTROGRAM_LOW_PERCENTILE_FILTER = 5
+MAX_SMOOTHING = 0.1
 
 KLIPPAIN_COLORS = {
     "purple": "#70088C",
@@ -194,9 +195,10 @@ def plot_freq_response_with_damping(ax, calibration_data, shapers, selected_shap
     ax2.yaxis.set_visible(False)
     
     best_shaper_vals = None
-    no_vibr_shaper = None
-    no_vibr_shaper_freq = None
-    no_vibr_shaper_accel = 0
+    lowest_vibration = float('inf')
+    lowest_vibration_shaper = None
+    lowest_vibration_shaper_freq = None
+    lowest_vibration_shaper_accel = 0
     
     # Draw the shappers curves and add their specific parameters in the legend
     # This adds also a way to find the best shaper with 0% of vibrations (to be printed in the legend later)
@@ -211,10 +213,11 @@ def plot_freq_response_with_damping(ax, calibration_data, shapers, selected_shap
             linestyle = 'dashdot'
             selected_shaper_freq = shaper.freq
             best_shaper_vals = shaper.vals
-        if (shaper.vibrs * 100 == 0.) and (shaper_max_accel > no_vibr_shaper_accel):
-            no_vibr_shaper_accel = shaper_max_accel
-            no_vibr_shaper = shaper.name
-            no_vibr_shaper_freq = shaper.freq
+        if (shaper.vibrs * 100 < lowest_vibration or (shaper.vibrs * 100 == lowest_vibration and shaper_max_accel > lowest_vibration_shaper_accel)) and shaper.smoothing < MAX_SMOOTHING:
+            lowest_vibration = shaper.vibrs * 100
+            lowest_vibration_shaper_accel = shaper_max_accel
+            lowest_vibration_shaper = shaper.name
+            lowest_vibration_shaper_freq = shaper.freq
         ax2.plot(freqs, shaper.vals, label=label, linestyle=linestyle)
     ax.plot(freqs, psd * best_shaper_vals, label='With %s applied' % (selected_shaper.upper()), color='cyan')
 
@@ -240,9 +243,17 @@ def plot_freq_response_with_damping(ax, calibration_data, shapers, selected_shap
     ax.fill_between(freqs, 0, peaks_warning_threshold, color='green', alpha=0.15, label='Relax Region')
     ax.fill_between(freqs, peaks_warning_threshold, peaks_effect_threshold, color='orange', alpha=0.2, label='Warning Region')
 
-    # Final user recommendations added to the legend with an added 0% vibration shaper and the estimated damping ratio over stock Klipper's algorithms
-    ax2.plot([], [], ' ', label="Recommended shaper: %s @ %.1f Hz" % (selected_shaper.upper(), selected_shaper_freq))
-    ax2.plot([], [], ' ', label="Recommended low vibrations shaper: %s @ %.1f Hz" % (no_vibr_shaper.upper(), no_vibr_shaper_freq))
+    # User recommendations are added to the legend: one is Klipper's original suggestion that is usually good for performances
+    # and the other one is the custom "low vibration" recommendation that looks for a suitable shaper that doesn't have excessive
+    # smoothing (<0.1) and that have a lower vibration level. If both recommendation are the same shaper, or if no suitable "low
+    # vibration" shaper is found, then only a single line as the "best shaper" recommendation is added to the legend
+    if lowest_vibration_shaper != selected_shaper and lowest_vibration_shaper != None:
+        ax2.plot([], [], ' ', label="Recommended performance shaper: %s @ %.1f Hz" % (selected_shaper.upper(), selected_shaper_freq))
+        ax2.plot([], [], ' ', label="Recommended low vibrations shaper: %s @ %.1f Hz" % (lowest_vibration_shaper.upper(), lowest_vibration_shaper_freq))
+    else:
+        ax2.plot([], [], ' ', label="Recommended best shaper: %s @ %.1f Hz" % (selected_shaper.upper(), selected_shaper_freq))
+
+    # And the estimated damping ratio is finally added at the end of the legend
     ax2.plot([], [], ' ', label="Estimated damping ratio (ζ): %.3f" % (zeta))
 
     # Add the main resonant frequency and damping ratio of the axis to the graph title
