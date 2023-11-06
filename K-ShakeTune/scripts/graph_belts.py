@@ -4,9 +4,10 @@
 ######## CoreXY BELTS CALIBRATION SCRIPT ########
 #################################################
 # Written by Frix_x#0161 #
-# @version: 2.0
+# @version: 2.1
 
 # CHANGELOG:
+#   v2.1: replaced the TwoSlopNorm by a custom made norm to allow the script to work on older versions of matplotlib
 #   v2.0: updated the script to align it to the new K-Shake&Tune module
 #   v1.0: first version of this tool for enhanced vizualisation of belt graphs
 
@@ -473,9 +474,13 @@ def plot_difference_spectrogram(ax, data1, data2, signal1, signal2, similarity_f
     ax.set_title(f"Differential Spectrogram", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.plot([], [], ' ', label=f'{textual_mhi} (experimental)')
     
-    # Draw the differential spectrogram with a specific norm to get light grey zero values and red for max values (vmin to vcenter is not used)
-    norm = matplotlib.colors.TwoSlopeNorm(vcenter=np.min(combined_data), vmax=np.max(combined_data))
-    ax.pcolormesh(bins, t, combined_data.T, cmap='RdBu_r', norm=norm, shading='gouraud')
+    # Draw the differential spectrogram with a specific custom norm to get white or light orange zero values and red for max values
+    colors = ['white', 'bisque', 'red', 'black']  
+    n_bins = [0, 0.12, 0.9, 1] # These values where found experimentaly to get a good higlhlighting of the differences only
+    cm = matplotlib.colors.LinearSegmentedColormap.from_list('WhiteToRed', list(zip(n_bins, colors)))
+    norm = matplotlib.colors.Normalize(vmin=np.min(combined_data), vmax=np.max(combined_data))
+    ax.pcolormesh(bins, t, combined_data.T, cmap=cm, norm=norm, shading='gouraud')
+
     ax.set_xlabel('Frequency (hz)')
     ax.set_xlim([0., max_freq])
     ax.set_ylabel('Time (s)')
