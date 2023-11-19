@@ -32,6 +32,7 @@ import glob
 import sys
 import shutil
 import tarfile
+import fcntl
 from datetime import datetime
 
 #################################################################################################################
@@ -48,15 +49,15 @@ RESULTS_SUBFOLDERS = ['belts', 'inputshaper', 'vibrations']
 
 
 def is_file_open(filepath):
-    for proc in os.listdir('/proc'):
-        if proc.isdigit():
-            for fd in glob.glob(f'/proc/{proc}/fd/*'):
-                try:
-                    if os.path.samefile(fd, filepath):
-                        return True
-                except FileNotFoundError:
-                    pass
-    return False
+    try:
+        with open(filepath, 'a') as file:
+            fcntl.flock(file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # File is not in use (and can be used safely)
+            fcntl.flock(file.fileno(), fcntl.LOCK_UN)
+            return False
+    except IOError:
+        # File is still in use (and should not be touched for now)
+        return True
 
 
 def get_belts_graph():
