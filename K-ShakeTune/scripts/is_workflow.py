@@ -49,15 +49,19 @@ RESULTS_SUBFOLDERS = ['belts', 'inputshaper', 'vibrations']
 
 
 def is_file_open(filepath):
-    try:
-        with open(filepath, 'a') as file:
-            fcntl.flock(file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            # File is not in use (and can be used safely)
-            fcntl.flock(file.fileno(), fcntl.LOCK_UN)
-            return False
-    except IOError:
-        # File is still in use (and should not be touched for now)
-        return True
+    for proc in os.listdir('/proc'):
+        if proc.isdigit():
+            for fd in glob.glob(f'/proc/{proc}/fd/*'):
+                try:
+                    if os.path.samefile(fd, filepath):
+                        return True
+                except FileNotFoundError:
+                    # Klipper has already released the CSV file
+                    pass
+                except PermissionError:
+                    # Unable to check for this particular process due to permissions
+                    pass
+    return False
 
 
 def get_belts_graph():
