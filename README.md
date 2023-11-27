@@ -11,11 +11,11 @@ It operates in two steps:
      2. Relocates the graphs and associated CSV files to your Klipper config folder for easy access via Mainsail/Fluidd to eliminate the need for SSH.
      3. Manages the folder by retaining only the most recent results (default setting of keeping the latest three sets).
 
-The [detailed documentation is here](./docs/README.md).
+Check out the **[detailed documentation of the Shake&Tune module here](./docs/README.md)**. You can also look at the documentation for each type of graph by directly clicking on them below to better understand your results and tune your machine!
 
-| Belts graphs | Axis graphs | Vibrations measurement |
+| [Belts graph](./docs/macros/belts_tuning.md) | [Axis input shaper graphs](./docs/macros/axis_tuning.md) | [Vibrations graph](./docs/macros/vibrations_tuning.md) |
 |:----------------:|:------------:|:---------------------:|
-| ![](./docs/images/belts_example.png) | ![](./docs/images/axis_example.png) | ![](./docs/images/vibrations_example.png) |
+| [<img src="./docs/images/belts_example.png">](./docs/macros/belts_tuning.md) | [<img src="./docs/images/axis_example.png">](./docs/macros/axis_tuning.md) | [<img src="./docs/images/vibrations_example.png">](./docs/macros/vibrations_tuning.md) |
 
 ## Installation
 
