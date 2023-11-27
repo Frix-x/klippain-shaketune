@@ -3,9 +3,10 @@
 ###### INPUT SHAPER KLIPPAIN WORKFLOW ######
 ############################################
 # Written by Frix_x#0161 #
-# @version: 2.0
+# @version: 2.1
 
 # CHANGELOG:
+#   v2.1: added more filesystem sync and file handler checks to avoid using corrupted CSV files by going to fast
 #   v2.0: new version of this as a Python script (to replace the old bash script) and implement the newer and improved shaper plotting scripts
 #   v1.7: updated the handling of shaper files to account for the new analysis scripts as we are now using raw data directly
 #   v1.6: - updated the handling of shaper graph files to be able to optionnaly account for added positions in the filenames and remove them
@@ -25,14 +26,12 @@
 #      VIBRATIONS  - To generate vibration diagram after calling the custom (Frix_x#0161) VIBRATIONS_CALIBRATION macro
 
 
-
 import os
 import time
 import glob
 import sys
 import shutil
 import tarfile
-import fcntl
 from datetime import datetime
 
 #################################################################################################################
@@ -80,15 +79,20 @@ def get_belts_graph():
     for filename in sorted_files[:2]:
         # Wait for the file handler to be released by Klipper
         while is_file_open(filename):
-            time.sleep(3)
+            time.sleep(2)
         
         # Extract the tested belt from the filename and rename/move the CSV file to the result folder
         belt = os.path.basename(filename).split('_')[3].split('.')[0].upper()
         new_file = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[0], f'belt_{current_date}_{belt}.csv')
         shutil.move(filename, new_file)
+        os.sync() # Sync filesystem to avoid problems
 
         # Save the file path for later
         lognames.append(new_file)
+
+        # Wait for the file handler to be released by the move command
+        while is_file_open(new_file):
+            time.sleep(2)
     
     # Generate the belts graph and its name
     fig = belts_calibration(lognames, KLIPPER_FOLDER)
@@ -110,12 +114,17 @@ def get_shaper_graph():
 
     # Wait for the file handler to be released by Klipper
     while is_file_open(filename):
-        time.sleep(3)
+        time.sleep(2)
     
     # Extract the tested axis from the filename and rename/move the CSV file to the result folder
     axis = os.path.basename(filename).split('_')[3].split('.')[0].upper()
     new_file = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[1], f'resonances_{current_date}_{axis}.csv')
     shutil.move(filename, new_file)
+    os.sync() # Sync filesystem to avoid problems
+
+    # Wait for the file handler to be released by the move command
+    while is_file_open(new_file):
+        time.sleep(2)
     
     # Generate the shaper graph and its name
     fig = shaper_calibration([new_file], KLIPPER_FOLDER)
@@ -139,7 +148,7 @@ def get_vibrations_graph(axis_name):
     for filename in globbed_files:
         # Wait for the file handler to be released by Klipper
         while is_file_open(filename):
-            time.sleep(3)
+            time.sleep(2)
 
         # Cleanup of the filename and moving it in the result folder
         cleanfilename = os.path.basename(filename).replace('adxl345', f'vibr_{current_date}')
@@ -151,6 +160,7 @@ def get_vibrations_graph(axis_name):
 
     # Sync filesystem to avoid problems as there is a lot of file copied
     os.sync()
+    time.sleep(5)
 
     # Generate the vibration graph and its name
     fig = vibrations_calibration(lognames, KLIPPER_FOLDER, axis_name)
