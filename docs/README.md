@@ -1,13 +1,16 @@
 # Klippain Shake&Tune module documentation
 
+![](./banner_long.png)
+
 ### Detailed documentation
 
-  1. [Input Shaping and tuning generalities](./is_tuning_generalities.md)
-  1. [Belt graphs](./macros/belts_tuning.md)
-  1. [Axis Input Shaper graphs](./macros/axis_tuning.md)
-  1. [Klippain vibrations graphs](./macros/vibrations_tuning.md)
+First, check out **[input shaping and tuning generalities](./is_tuning_generalities.md)** to understand how it all works and what to look for when taking these measurements.
+Then look at the documentation for each type of graph by clicking on them below to better understand your results and tune your machine!
 
-![](./banner.png)
+| [Belts graph](./macros/belts_tuning.md) | [Axis input shaper graphs](./macros/axis_tuning.md) | [Vibrations graph](./macros/vibrations_tuning.md) |
+|:----------------:|:------------:|:---------------------:|
+| [<img src="./images/belts_example.png">](./macros/belts_tuning.md) | [<img src="./images/axis_example.png">](./macros/axis_tuning.md) | [<img src="./images/vibrations_example.png">](./macros/vibrations_tuning.md) |
+
 
 ### Complementary ressources
 
