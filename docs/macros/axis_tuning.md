@@ -11,7 +11,7 @@ Then, call the `AXES_SHAPER_CALIBRATION` macro and look for the graphs in the re
 
 | parameters | default value | description |
 |-----------:|---------------|-------------|
-|VERBOSE|1|Wether to log things in the console|
+|VERBOSE|1|Whether or not to log things in the console|
 |FREQ_START|5|Starting excitation frequency|
 |FREQ_END|133|Maximum excitation frequency|
 |HZ_PER_SEC|1|Number of Hz per seconds for the test|
