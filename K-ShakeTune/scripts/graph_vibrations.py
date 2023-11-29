@@ -4,15 +4,6 @@
 ###### SPEED AND VIBRATIONS PLOTTING SCRIPT ######
 ##################################################
 # Written by Frix_x#0161 #
-# @version: 2.0
-
-# CHANGELOG:
-#   v2.0: - updated the script to align it to the new K-Shake&Tune module
-#         - new features for peaks detection and advised speed zones
-#   v1.2: fixed a bug that could happen when username is not "pi" (thanks @spikeygg)
-#   v1.1: better graph formatting
-#   v1.0: first version of the script
-
 
 # Be sure to make this script executable using SSH: type 'chmod +x ./graph_vibrations.py' when in the folder !
 

@@ -4,20 +4,6 @@
 ###### INPUT SHAPER KLIPPAIN WORKFLOW ######
 ############################################
 # Written by Frix_x#0161 #
-# @version: 2.1
-
-# CHANGELOG:
-#   v2.1: added more filesystem sync and file handler checks to avoid using corrupted CSV files by going to fast
-#   v2.0: new version of this as a Python script (to replace the old bash script) and implement the newer and improved shaper plotting scripts
-#   v1.7: updated the handling of shaper files to account for the new analysis scripts as we are now using raw data directly
-#   v1.6: - updated the handling of shaper graph files to be able to optionnaly account for added positions in the filenames and remove them
-#         - fixed a bug in the belt graph on slow SD card or Pi clones (Klipper was still writing in the file while we were already reading it)
-#   v1.5: fixed klipper unnexpected fail at the end of the execution, even if graphs were correctly generated (unicode decode error fixed)
-#   v1.4: added the ~/klipper dir parameter to the call of graph_vibrations.py for a better user handling (in case user is not "pi")
-#   v1.3: some documentation improvement regarding the line endings that needs to be LF for this file
-#   v1.2: added the movement name to be transfered to the Python script in vibration calibration (to print it on the result graphs)
-#   v1.1: multiple fixes and tweaks (mainly to avoid having empty files read by the python scripts after the mv command)
-#   v1.0: first version of the script based on a Zellneralex script
 
 # Usage:
 #   This script was designed to be used with gcode_shell_commands directly from Klipper

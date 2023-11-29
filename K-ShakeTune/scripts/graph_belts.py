@@ -4,13 +4,6 @@
 ######## CoreXY BELTS CALIBRATION SCRIPT ########
 #################################################
 # Written by Frix_x#0161 #
-# @version: 2.1
-
-# CHANGELOG:
-#   v2.1: replaced the TwoSlopNorm by a custom made norm to allow the script to work on older versions of matplotlib
-#   v2.0: updated the script to align it to the new K-Shake&Tune module
-#   v1.0: first version of this tool for enhanced vizualisation of belt graphs
-
 
 # Be sure to make this script executable using SSH: type 'chmod +x ./graph_belts.py' when in the folder!
 

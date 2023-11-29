@@ -6,19 +6,7 @@
 # Derived from the calibrate_shaper.py official Klipper script
 # Copyright (C) 2020  Dmitry Butyugin <dmbutyugin@google.com>
 # Copyright (C) 2020  Kevin O'Connor <kevin@koconnor.net>
-#
 # Written by Frix_x#0161 #
-# @version: 2.0
-
-# CHANGELOG:
-#   v2.0: updated the script to align it to the new K-Shake&Tune module
-#   v1.1: - improved the damping ratio computation with linear approximation for more precision
-#         - reworked the top graph to add more information to it with colored zones,
-#           automated peak detection, etc...
-#         - added a full spectrogram of the signal on the bottom to allow deeper analysis
-#   v1.0: first version of this script inspired from the official Klipper
-#         shaper calibration script to add an automatic damping ratio estimation to it
-
 
 # Be sure to make this script executable using SSH: type 'chmod +x ./graph_shaper.py' when in the folder!
 
