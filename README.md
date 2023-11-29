@@ -19,16 +19,16 @@ Check out the **[detailed documentation of the Shake&Tune module here](./docs/RE
 
 ## Installation
 
-For those not using the full [Klippain](https://github.com/Frix-x/klippain), follow these steps to integrate this Shake&Tune module in your setup:
+Follow these steps to install the Shake&Tune module in your printer:
   1. Run the install script over SSH on your printer:
      ```bash
      wget -O - https://raw.githubusercontent.com/Frix-x/klippain-shaketune/main/install.sh | bash
      ```
-  2. Append the following to your `printer.cfg` file:
+  1. Append the following to your `printer.cfg` file:
      ```
      [include K-ShakeTune/*.cfg]
      ```
-  3. Optionally, if you want to get automatic updates, add the following to your `moonraker.cfg` file:
+  1. Optionally, if you want to get automatic updates, add the following to your `moonraker.cfg` file:
      ```
      [update_manager Klippain-ShakeTune]
      type: git_repo
@@ -42,7 +42,7 @@ For those not using the full [Klippain](https://github.com/Frix-x/klippain), fol
    
    > **Note**:
    >
-   > If already using my old IS workflow scripts, please remove everything before installing this new module. This include the macros, the Python scripts, the `plot_graph.sh` and the `[gcode_shell_command plot_graph]` section.
+   > If already using my old IS workflow scripts, please remove everything before installing this new module. This include the macros, the Python scripts, the `plot_graph.sh` and the `[gcode_shell_command plot_graph]` section that are not needed anymore.
 
 ## Usage
 

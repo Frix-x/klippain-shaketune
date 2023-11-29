@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 ############################################
 ###### INPUT SHAPER KLIPPAIN WORKFLOW ######
 ############################################
@@ -223,7 +224,7 @@ def main():
             os.makedirs(folder)
 
     if len(sys.argv) < 2:
-        print("Usage: plot_graphs.py [SHAPER|BELTS|VIBRATIONS]")
+        print("Usage: is_workflow.py [SHAPER|BELTS|VIBRATIONS]")
         sys.exit(1)
 
     if sys.argv[1].lower() == 'belts':
@@ -233,7 +234,7 @@ def main():
     elif sys.argv[1].lower() == 'vibrations':
         fig, png_filename = get_vibrations_graph(axis_name=sys.argv[2])
     else:
-        print("Usage: plot_graphs.py [SHAPER|BELTS|VIBRATIONS]")
+        print("Usage: is_workflow.py [SHAPER|BELTS|VIBRATIONS]")
         sys.exit(1)
 
     fig.savefig(png_filename)
