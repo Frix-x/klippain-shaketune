@@ -30,6 +30,7 @@ STORE_RESULTS = 3
 from graph_belts import belts_calibration
 from graph_shaper import shaper_calibration
 from graph_vibrations import vibrations_calibration
+from analyze_axesmap import axesmap_calibration
 
 RESULTS_SUBFOLDERS = ['belts', 'inputshaper', 'vibrations']
 
@@ -50,7 +51,7 @@ def is_file_open(filepath):
     return False
 
 
-def get_belts_graph():
+def create_belts_graph():
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     lognames = []
 
@@ -61,6 +62,7 @@ def get_belts_graph():
     if len(globbed_files) < 2:
         print("Not enough CSV files found in the /tmp folder. Two files are required for the belt graphs!")
         sys.exit(1)
+
     sorted_files = sorted(globbed_files, key=os.path.getmtime, reverse=True)
 
     for filename in sorted_files[:2]:
@@ -84,11 +86,12 @@ def get_belts_graph():
     # Generate the belts graph and its name
     fig = belts_calibration(lognames, KLIPPER_FOLDER)
     png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[0], f'belts_{current_date}.png')
-    
-    return fig, png_filename
+
+    fig.savefig(png_filename)
+    return
 
 
-def get_shaper_graph():
+def create_shaper_graph():
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     # Get all the files and sort them based on last modified time to select the most recent one
@@ -96,6 +99,7 @@ def get_shaper_graph():
     if not globbed_files:
         print("No CSV files found in the /tmp folder to create the input shaper graphs!")
         sys.exit(1)
+
     sorted_files = sorted(globbed_files, key=os.path.getmtime, reverse=True)
     filename = sorted_files[0]
 
@@ -117,10 +121,11 @@ def get_shaper_graph():
     fig = shaper_calibration([new_file], KLIPPER_FOLDER)
     png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[1], f'resonances_{current_date}_{axis}.png')
     
-    return fig, png_filename
+    fig.savefig(png_filename)
+    return
 
 
-def get_vibrations_graph(axis_name):
+def create_vibrations_graph(axis_name):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     lognames = []
 
@@ -159,7 +164,35 @@ def get_vibrations_graph(axis_name):
             tar.add(csv_file, recursive=False)
             os.remove(csv_file)
 
-    return fig, png_filename
+    fig.savefig(png_filename)
+    return
+
+
+def find_axesmap(accel):
+    current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
+    result_filename = os.path.join(RESULTS_FOLDER, f'axes_map_{current_date}.txt')
+    lognames = []
+
+    globbed_files = glob.glob('/tmp/adxl345-*.csv')
+    if not globbed_files:
+        print("No CSV files found in the /tmp folder to analyze and find the axes_map!")
+        sys.exit(1)
+
+    sorted_files = sorted(globbed_files, key=os.path.getmtime, reverse=True)
+    filename = sorted_files[0]
+
+    # Wait for the file handler to be released by Klipper
+    while is_file_open(filename):
+        time.sleep(2)
+
+    # Analyze the CSV to find the axes_map parameter
+    lognames.append(filename)
+    results = axesmap_calibration(lognames, accel)
+
+    with open(result_filename, 'w') as f:
+        f.write(results)
+
+    return
 
 
 # Utility function to get old files based on their modification time
@@ -210,20 +243,21 @@ def main():
             os.makedirs(folder)
 
     if len(sys.argv) < 2:
-        print("Usage: is_workflow.py [SHAPER|BELTS|VIBRATIONS]")
+        print("Usage: is_workflow.py [BELTS|SHAPER|VIBRATIONS|AXESMAP]")
         sys.exit(1)
 
     if sys.argv[1].lower() == 'belts':
-        fig, png_filename = get_belts_graph()
+        create_belts_graph()
     elif sys.argv[1].lower() == 'shaper':
-        fig, png_filename = get_shaper_graph()
+        create_shaper_graph()
     elif sys.argv[1].lower() == 'vibrations':
-        fig, png_filename = get_vibrations_graph(axis_name=sys.argv[2])
+        create_vibrations_graph(axis_name=sys.argv[2])
+    elif sys.argv[1].lower() == 'axesmap':
+        find_axesmap(accel=sys.argv[2])
     else:
-        print("Usage: is_workflow.py [SHAPER|BELTS|VIBRATIONS]")
+        print("Usage: is_workflow.py [BELTS|SHAPER|VIBRATIONS|AXESMAP]")
         sys.exit(1)
 
-    fig.savefig(png_filename)
 
     clean_files()
     print(f"Graphs created. You will find the results in {RESULTS_FOLDER}")
