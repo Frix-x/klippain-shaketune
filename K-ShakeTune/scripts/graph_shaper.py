@@ -17,6 +17,7 @@
 import optparse, matplotlib, sys, importlib, os, math
 from textwrap import wrap
 import numpy as np
+import scipy
 import matplotlib.pyplot, matplotlib.dates, matplotlib.font_manager
 import matplotlib.ticker, matplotlib.gridspec
 import locale
@@ -99,20 +100,22 @@ def compute_damping_ratio(psd, freqs):
 
 def compute_spectrogram(data):
     N = data.shape[0]
-    Fs = N / (data[-1,0] - data[0,0])
+    Fs = N / (data[-1, 0] - data[0, 0])
     # Round up to a power of 2 for faster FFT
     M = 1 << int(.5 * Fs - 1).bit_length()
     window = np.kaiser(M, 6.)
-    def _specgram(x):
-        return matplotlib.mlab.specgram(
-                x, Fs=Fs, NFFT=M, noverlap=M//2, window=window,
-                mode='psd', detrend='mean', scale_by_freq=False)
 
-    d = {'x': data[:,1], 'y': data[:,2], 'z': data[:,3]}
-    pdata, bins, t = _specgram(d['x'])
-    for ax in 'yz':
-        pdata += _specgram(d[ax])[0]
-    return pdata, bins, t
+    def _specgram(x):
+        x_detrended = x - np.mean(x)  # Detrending by subtracting the mean value
+        return scipy.signal.spectrogram(
+            x_detrended, fs=Fs, window=window, nperseg=M, noverlap=M//2,
+            detrend='constant', scaling='density', mode='psd')
+
+    d = {'x': data[:, 1], 'y': data[:, 2], 'z': data[:, 3]}
+    f, t, pdata = _specgram(d['x'])
+    for axis in 'yz':
+        pdata += _specgram(d[axis])[2]
+    return pdata, t, f
 
 
 # This find all the peaks in a curve by looking at when the derivative term goes from positive to negative
@@ -270,7 +273,7 @@ def plot_spectrogram(ax, data, peaks, max_freq):
     vmin_value = np.percentile(pdata, SPECTROGRAM_LOW_PERCENTILE_FILTER)
 
     ax.set_title("Time-Frequency Spectrogram", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
-    ax.pcolormesh(bins, t, pdata.T, norm=matplotlib.colors.LogNorm(vmin=vmin_value),
+    ax.pcolormesh(t, bins, pdata.T, norm=matplotlib.colors.LogNorm(vmin=vmin_value),
                   cmap='inferno', shading='gouraud')
 
     # Add peaks lines in the spectrogram to get hint from peaks found in the first graph
