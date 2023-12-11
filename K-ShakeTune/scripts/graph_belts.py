@@ -4,13 +4,6 @@
 ######## CoreXY BELTS CALIBRATION SCRIPT ########
 #################################################
 # Written by Frix_x#0161 #
-# @version: 2.1
-
-# CHANGELOG:
-#   v2.1: replaced the TwoSlopNorm by a custom made norm to allow the script to work on older versions of matplotlib
-#   v2.0: updated the script to align it to the new K-Shake&Tune module
-#   v1.0: first version of this tool for enhanced vizualisation of belt graphs
-
 
 # Be sure to make this script executable using SSH: type 'chmod +x ./graph_belts.py' when in the folder!
 
@@ -19,9 +12,9 @@
 #####################################################################
 
 import optparse, matplotlib, sys, importlib, os
-from textwrap import wrap
 from collections import namedtuple
 import numpy as np
+import scipy
 import matplotlib.pyplot, matplotlib.dates, matplotlib.font_manager
 import matplotlib.ticker, matplotlib.gridspec, matplotlib.colors
 import matplotlib.patches
@@ -172,144 +165,61 @@ def pair_peaks(peaks1, freqs1, psd1, peaks2, freqs2, psd2):
 
 def compute_spectrogram(data):
     N = data.shape[0]
-    Fs = N / (data[-1,0] - data[0,0])
+    Fs = N / (data[-1, 0] - data[0, 0])
     # Round up to a power of 2 for faster FFT
     M = 1 << int(.5 * Fs - 1).bit_length()
     window = np.kaiser(M, 6.)
-    def _specgram(x):
-        return matplotlib.mlab.specgram(
-                x, Fs=Fs, NFFT=M, noverlap=M//2, window=window,
-                mode='psd', detrend='mean', scale_by_freq=False)
 
-    d = {'x': data[:,1], 'y': data[:,2], 'z': data[:,3]}
-    pdata, bins, t = _specgram(d['x'])
-    for ax in 'yz':
-        pdata += _specgram(d[ax])[0]
-    return pdata, bins, t
+    def _specgram(x):
+        x_detrended = x - np.mean(x)  # Detrending by subtracting the mean value
+        return scipy.signal.spectrogram(
+            x_detrended, fs=Fs, window=window, nperseg=M, noverlap=M//2,
+            detrend='constant', scaling='density', mode='psd')
+
+    d = {'x': data[:, 1], 'y': data[:, 2], 'z': data[:, 3]}
+    f, t, pdata = _specgram(d['x'])
+    for axis in 'yz':
+        pdata += _specgram(d[axis])[2]
+    return pdata, t, f
 
 
 ######################################################################
 # Computation of the differential spectrogram
 ######################################################################
 
-# Performs a standard bilinear interpolation for a given x, y point based on surrounding input grid values. This function
-# is part of the logic to re-align both belts spectrogram in order to combine them in the differential spectrogram.
-def bilinear_interpolate(x, y, points, values):
-    x1, x2 = points[0]
-    y1, y2 = points[1]
-    
-    f11, f12 = values[0]
-    f21, f22 = values[1]
-    
-    interpolated_value = (
-        (f11 * (x2 - x) * (y2 - y) +
-         f21 * (x - x1) * (y2 - y) +
-         f12 * (x2 - x) * (y - y1) +
-         f22 * (x - x1) * (y - y1)) / ((x2 - x1) * (y2 - y1))
-    )
-
-    return interpolated_value
-
-
-# Interpolate source_data (2D) to match target_x and target_y in order to interpolate and
+# Interpolate source_data (2D) to match target_x and target_y in order to
 # get similar time and frequency dimensions for the differential spectrogram
 def interpolate_2d(target_x, target_y, source_x, source_y, source_data):
-    interpolated_data = np.zeros((len(target_y), len(target_x)))
-    
-    for i, y in enumerate(target_y):
-        for j, x in enumerate(target_x):
-            # Find indices of surrounding points in source data
-            # and ensure we don't exceed array bounds
-            x_indices = np.searchsorted(source_x, x) - 1
-            y_indices = np.searchsorted(source_y, y) - 1
-            x_indices = max(0, min(len(source_x) - 1, x_indices))
-            y_indices = max(0, min(len(source_y) - 1, y_indices))
+    # Create a grid of points in the source and target space
+    source_points = np.array([(x, y) for y in source_y for x in source_x])
+    target_points = np.array([(x, y) for y in target_y for x in target_x])
 
-            if x_indices == len(source_x) - 2:
-                x_indices -= 1
-            if y_indices == len(source_y) - 2:
-                y_indices -= 1
-            
-            x1, x2 = source_x[x_indices], source_x[x_indices + 1]
-            y1, y2 = source_y[y_indices], source_y[y_indices + 1]
-            
-            f11 = source_data[y_indices, x_indices]
-            f12 = source_data[y_indices, x_indices + 1]
-            f21 = source_data[y_indices + 1, x_indices]
-            f22 = source_data[y_indices + 1, x_indices + 1]
-            
-            interpolated_data[i, j] = bilinear_interpolate(x, y, ((x1, x2), (y1, y2)), ((f11, f12), (f21, f22)))
+    # Flatten the source data to match the flattened source points
+    source_values = source_data.flatten()
+
+    # Interpolate and reshape the interpolated data to match the target grid shape and replace NaN with zeros
+    interpolated_data = scipy.interpolate.griddata(source_points, source_values, target_points, method='nearest')
+    interpolated_data = interpolated_data.reshape((len(target_y), len(target_x)))
+    interpolated_data = np.nan_to_num(interpolated_data)
 
     return interpolated_data
 
 
-# This function identifies a "ridge" of high gradient magnitude in a spectrogram (pdata) - ie. a resonance diagonal line. Starting from
-# the maximum value in the first column, it iteratively follows the direction of the highest gradient in the vicinity (window configured using
-# the n_average parameter). The result is a sequence of indices that traces the resonance line across the original spectrogram.
-def detect_ridge(pdata, n_average=3):
-    grad_y, grad_x = np.gradient(pdata)
-    magnitude = np.sqrt(grad_x**2 + grad_y**2)
-    
-    # Start at the maximum value in the first column
-    start_idx = np.argmax(pdata[:, 0])
-    path = [start_idx]
-    
-    # Walk through the spectrogram following the path of the ridge
-    for j in range(1, pdata.shape[1]):
-        # Look in the vicinity of the previous point
-        vicinity = magnitude[max(0, path[-1]-n_average):min(pdata.shape[0], path[-1]+n_average+1), j]
-        # Take an average of top few points
-        sorted_indices = np.argsort(vicinity)
-        top_indices = sorted_indices[-n_average:]
-        next_idx = int(np.mean(top_indices) + max(0, path[-1]-n_average))
-        path.append(next_idx)
-    
-    return np.array(path)
-
-
-# This function calculates the time offset between two resonances lines (ridge1 and ridge2) using cross-correlation in
-# the frequency domain (using FFT). The result provides the lag (or offset) at which the two sequences are most similar.
-# This is used to re-align both belts spectrograms on their resonances lines in order to create the combined spectrogram.
-def compute_cross_correlation_offset(ridge1, ridge2):
-    # Ensure that the two arrays have the same shape
-    if len(ridge1) < len(ridge2):
-        ridge1 = np.pad(ridge1, (0, len(ridge2) - len(ridge1)))
-    elif len(ridge1) > len(ridge2):
-        ridge2 = np.pad(ridge2, (0, len(ridge1) - len(ridge2)))
-
-    cross_corr = np.fft.fftshift(np.fft.ifft(np.fft.fft(ridge1) * np.conj(np.fft.fft(ridge2))))
-    return np.argmax(np.abs(cross_corr)) - len(ridge1) // 2
-
-
-# This function shifts data along its second dimension - ie. time here - by a specified shift_amount
-def shift_data_in_time(data, shift_amount):
-    if shift_amount > 0:
-        return np.pad(data, ((0, 0), (shift_amount, 0)), mode='constant')[:, :-shift_amount]
-    elif shift_amount < 0:
-        return np.pad(data, ((0, 0), (0, -shift_amount)), mode='constant')[:, -shift_amount:]
-    else:
-        return data
-
-
-# Main logic function to combine two similar spectrogram - ie. from both belts paths - by detecting similarities (ridges), computing
-# the time lag and realigning them. Finally this function combine (by substracting signals) the aligned spectrograms in a new one.
-# This result of a mostly zero-ed new spectrogram with some colored zones highlighting differences in the belts paths.
+# Main logic function to combine two similar spectrogram - ie. from both belts paths - by substracting signals in order to create
+# a new composite spectrogram. This result of a divergent but mostly centered new spectrogram (center will be white) with some colored zones
+# highlighting differences in the belts paths. The summative spectrogram is used for the MHI calculation.
 def combined_spectrogram(data1, data2):
     pdata1, bins1, t1 = compute_spectrogram(data1)
-    pdata2, _, _ = compute_spectrogram(data2)
+    pdata2, bins2, t2 = compute_spectrogram(data2)
 
-    # Detect ridges
-    ridge1 = detect_ridge(pdata1)
-    ridge2 = detect_ridge(pdata2)
+    # Interpolate the spectrograms
+    pdata2_interpolated = interpolate_2d(bins1, t1, bins2, t2, pdata2)
+    
+    # Cobine them in two form: a summed diff for the MHI computation and a diverging diff for the spectrogram colors
+    combined_sum = np.abs(pdata1 - pdata2_interpolated)
+    combined_divergent = pdata1 - pdata2_interpolated
 
-    # Compute offset using cross-correlation and shit/align and interpolate the spectrograms
-    offset = compute_cross_correlation_offset(ridge1, ridge2)
-    pdata2_aligned = shift_data_in_time(pdata2, offset)
-    pdata2_interpolated = interpolate_2d(t1, bins1, t1, bins1, pdata2_aligned)
-
-    # Combine the spectrograms
-    combined_data = np.abs(pdata1 - pdata2_interpolated)
-    return combined_data, bins1, t1
+    return combined_sum, combined_divergent, bins1, t1
 
 
 # Compute a composite and highly subjective value indicating the "mechanical health of the printer (0 to 100%)" that represent the
@@ -318,7 +228,8 @@ def combined_spectrogram(data1, data2):
 # This result in a percentage value quantifying the machine behavior around the main resonances that give an hint if only touching belt tension
 # will give good graphs or if there is a chance of mechanical issues in the background (above 50% should be considered as probably problematic)
 def compute_mhi(combined_data, similarity_coefficient, num_unpaired_peaks):
-    filtered_data = combined_data[combined_data > 100]
+    # filtered_data = combined_data[combined_data > 100]
+    filtered_data = np.abs(combined_data)
 
     # First compute a "total variability metric" based on the sum of the gradient that sum the magnitude of will emphasize regions of the
     # spectrogram where there are rapid changes in magnitude (like the edges of resonance peaks).
@@ -464,27 +375,26 @@ def plot_compare_frequency(ax, lognames, signal1, signal2, max_freq):
 
 
 def plot_difference_spectrogram(ax, data1, data2, signal1, signal2, similarity_factor, max_freq):
-    combined_data, bins, t = combined_spectrogram(data1, data2)
+    combined_sum, combined_divergent, bins, t = combined_spectrogram(data1, data2)
 
     # Compute the MHI value from the differential spectrogram sum of gradient, salted with
     # the similarity factor and the number or unpaired peaks from the belts frequency profile
     # Be careful, this value is highly opinionated and is pretty experimental!
-    mhi, textual_mhi = compute_mhi(combined_data, similarity_factor, len(signal1.unpaired_peaks) + len(signal2.unpaired_peaks))
+    mhi, textual_mhi = compute_mhi(combined_sum, similarity_factor, len(signal1.unpaired_peaks) + len(signal2.unpaired_peaks))
     print(f"[experimental] Mechanical Health Indicator: {textual_mhi.lower()} ({mhi:.1f}%)")
     ax.set_title(f"Differential Spectrogram", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.plot([], [], ' ', label=f'{textual_mhi} (experimental)')
     
-    # Draw the differential spectrogram with a specific custom norm to get white or light orange zero values and red for max values
-    colors = ['white', 'bisque', 'red', 'black']  
-    n_bins = [0, 0.12, 0.9, 1] # These values where found experimentaly to get a good higlhlighting of the differences only
-    cm = matplotlib.colors.LinearSegmentedColormap.from_list('WhiteToRed', list(zip(n_bins, colors)))
-    norm = matplotlib.colors.Normalize(vmin=np.min(combined_data), vmax=np.max(combined_data))
-    ax.pcolormesh(bins, t, combined_data.T, cmap=cm, norm=norm, shading='gouraud')
+    # Draw the differential spectrogram with a specific custom norm to get orange or purple values where there is signal or white near zeros
+    colors = [KLIPPAIN_COLORS['dark_orange'], KLIPPAIN_COLORS['orange'], 'white', KLIPPAIN_COLORS['purple'], KLIPPAIN_COLORS['dark_purple']]  
+    cm = matplotlib.colors.LinearSegmentedColormap.from_list('klippain_divergent', list(zip([0, 0.25, 0.5, 0.75, 1], colors)))
+    norm = matplotlib.colors.TwoSlopeNorm(vmin=np.min(combined_divergent), vcenter=0, vmax=np.max(combined_divergent))
+    ax.pcolormesh(t, bins, combined_divergent.T, cmap=cm, norm=norm, shading='gouraud')
 
     ax.set_xlabel('Frequency (hz)')
     ax.set_xlim([0., max_freq])
     ax.set_ylabel('Time (s)')
-    ax.set_ylim([0, t[-1]])
+    ax.set_ylim([0, bins[-1]])
 
     fontP = matplotlib.font_manager.FontProperties()
     fontP.set_size('medium')
@@ -493,16 +403,16 @@ def plot_difference_spectrogram(ax, data1, data2, signal1, signal2, similarity_f
     # Plot vertical lines for unpaired peaks
     unpaired_peak_count = 0
     for _, peak in enumerate(signal1.unpaired_peaks):
-        ax.axvline(signal1.freqs[peak], color='red', linestyle='dotted', linewidth=1.5)
+        ax.axvline(signal1.freqs[peak], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
         ax.annotate(f"Peak {unpaired_peak_count + 1}", (signal1.freqs[peak], t[-1]*0.05),
-                    textcoords="data", color='red', rotation=90, fontsize=10,
+                    textcoords="data", color=KLIPPAIN_COLORS['red_pink'], rotation=90, fontsize=10,
                     verticalalignment='bottom', horizontalalignment='right')
         unpaired_peak_count +=1
 
     for _, peak in enumerate(signal2.unpaired_peaks):
-        ax.axvline(signal2.freqs[peak], color='red', linestyle='dotted', linewidth=1.5)
+        ax.axvline(signal2.freqs[peak], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
         ax.annotate(f"Peak {unpaired_peak_count + 1}", (signal2.freqs[peak], t[-1]*0.05),
-                    textcoords="data", color='red', rotation=90, fontsize=10,
+                    textcoords="data", color=KLIPPAIN_COLORS['red_pink'], rotation=90, fontsize=10,
                     verticalalignment='bottom', horizontalalignment='right')
         unpaired_peak_count +=1
     
@@ -511,11 +421,11 @@ def plot_difference_spectrogram(ax, data1, data2, signal1, signal2, similarity_f
         label = ALPHABET[idx]
         x_min = min(peak1[1], peak2[1])
         x_max = max(peak1[1], peak2[1])
-        ax.axvline(x_min, color=KLIPPAIN_COLORS['purple'], linestyle='dotted', linewidth=1.5)
-        ax.axvline(x_max, color=KLIPPAIN_COLORS['purple'], linestyle='dotted', linewidth=1.5)
-        ax.fill_between([x_min, x_max], 0, np.max(combined_data), color=KLIPPAIN_COLORS['purple'], alpha=0.3)
+        ax.axvline(x_min, color=KLIPPAIN_COLORS['dark_purple'], linestyle='dotted', linewidth=1.5)
+        ax.axvline(x_max, color=KLIPPAIN_COLORS['dark_purple'], linestyle='dotted', linewidth=1.5)
+        ax.fill_between([x_min, x_max], 0, np.max(combined_divergent), color=KLIPPAIN_COLORS['dark_purple'], alpha=0.3)
         ax.annotate(f"Peaks {label}", (x_min, t[-1]*0.05),
-                textcoords="data", color=KLIPPAIN_COLORS['purple'], rotation=90, fontsize=10,
+                textcoords="data", color=KLIPPAIN_COLORS['dark_purple'], rotation=90, fontsize=10,
                 verticalalignment='bottom', horizontalalignment='right')
 
     return

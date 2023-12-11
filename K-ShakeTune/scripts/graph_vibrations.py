@@ -4,15 +4,6 @@
 ###### SPEED AND VIBRATIONS PLOTTING SCRIPT ######
 ##################################################
 # Written by Frix_x#0161 #
-# @version: 2.0
-
-# CHANGELOG:
-#   v2.0: - updated the script to align it to the new K-Shake&Tune module
-#         - new features for peaks detection and advised speed zones
-#   v1.2: fixed a bug that could happen when username is not "pi" (thanks @spikeygg)
-#   v1.1: better graph formatting
-#   v1.0: first version of the script
-
 
 # Be sure to make this script executable using SSH: type 'chmod +x ./graph_vibrations.py' when in the folder !
 
@@ -326,7 +317,7 @@ def parse_log(logname):
             return np.loadtxt(logname, comments='#', delimiter=',')
     # Power spectral density data or shaper calibration data
     raise ValueError("File %s does not contain raw accelerometer data and therefore "
-               "is not supported by graph_vibrations.py script. Please use "
+               "is not supported by this script. Please use the official Klipper"
                "calibrate_shaper.py script to process it instead." % (logname,))
 
 
@@ -335,7 +326,7 @@ def extract_speed(logname):
         speed = re.search('sp(.+?)n', os.path.basename(logname)).group(1).replace('_','.')
     except AttributeError:
         raise ValueError("File %s does not contain speed in its name and therefore "
-               "is not supported by graph_vibrations.py script." % (logname,))
+               "is not supported by this script." % (logname,))
     return float(speed)
 
 

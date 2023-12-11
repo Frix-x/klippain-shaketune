@@ -1,22 +1,9 @@
 #!/usr/bin/env python3
+
 ############################################
 ###### INPUT SHAPER KLIPPAIN WORKFLOW ######
 ############################################
 # Written by Frix_x#0161 #
-# @version: 2.1
-
-# CHANGELOG:
-#   v2.1: added more filesystem sync and file handler checks to avoid using corrupted CSV files by going to fast
-#   v2.0: new version of this as a Python script (to replace the old bash script) and implement the newer and improved shaper plotting scripts
-#   v1.7: updated the handling of shaper files to account for the new analysis scripts as we are now using raw data directly
-#   v1.6: - updated the handling of shaper graph files to be able to optionnaly account for added positions in the filenames and remove them
-#         - fixed a bug in the belt graph on slow SD card or Pi clones (Klipper was still writing in the file while we were already reading it)
-#   v1.5: fixed klipper unnexpected fail at the end of the execution, even if graphs were correctly generated (unicode decode error fixed)
-#   v1.4: added the ~/klipper dir parameter to the call of graph_vibrations.py for a better user handling (in case user is not "pi")
-#   v1.3: some documentation improvement regarding the line endings that needs to be LF for this file
-#   v1.2: added the movement name to be transfered to the Python script in vibration calibration (to print it on the result graphs)
-#   v1.1: multiple fixes and tweaks (mainly to avoid having empty files read by the python scripts after the mv command)
-#   v1.0: first version of the script based on a Zellneralex script
 
 # Usage:
 #   This script was designed to be used with gcode_shell_commands directly from Klipper
@@ -43,6 +30,7 @@ STORE_RESULTS = 3
 from graph_belts import belts_calibration
 from graph_shaper import shaper_calibration
 from graph_vibrations import vibrations_calibration
+from analyze_axesmap import axesmap_calibration
 
 RESULTS_SUBFOLDERS = ['belts', 'inputshaper', 'vibrations']
 
@@ -63,7 +51,7 @@ def is_file_open(filepath):
     return False
 
 
-def get_belts_graph():
+def create_belts_graph():
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     lognames = []
 
@@ -74,6 +62,7 @@ def get_belts_graph():
     if len(globbed_files) < 2:
         print("Not enough CSV files found in the /tmp folder. Two files are required for the belt graphs!")
         sys.exit(1)
+
     sorted_files = sorted(globbed_files, key=os.path.getmtime, reverse=True)
 
     for filename in sorted_files[:2]:
@@ -97,11 +86,12 @@ def get_belts_graph():
     # Generate the belts graph and its name
     fig = belts_calibration(lognames, KLIPPER_FOLDER)
     png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[0], f'belts_{current_date}.png')
-    
-    return fig, png_filename
+
+    fig.savefig(png_filename)
+    return
 
 
-def get_shaper_graph():
+def create_shaper_graph():
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     # Get all the files and sort them based on last modified time to select the most recent one
@@ -109,6 +99,7 @@ def get_shaper_graph():
     if not globbed_files:
         print("No CSV files found in the /tmp folder to create the input shaper graphs!")
         sys.exit(1)
+
     sorted_files = sorted(globbed_files, key=os.path.getmtime, reverse=True)
     filename = sorted_files[0]
 
@@ -130,10 +121,11 @@ def get_shaper_graph():
     fig = shaper_calibration([new_file], KLIPPER_FOLDER)
     png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[1], f'resonances_{current_date}_{axis}.png')
     
-    return fig, png_filename
+    fig.savefig(png_filename)
+    return
 
 
-def get_vibrations_graph(axis_name):
+def create_vibrations_graph(axis_name):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     lognames = []
 
@@ -172,7 +164,35 @@ def get_vibrations_graph(axis_name):
             tar.add(csv_file, recursive=False)
             os.remove(csv_file)
 
-    return fig, png_filename
+    fig.savefig(png_filename)
+    return
+
+
+def find_axesmap(accel):
+    current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
+    result_filename = os.path.join(RESULTS_FOLDER, f'axes_map_{current_date}.txt')
+    lognames = []
+
+    globbed_files = glob.glob('/tmp/adxl345-*.csv')
+    if not globbed_files:
+        print("No CSV files found in the /tmp folder to analyze and find the axes_map!")
+        sys.exit(1)
+
+    sorted_files = sorted(globbed_files, key=os.path.getmtime, reverse=True)
+    filename = sorted_files[0]
+
+    # Wait for the file handler to be released by Klipper
+    while is_file_open(filename):
+        time.sleep(2)
+
+    # Analyze the CSV to find the axes_map parameter
+    lognames.append(filename)
+    results = axesmap_calibration(lognames, accel)
+
+    with open(result_filename, 'w') as f:
+        f.write(results)
+
+    return
 
 
 # Utility function to get old files based on their modification time
@@ -223,20 +243,21 @@ def main():
             os.makedirs(folder)
 
     if len(sys.argv) < 2:
-        print("Usage: plot_graphs.py [SHAPER|BELTS|VIBRATIONS]")
+        print("Usage: is_workflow.py [BELTS|SHAPER|VIBRATIONS|AXESMAP]")
         sys.exit(1)
 
     if sys.argv[1].lower() == 'belts':
-        fig, png_filename = get_belts_graph()
+        create_belts_graph()
     elif sys.argv[1].lower() == 'shaper':
-        fig, png_filename = get_shaper_graph()
+        create_shaper_graph()
     elif sys.argv[1].lower() == 'vibrations':
-        fig, png_filename = get_vibrations_graph(axis_name=sys.argv[2])
+        create_vibrations_graph(axis_name=sys.argv[2])
+    elif sys.argv[1].lower() == 'axesmap':
+        find_axesmap(accel=sys.argv[2])
     else:
-        print("Usage: plot_graphs.py [SHAPER|BELTS|VIBRATIONS]")
+        print("Usage: is_workflow.py [BELTS|SHAPER|VIBRATIONS|AXESMAP]")
         sys.exit(1)
 
-    fig.savefig(png_filename)
 
     clean_files()
     print(f"Graphs created. You will find the results in {RESULTS_FOLDER}")

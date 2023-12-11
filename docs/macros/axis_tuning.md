@@ -11,7 +11,6 @@ Then, call the `AXES_SHAPER_CALIBRATION` macro and look for the graphs in the re
 
 | parameters | default value | description |
 |-----------:|---------------|-------------|
-|VERBOSE|1|Whether or not to log things in the console|
 |FREQ_START|5|Starting excitation frequency|
 |FREQ_END|133|Maximum excitation frequency|
 |HZ_PER_SEC|1|Number of Hz per seconds for the test|
@@ -112,7 +111,7 @@ Such graph patterns can arise from various factors, and there isn't a one-size-f
 
 ### Problematic CANBUS speed
 
-Using CANBUS toolheads with an integrated ADXL chip can sometimes pose challenges if the CANBUS speed is set too low. While users might lower the bus speed to fix Klipper's timing errors, this change will also affect input shaping measurements. An example outcome of a low bus speed is the following graph that, though generally well-shaped, appears jagged and spiky throughout. Additional low-frequency energy might also be present. For optimal ADXL board operation on your CANBUS toolhead, a speed setting of 500k is the minimum, but 1M is advisable.
+Using CANBUS toolheads with an integrated accelerometer chip can sometimes pose challenges if the CANBUS speed is set too low. While users might lower the bus speed to fix Klipper's timing errors, this change will also affect input shaping measurements. An example outcome of a low bus speed is the following graph that, though generally well-shaped, appears jagged and spiky throughout. Additional low-frequency energy might also be present. For optimal accelerometer board operation on your CANBUS toolhead, a speed setting of 500k is the minimum, but 1M is advisable.
 
 | CANBUS problem present | CANBUS problem solved |
 | --- | --- |
