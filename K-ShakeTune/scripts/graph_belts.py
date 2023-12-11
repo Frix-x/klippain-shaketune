@@ -212,14 +212,12 @@ def combined_spectrogram(data1, data2):
     pdata1, bins1, t1 = compute_spectrogram(data1)
     pdata2, bins2, t2 = compute_spectrogram(data2)
 
-    # Interpolate the spectrograms and apply logarithmic scaling
+    # Interpolate the spectrograms
     pdata2_interpolated = interpolate_2d(bins1, t1, bins2, t2, pdata2)
-    pdata1_log = np.log1p(pdata1 / np.max(pdata1))
-    pdata2_log = np.log1p(pdata2_interpolated / np.max(pdata2_interpolated))
-
-    # Combined spectrograms
+    
+    # Cobine them in two form: a summed diff for the MHI computation and a diverging diff for the spectrogram colors
     combined_sum = np.abs(pdata1 - pdata2_interpolated)
-    combined_divergent = pdata1_log - pdata2_log
+    combined_divergent = pdata1 - pdata2_interpolated
 
     return combined_sum, combined_divergent, bins1, t1
 
@@ -388,11 +386,9 @@ def plot_difference_spectrogram(ax, data1, data2, signal1, signal2, similarity_f
     ax.plot([], [], ' ', label=f'{textual_mhi} (experimental)')
     
     # Draw the differential spectrogram with a specific custom norm to get orange or purple values where there is signal or white near zeros
-    colors = [KLIPPAIN_COLORS['orange'], 'white', 'white', KLIPPAIN_COLORS['purple']]  
-    n_bins = [0, 0.3, 0.7, 1] # These values where found experimentaly to get a good higlhlighting of the differences only
-    cm = matplotlib.colors.LinearSegmentedColormap.from_list('klippain_divergent', list(zip(n_bins, colors)))
-    # norm = matplotlib.colors.Normalize(vmin=np.min(combined_divergent), vmax=np.max(combined_divergent))
-    norm = matplotlib.colors.SymLogNorm(linthresh=0.01, vmin=np.min(combined_divergent), vmax=np.max(combined_divergent), base=10, clip=False)
+    colors = [KLIPPAIN_COLORS['dark_orange'], KLIPPAIN_COLORS['orange'], 'white', KLIPPAIN_COLORS['purple'], KLIPPAIN_COLORS['dark_purple']]  
+    cm = matplotlib.colors.LinearSegmentedColormap.from_list('klippain_divergent', list(zip([0, 0.25, 0.5, 0.75, 1], colors)))
+    norm = matplotlib.colors.TwoSlopeNorm(vmin=np.min(combined_divergent), vcenter=0, vmax=np.max(combined_divergent))
     ax.pcolormesh(t, bins, combined_divergent.T, cmap=cm, norm=norm, shading='gouraud')
 
     ax.set_xlabel('Frequency (hz)')

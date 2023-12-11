@@ -20,11 +20,12 @@ Check out the **[detailed documentation of the Shake&Tune module here](./docs/RE
 ## Installation
 
 Follow these steps to install the Shake&Tune module in your printer:
-  1. Run the install script over SSH on your printer:
+  1. Be sure to have a working accelerometer on your machine. You can follow the official [Measuring Resonances Klipper documentation](https://www.klipper3d.org/Measuring_Resonances.html) to configure one. Validate with an `ACCELEROMETER_QUERY` command that everything works correctly.
+  1. Then, you can install the Shake&Tune package by running over SSH on your printer:
      ```bash
      wget -O - https://raw.githubusercontent.com/Frix-x/klippain-shaketune/main/install.sh | bash
      ```
-  1. Append the following to your `printer.cfg` file:
+  1. Finally, append the following to your `printer.cfg` file and restart Klipper (if prefered, you can include only the needed macros: using `*.cfg` is a convenient way to include them all at once):
      ```
      [include K-ShakeTune/*.cfg]
      ```
@@ -47,9 +48,10 @@ Follow these steps to install the Shake&Tune module in your printer:
 ## Usage
 
 Ensure your machine is homed, then invoke one of the following macros as needed:
+  - `AXES_MAP_CALIBRATION` to automatically find Klipper's `axes_map` parameter for your accelerometer orientation (be careful, this is experimental for now).
   - `BELTS_SHAPER_CALIBRATION` for belt resonance graphs, useful for verifying belt tension and differential belt paths behavior.
   - `AXES_SHAPER_CALIBRATION` for input shaper graphs to mitigate ringing/ghosting by tuning Klipper's input shaper system.
-  - `VIBRATIONS_CALIBRATION` for machine vibration graphs to optimize your slicer speed profiles.
+  - `VIBRATIONS_CALIBRATION` for machine and motors vibration graphs, used to optimize your slicer speed profiles and TMC drivers parameters.
   - `EXCITATE_AXIS_AT_FREQ` to sustain a specific excitation frequency, useful to let you inspect and find out what is resonating.
 
-For further insights on the usage of the macros and the generated graphs, refer to the [K-Shake&Tune module documentation](./docs/README.md).
+For further insights on the usage of these macros and the generated graphs, refer to the [K-Shake&Tune module documentation](./docs/README.md).

@@ -13,16 +13,16 @@ When a 3D printer moves, the motors apply some force to move the toolhead along 
 ## Generalities on the graphs
 
 When tuning Input Shaper, keep the following in mind:
-  1. **Focus on the shape of the graphs, not the exact numbers**. There could be differences between ADXL boards or even printers, so there is no specific "target" value. This means that you shouldn't expect to get the same graphs between different printers, even if they are similar in term of brand, parts, size and assembly.
-  1. Small differences between consecutive test runs are normal, as ADXL quality and sensitivity is quite variable between boards.
+  1. **Focus on the shape of the graphs, not the exact numbers**. There could be differences between accelerometer boards or even printers, so there is no specific "target" value. This means that you shouldn't expect to get the same graphs between different printers, even if they are similar in term of brand, parts, size and assembly.
+  1. Small differences between consecutive test runs are normal, as accelerometer quality and sensitivity is quite variable between boards.
   1. Perform the tests when the machine is heat-soaked and close to printing conditions, as the temperature will impact the machine components such as belt tension or even the frame that is known to expand a little bit.
   1. Avoid running the toolhead fans during the tests, as they introduce unnecessary noise to the graphs, making them harder to interpret. This means that even if you should heatsoak the printer, you should also refrain from activating the hotend heater during the test, as it will also trigger the hotend fan. However, as a bad fan usually introduce some vibrations, you can use the test to diagnose an unbalanced fan as seen in the [Examples of Input Shaper graphs](./macros/axis_tuning.md) section.
-  1. Ensure the accuracy of your ADXL measurements by running a `MEASURE_AXES_NOISE` test and checking that the result is below 100 for all axes. If it's not, check your ADXL board and wiring before continuing.
+  1. Ensure the accuracy of your accelerometer measurements by running a `MEASURE_AXES_NOISE` test and checking that the result is below 100 for all axes. If it's not, check your accelerometer board and wiring before continuing.
   1. The graphs can only show symptoms of possible problems and in different ways. Those symptoms can sometimes suggest causes, but they rarely pinpoint the exact issues. For example, while you may be able to diagnose that some screws are not tightened properly, you will unlikely find which exact screw is problematic using only these tests. You will most always need to tinker and experiment.
   1. Finally, remember why you're running these tests: to get clean prints. Don't become too obsessive over perfect graphs, as the last bits of optimization will probably have the least impact on the printed parts in terms of ringing and ghosting.
 
 
-### Special note on accelerometer (ADXL) mounting point
+### Special note on accelerometer mounting point
 Input Shaping algorithms work by suppressing a single resonant frequency (or a range around a single resonant frequency). When setting the filter, **the primary goal is to target the resonant frequency of the toolhead and belts system** (see the [theory behind it](#theory-behind-it)), as this has the most significant impact on print quality and is the root cause of ringing.
 
 When setting up Input Shaper, it is important to consider the accelerometer mounting point. There are mainly two possibilities, each with its pros and cons:

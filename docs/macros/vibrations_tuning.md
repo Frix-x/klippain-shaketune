@@ -15,7 +15,7 @@ Call the `VIBRATIONS_CALIBRATION` macro with the direction and speed range you w
 |-----------:|---------------|-------------|
 |SIZE|60|size in mm of the area where the movements are done|
 |DIRECTION|"XY"|direction vector where you want to do the measurements. Can be set to either "XY", "AB", "ABXY", "A", "B", "X", "Y", "Z", "E"|
-|Z_HEIGHT|20|z height to put the toolhead before starting the movements. Be careful, if your ADXL is under the nozzle, increase it to avoid a crash of the ADXL on the bed of the machine|
+|Z_HEIGHT|20|z height to put the toolhead before starting the movements. Be careful, if your accelerometer is mounted under the nozzle, increase it to avoid crashing it on the bed of the machine|
 |ACCEL|3000 (or max printer accel)|accel in mm/s^2 used for all the moves. Try to keep it relatively low to avoid bad oscillations that affect the measurements, but but high enough to reach constant speed for >~70% of the segments|
 |MIN_SPEED|20|minimum speed of the toolhead in mm/s for the movements|
 |MAX_SPEED|200|maximum speed of the toolhead in mm/s for the movements|
@@ -32,7 +32,7 @@ Call the `VIBRATIONS_CALIBRATION` macro with the direction and speed range you w
 
 These graphs essentially depict the behavior of the motor control on your machine. While there isn't much room for easy adjustments to enhance them, most of you should only utilize them to configure your slicer profile to avoid problematic speeds.
 
-However, if you want to go the rabbit hole, as the data in these graphs largely hinges on the type of motors and their physical characteristic and their control by the TMC black magic, there are opportunities for optimization. Tweaking TMC parameters allow to adjust the peaks, enhance machine performance, or diminish overall machine noise. For this process, I recommend to directly use the [Klipper TMC Autotune](https://github.com/andrewmcgr/klipper_tmc_autotune) plugin, which should simplify everything considerably. But keep in mind that it's still an experimental plugin and it's not perfect.
+However, if you want to go the rabbit hole, as the data in these graphs largely hinges on the type of motors, their physical characteristic and the way they are controlled by the TMC drivers black magic, there are opportunities for optimization. Tweaking TMC parameters allow to adjust the peaks, enhance machine performance, or diminish overall machine noise. For this process, I recommend to directly use the [Klipper TMC Autotune](https://github.com/andrewmcgr/klipper_tmc_autotune) plugin, which should simplify everything considerably. But keep in mind that it's still an experimental plugin and it's not perfect.
 
 For individuals inclined to reach the bottom of the rabbit hole and that want to handle this manually, the use of an oscilloscope is mandatory. Majority of the necessary resources are available directly on the Trinamics TMC website:
   1. You should first consult the datasheet specific to your TMC model for guidance on parameter names and their respective uses.
