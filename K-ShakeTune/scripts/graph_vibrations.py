@@ -11,6 +11,7 @@
 ################ !!! DO NOT EDIT BELOW THIS LINE !!! ################
 #####################################################################
 
+import math
 import optparse, matplotlib, re, sys, importlib, os, operator
 from collections import OrderedDict
 import numpy as np
@@ -28,8 +29,10 @@ VALLEY_DETECTION_THRESHOLD = 0.1 # Lower is more sensitive
 
 KLIPPAIN_COLORS = {
     "purple": "#70088C",
+    "orange": "#FF8D32",
     "dark_purple": "#150140",
-    "dark_orange": "#F24130"
+    "dark_orange": "#F24130",
+    "red_pink": "#F2055C"
 }
 
 
@@ -65,7 +68,6 @@ def calc_psd(datas, group, max_freq):
     signal_axes = ['x', 'y', 'z', 'all']
 
     for i in range(0, len(datas), group):
-        
         # Round up to the nearest power of 2 for faster FFT
         N = datas[i].shape[0]
         T = datas[i][-1,0] - datas[i][0,0]
@@ -119,19 +121,26 @@ def calc_psd(datas, group, max_freq):
     return first_freqs[first_freqs <= max_freq], psd_list
 
 
-def calc_powertot(psd_list, freqs):
-    pwrtot_sum = []
-    pwrtot_x = []
-    pwrtot_y = []
-    pwrtot_z = []
+def calc_speed_profile(psd_list, freqs):
+    # Preallocate arrays as psd_list is known and consistent
+    pwrtot_sum = np.zeros(len(psd_list))
+    pwrtot_x = np.zeros(len(psd_list))
+    pwrtot_y = np.zeros(len(psd_list))
+    pwrtot_z = np.zeros(len(psd_list))
 
-    for psd in psd_list:
-        pwrtot_sum.append(np.trapz(psd[0], freqs))
-        pwrtot_x.append(np.trapz(psd[1], freqs))
-        pwrtot_y.append(np.trapz(psd[2], freqs))
-        pwrtot_z.append(np.trapz(psd[3], freqs))
+    for i, psd in enumerate(psd_list):
+        pwrtot_sum[i] = np.trapz(psd[0], freqs)
+        pwrtot_x[i] = np.trapz(psd[1], freqs)
+        pwrtot_y[i] = np.trapz(psd[2], freqs)
+        pwrtot_z[i] = np.trapz(psd[3], freqs)
 
     return [pwrtot_sum, pwrtot_x, pwrtot_y, pwrtot_z]
+
+
+def calc_vibration_profile(power_spectral_densities):
+    # Sum the PSD across all speeds for each frequency
+    total_vibration = np.sum([psd[0] for psd in power_spectral_densities], axis=0)
+    return total_vibration
 
 
 # This find all the peaks in a curve by looking at when the derivative term goes from positive to negative
@@ -161,9 +170,7 @@ def detect_peaks(power_total, speeds, window_size=10, vicinity=10):
         local_max = peak + np.argmax(power_total[max(0, peak-vicinity):min(len(power_total), peak+vicinity+1)]) - vicinity
         refined_peaks.append(local_max)
 
-    peak_speeds = ["{:.1f}".format(speeds[i]) for i in refined_peaks]
     num_peaks = len(refined_peaks)
-    print("Vibrations peaks detected: %d @ %s mm/s (avoid running these speeds in your slicer profile)" % (num_peaks, ", ".join(map(str, peak_speeds))))
 
     return np.array(refined_peaks), num_peaks
 
@@ -220,10 +227,10 @@ def resample_signal(speeds, power_total, new_spacing=0.1):
 # Graphing
 ######################################################################
 
-def plot_total_power(ax, speeds, power_total):
+def plot_speed_profile(ax, speeds, power_total):
     resampled_speeds, resampled_power_total = resample_signal(speeds, power_total[0])
 
-    ax.set_title("Vibrations decomposition", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
+    ax.set_title("Machine speed profile", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_xlabel('Speed (mm/s)')
     ax.set_ylabel('Energy')
     
@@ -244,6 +251,9 @@ def plot_total_power(ax, speeds, power_total):
 
     peaks, num_peaks = detect_peaks(resampled_power_total, resampled_speeds)
     low_energy_zones = identify_low_energy_zones(resampled_power_total)
+    
+    peak_speeds = ["{:.1f}".format(resampled_speeds[i]) for i in peaks]
+    print("Vibrations peaks detected: %d @ %s mm/s (avoid setting a speed near these values in your slicer print profile)" % (num_peaks, ", ".join(map(str, peak_speeds))))
 
     if peaks.size:
         ax.plot(speed_array[peaks], power_total_sum[peaks], "x", color='black', markersize=8)
@@ -277,7 +287,7 @@ def plot_total_power(ax, speeds, power_total):
         return None
 
 
-def plot_spectrogram(ax, speeds, freqs, power_spectral_densities, peaks, max_freq):
+def plot_spectrogram(ax, speeds, freqs, power_spectral_densities, peaks, fr, max_freq):
     spectrum = np.empty([len(freqs), len(speeds)])
 
     for i in range(len(speeds)):
@@ -296,11 +306,75 @@ def plot_spectrogram(ax, speeds, freqs, power_spectral_densities, peaks, max_fre
                         textcoords="data", color='cyan', rotation=90, fontsize=10,
                         verticalalignment='top', horizontalalignment='right')
     
+    # Add motor resonance line
+    if fr is not None:
+        ax.axhline(fr, color='cyan', linestyle='dotted', linewidth=1)
+        ax.annotate(f"Motor resonance", (speeds[-1]*0.95, fr+2), 
+                    textcoords="data", color='cyan', fontsize=10,
+                    verticalalignment='bottom', horizontalalignment='right')
+    
     ax.set_ylim([0., max_freq])
     ax.set_ylabel('Frequency (hz)')
     ax.set_xlabel('Speed (mm/s)')
 
     return
+
+
+def plot_vibration_profile(ax, freqs, vibration_power):
+    kernel = np.ones(10)/10
+    smoothed_vibration_power = np.convolve(vibration_power, kernel, mode='same')
+
+    ax.set_title("Motors frequency profile", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
+    ax.set_xlabel('Energy')
+    ax.set_ylabel('Frequency (hz)')
+
+    ax2 = ax.twinx()
+    ax2.yaxis.set_visible(False)
+    
+    vibr_power_array = np.array(smoothed_vibration_power)
+    freq_array = np.array(freqs)
+    max_x = vibr_power_array.max() + vibr_power_array.max() * 0.1
+    ax.set_ylim([freq_array.min(), freq_array.max()])
+    ax.set_xlim([0, max_x])
+    ax2.set_xlim([0, max_x])
+
+    ax.plot(smoothed_vibration_power, freqs, color=KLIPPAIN_COLORS['orange'])
+
+    max_power_index = np.argmax(vibr_power_array)
+    fr = freq_array[max_power_index]
+    max_power = vibr_power_array[max_power_index]
+    half_power = max_power / math.sqrt(2)
+    idx_below = np.where(vibr_power_array[:max_power_index] <= half_power)[0][-1]
+    idx_above = np.where(vibr_power_array[max_power_index:] <= half_power)[0][0] + max_power_index
+    freq_below_half_power = freqs[idx_below] + (half_power - vibr_power_array[idx_below]) * (freqs[idx_below + 1] - freqs[idx_below]) / (vibr_power_array[idx_below + 1] - vibr_power_array[idx_below])
+    freq_above_half_power = freqs[idx_above - 1] + (half_power - vibr_power_array[idx_above - 1]) * (freqs[idx_above] - freqs[idx_above - 1]) / (vibr_power_array[idx_above] - vibr_power_array[idx_above - 1])
+    bandwidth = freq_above_half_power - freq_below_half_power
+    zeta = bandwidth / (2 * fr)
+
+    if fr > 20:
+        print("Motors have a main resonant frequency at %.1fHz with an estimated damping ratio of %.3f" % (fr, zeta))
+    else:
+        print("The resonance frequency of the motors is too low (%.1fHz). This is probably due to the test run with too high acceleration!" % fr)
+        print("Try lowering the ACCEL value before restarting the macro to ensure that only constant speeds are recorded and that the dynamic behavior in the corners is not impacting the measurements.")
+
+    ax.plot(vibr_power_array[max_power_index], freq_array[max_power_index], "x", color='black', markersize=8)
+    fontcolor = KLIPPAIN_COLORS['purple']
+    fontweight = 'bold'
+    ax.annotate(f"R", (vibr_power_array[max_power_index], freq_array[max_power_index]), 
+                textcoords="offset points", xytext=(8, 8), 
+                ha='right', fontsize=13, color=fontcolor, weight=fontweight)
+    ax2.plot([], [], ' ', label="Motor resonant frequency (ω0): %.1fHz" % (fr))
+    ax2.plot([], [], ' ', label="Motor damping ratio (ζ): %.3f" % (zeta))
+
+    ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+    ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+    ax.grid(which='major', color='grey')
+    ax.grid(which='minor', color='lightgrey')
+    fontP = matplotlib.font_manager.FontProperties()
+    fontP.set_size('small')
+    ax2.legend(loc='upper right', prop=fontP)
+
+    return fr if fr > 20 else None
 
 
 ######################################################################
@@ -364,15 +438,17 @@ def vibrations_calibration(lognames, klipperdir="~/klipper", axisname=None, max_
     group_by = speeds.count(speeds[0])
     # Compute psd and total power of the signal
     freqs, power_spectral_densities = calc_psd(datas, group_by, max_freq)
-    power_total = calc_powertot(power_spectral_densities, freqs)
+    speed_power = calc_speed_profile(power_spectral_densities, freqs)
+    vibration_power = calc_vibration_profile(power_spectral_densities)
 
     fig = matplotlib.pyplot.figure()
-    gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=[4, 3])
+    gs = matplotlib.gridspec.GridSpec(2, 2, height_ratios=[4, 3], width_ratios=[5, 3])
     ax1 = fig.add_subplot(gs[0])
-    ax2 = fig.add_subplot(gs[1])
+    ax2 = fig.add_subplot(gs[2])
+    ax4 = fig.add_subplot(gs[3])
 
     title_line1 = "VIBRATIONS MEASUREMENT TOOL"
-    fig.text(0.12, 0.965, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold')
+    fig.text(0.075, 0.965, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold')
     try:
         filename_parts = (lognames[0].split('/')[-1]).split('_')
         dt = datetime.strptime(f"{filename_parts[1]} {filename_parts[2].split('-')[0]}", "%Y%m%d %H%M%S")
@@ -380,20 +456,21 @@ def vibrations_calibration(lognames, klipperdir="~/klipper", axisname=None, max_
     except:
         print("Warning: CSV filename look to be different than expected (%s)" % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
-    fig.text(0.12, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
+    fig.text(0.075, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     # Remove speeds duplicates and graph the processed datas
     speeds = list(OrderedDict((x, True) for x in speeds).keys())
 
-    peaks = plot_total_power(ax1, speeds, power_total)
-    plot_spectrogram(ax2, speeds, freqs, power_spectral_densities, peaks, max_freq)
+    speed_peaks = plot_speed_profile(ax1, speeds, speed_power)
+    fr = plot_vibration_profile(ax4, freqs, vibration_power)
+    plot_spectrogram(ax2, speeds, freqs, power_spectral_densities, speed_peaks, fr, max_freq)
 
-    fig.set_size_inches(8.3, 11.6)
+    fig.set_size_inches(14, 11.6)
     fig.tight_layout()
     fig.subplots_adjust(top=0.89)
 
     # Adding a small Klippain logo to the top left corner of the figure
-    ax_logo = fig.add_axes([0.001, 0.899, 0.1, 0.1], anchor='NW', zorder=-1)
+    ax_logo = fig.add_axes([0.001, 0.924, 0.075, 0.075], anchor='NW', zorder=-1)
     ax_logo.imshow(matplotlib.pyplot.imread(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'klippain.png')))
     ax_logo.axis('off')
 
