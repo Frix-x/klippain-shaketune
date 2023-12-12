@@ -23,7 +23,7 @@ Follow these steps to install the Shake&Tune module in your printer:
   1. Be sure to have a working accelerometer on your machine. You can follow the official [Measuring Resonances Klipper documentation](https://www.klipper3d.org/Measuring_Resonances.html) to configure one. Validate with an `ACCELEROMETER_QUERY` command that everything works correctly.
   1. Install the system libraries that are needed to run the custom Python scripts:
      ```bash
-     sudo apt update && sudo apt install libopenblas-dev libatlas-base-dev -y
+     sudo apt update && sudo apt install python3-venv libopenblas-dev libatlas-base-dev -y
      ```
   1. Then, you can install the Shake&Tune package by running over SSH on your printer:
      ```bash
