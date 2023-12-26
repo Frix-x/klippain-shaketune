@@ -20,7 +20,7 @@ import numpy as np
 import scipy
 import matplotlib.pyplot, matplotlib.dates, matplotlib.font_manager
 import matplotlib.ticker, matplotlib.gridspec
-import locale
+from locale_utils import set_locale, print_with_c_locale
 from datetime import datetime
 
 matplotlib.use('Agg')
@@ -38,24 +38,6 @@ KLIPPAIN_COLORS = {
 }
 
 
-# Set the best locale for time and date formating (generation of the titles)
-try:
-    current_locale = locale.getlocale(locale.LC_TIME)
-    if current_locale is None or current_locale[0] is None:
-        locale.setlocale(locale.LC_TIME, 'C')
-except locale.Error:
-    locale.setlocale(locale.LC_TIME, 'C')
-
-# Override the built-in print function to avoid problem in Klipper due to locale settings
-original_print = print
-def print_with_c_locale(*args, **kwargs):
-    original_locale = locale.setlocale(locale.LC_ALL, None)
-    locale.setlocale(locale.LC_ALL, 'C')
-    original_print(*args, **kwargs)
-    locale.setlocale(locale.LC_ALL, original_locale)
-print = print_with_c_locale
-
-
 ######################################################################
 # Computation
 ######################################################################
@@ -70,14 +52,14 @@ def calibrate_shaper_with_damping(datas, max_smoothing):
 
     calibration_data.normalize_to_frequencies()
 
-    shaper, all_shapers = helper.find_best_shaper(calibration_data, max_smoothing, print)
+    shaper, all_shapers = helper.find_best_shaper(calibration_data, max_smoothing, print_with_c_locale)
 
     freqs = calibration_data.freq_bins
     psd = calibration_data.psd_sum
     fr, zeta = compute_damping_ratio(psd, freqs)
 
-    print("Recommended shaper is %s @ %.1f Hz" % (shaper.name, shaper.freq))
-    print("Axis has a main resonant frequency at %.1fHz with an estimated damping ratio of %.3f" % (fr, zeta))
+    print_with_c_locale("Recommended shaper is %s @ %.1f Hz" % (shaper.name, shaper.freq))
+    print_with_c_locale("Axis has a main resonant frequency at %.1fHz with an estimated damping ratio of %.3f" % (fr, zeta))
 
     return shaper.name, all_shapers, calibration_data, fr, zeta
 
@@ -148,7 +130,7 @@ def detect_peaks(psd, freqs, window_size=5, vicinity=3):
     num_peaks = len(refined_peaks)
     num_peaks_above_effect_threshold = np.sum(psd[refined_peaks] > effect_threshold)
     
-    print("Peaks detected on the graph: %d @ %s Hz (%d above effect threshold)" % (num_peaks, ", ".join(map(str, peak_freqs)), num_peaks_above_effect_threshold))
+    print_with_c_locale("Peaks detected on the graph: %d @ %s Hz (%d above effect threshold)" % (num_peaks, ", ".join(map(str, peak_freqs)), num_peaks_above_effect_threshold))
 
     return np.array(refined_peaks), num_peaks, num_peaks_above_effect_threshold
 
@@ -319,6 +301,7 @@ def setup_klipper_import(kdir):
 
 
 def shaper_calibration(lognames, klipperdir="~/klipper", max_smoothing=None, max_freq=200.):
+    set_locale()
     setup_klipper_import(klipperdir)
 
     # Parse data
@@ -340,7 +323,7 @@ def shaper_calibration(lognames, klipperdir="~/klipper", max_smoothing=None, max
         dt = datetime.strptime(f"{filename_parts[1]} {filename_parts[2]}", "%Y%m%d %H%M%S")
         title_line2 = dt.strftime('%x %X') + ' -- ' + filename_parts[3].upper().split('.')[0] + ' axis'
     except:
-        print("Warning: CSV filename look to be different than expected (%s)" % (lognames[0]))
+        print_with_c_locale("Warning: CSV filename look to be different than expected (%s)" % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
     fig.text(0.12, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 

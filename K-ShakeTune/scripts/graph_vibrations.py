@@ -17,7 +17,7 @@ from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot, matplotlib.dates, matplotlib.font_manager
 import matplotlib.ticker, matplotlib.gridspec
-import locale
+from locale_utils import set_locale, print_with_c_locale
 from datetime import datetime
 
 matplotlib.use('Agg')
@@ -34,24 +34,6 @@ KLIPPAIN_COLORS = {
     "dark_orange": "#F24130",
     "red_pink": "#F2055C"
 }
-
-
-# Set the best locale for time and date formating (generation of the titles)
-try:
-    current_locale = locale.getlocale(locale.LC_TIME)
-    if current_locale is None or current_locale[0] is None:
-        locale.setlocale(locale.LC_TIME, 'C')
-except locale.Error:
-    locale.setlocale(locale.LC_TIME, 'C')
-
-# Override the built-in print function to avoid problem in Klipper due to locale settings
-original_print = print
-def print_with_c_locale(*args, **kwargs):
-    original_locale = locale.setlocale(locale.LC_ALL, None)
-    locale.setlocale(locale.LC_ALL, 'C')
-    original_print(*args, **kwargs)
-    locale.setlocale(locale.LC_ALL, original_locale)
-print = print_with_c_locale
 
 
 ######################################################################
@@ -255,7 +237,7 @@ def plot_speed_profile(ax, speeds, power_total):
     low_energy_zones = identify_low_energy_zones(resampled_power_total)
     
     peak_speeds = ["{:.1f}".format(resampled_speeds[i]) for i in peaks]
-    print("Vibrations peaks detected: %d @ %s mm/s (avoid setting a speed near these values in your slicer print profile)" % (num_peaks, ", ".join(map(str, peak_speeds))))
+    print_with_c_locale("Vibrations peaks detected: %d @ %s mm/s (avoid setting a speed near these values in your slicer print profile)" % (num_peaks, ", ".join(map(str, peak_speeds))))
 
     if peaks.size:
         ax.plot(speed_array[peaks], power_total_sum[peaks], "x", color='black', markersize=8)
@@ -354,10 +336,10 @@ def plot_vibration_profile(ax, freqs, vibration_power):
     zeta = bandwidth / (2 * fr)
 
     if fr > 20:
-        print("Motors have a main resonant frequency at %.1fHz with an estimated damping ratio of %.3f" % (fr, zeta))
+        print_with_c_locale("Motors have a main resonant frequency at %.1fHz with an estimated damping ratio of %.3f" % (fr, zeta))
     else:
-        print("The resonance frequency of the motors is too low (%.1fHz). This is probably due to the test run with too high acceleration!" % fr)
-        print("Try lowering the ACCEL value before restarting the macro to ensure that only constant speeds are recorded and that the dynamic behavior in the corners is not impacting the measurements.")
+        print_with_c_locale("The resonance frequency of the motors is too low (%.1fHz). This is probably due to the test run with too high acceleration!" % fr)
+        print_with_c_locale("Try lowering the ACCEL value before restarting the macro to ensure that only constant speeds are recorded and that the dynamic behavior in the corners is not impacting the measurements.")
 
     ax.plot(vibr_power_array[max_power_index], freq_array[max_power_index], "x", color='black', markersize=8)
     fontcolor = KLIPPAIN_COLORS['purple']
@@ -428,6 +410,7 @@ def setup_klipper_import(kdir):
 
 
 def vibrations_calibration(lognames, klipperdir="~/klipper", axisname=None, max_freq=1000., remove=0):
+    set_locale()
     setup_klipper_import(klipperdir)
 
     # Parse the raw data and get them ready for analysis
@@ -456,7 +439,7 @@ def vibrations_calibration(lognames, klipperdir="~/klipper", axisname=None, max_
         dt = datetime.strptime(f"{filename_parts[1]} {filename_parts[2].split('-')[0]}", "%Y%m%d %H%M%S")
         title_line2 = dt.strftime('%x %X') + ' -- ' + axisname.upper() + ' axis'
     except:
-        print("Warning: CSV filename look to be different than expected (%s)" % (lognames[0]))
+        print_with_c_locale("Warning: CSV filename look to be different than expected (%s)" % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
     fig.text(0.075, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 

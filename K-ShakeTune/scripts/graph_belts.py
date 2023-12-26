@@ -18,7 +18,7 @@ import scipy
 import matplotlib.pyplot, matplotlib.dates, matplotlib.font_manager
 import matplotlib.ticker, matplotlib.gridspec, matplotlib.colors
 import matplotlib.patches
-import locale
+from locale_utils import set_locale, print_with_c_locale
 from datetime import datetime
 
 matplotlib.use('Agg')
@@ -42,24 +42,6 @@ KLIPPAIN_COLORS = {
     "dark_orange": "#F24130",
     "red_pink": "#F2055C"
 }
-
-
-# Set the best locale for time and date formating (generation of the titles)
-try:
-    current_locale = locale.getlocale(locale.LC_TIME)
-    if current_locale is None or current_locale[0] is None:
-        locale.setlocale(locale.LC_TIME, 'C')
-except locale.Error:
-    locale.setlocale(locale.LC_TIME, 'C')
-
-# Override the built-in print function to avoid problem in Klipper due to locale settings
-original_print = print
-def print_with_c_locale(*args, **kwargs):
-    original_locale = locale.setlocale(locale.LC_ALL, None)
-    locale.setlocale(locale.LC_ALL, 'C')
-    original_print(*args, **kwargs)
-    locale.setlocale(locale.LC_ALL, original_locale)
-print = print_with_c_locale
 
 
 ######################################################################
@@ -284,7 +266,7 @@ def plot_compare_frequency(ax, lognames, signal1, signal2, max_freq):
         signal1_belt += " (axis 1, 1)"
         signal2_belt += " (axis 1,-1)"
     else:
-        print("Warning: belts doesn't seem to have the correct name A and B (extracted from the filename.csv)")
+        print_with_c_locale("Warning: belts doesn't seem to have the correct name A and B (extracted from the filename.csv)")
 
     # Plot the two belts PSD signals
     ax.plot(signal1.freqs, signal1.psd, label="Belt " + signal1_belt, color=KLIPPAIN_COLORS['purple'])
@@ -339,7 +321,7 @@ def plot_compare_frequency(ax, lognames, signal1, signal2, max_freq):
     similarity_factor = compute_curve_similarity_factor(signal1, signal2)
     ax2.plot([], [], ' ', label=f'Estimated similarity: {similarity_factor:.1f}%')
     ax2.plot([], [], ' ', label=f'Number of unpaired peaks: {unpaired_peak_count}')
-    print(f"Belts estimated similarity: {similarity_factor:.1f}%")
+    print_with_c_locale(f"Belts estimated similarity: {similarity_factor:.1f}%")
 
     # Setting axis parameters, grid and graph title
     ax.set_xlabel('Frequency (Hz)')
@@ -383,7 +365,7 @@ def plot_difference_spectrogram(ax, data1, data2, signal1, signal2, similarity_f
     # the similarity factor and the number or unpaired peaks from the belts frequency profile
     # Be careful, this value is highly opinionated and is pretty experimental!
     mhi, textual_mhi = compute_mhi(combined_sum, similarity_factor, len(signal1.unpaired_peaks) + len(signal2.unpaired_peaks))
-    print(f"[experimental] Mechanical Health Indicator: {textual_mhi.lower()} ({mhi:.1f}%)")
+    print_with_c_locale(f"[experimental] Mechanical Health Indicator: {textual_mhi.lower()} ({mhi:.1f}%)")
     ax.set_title(f"Differential Spectrogram", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.plot([], [], ' ', label=f'{textual_mhi} (experimental)')
     
@@ -476,6 +458,7 @@ def setup_klipper_import(kdir):
 
 
 def belts_calibration(lognames, klipperdir="~/klipper", max_freq=200.):
+    set_locale()
     setup_klipper_import(klipperdir)
 
     # Parse data
@@ -506,7 +489,7 @@ def belts_calibration(lognames, klipperdir="~/klipper", max_freq=200.):
         dt = datetime.strptime(f"{filename.split('_')[1]} {filename.split('_')[2]}", "%Y%m%d %H%M%S")
         title_line2 = dt.strftime('%x %X')
     except:
-        print("Warning: CSV filenames look to be different than expected (%s , %s)" % (lognames[0], lognames[1]))
+        print_with_c_locale("Warning: CSV filenames look to be different than expected (%s , %s)" % (lognames[0], lognames[1]))
         title_line2 = lognames[0].split('/')[-1] + " / " +  lognames[1].split('/')[-1]
     fig.text(0.12, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
