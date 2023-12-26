@@ -22,7 +22,9 @@ NUM_POINTS = 500
 
 # Set the best locale for time and date formating (generation of the titles)
 try:
-    locale.setlocale(locale.LC_TIME, locale.getdefaultlocale())
+    current_locale = locale.getlocale(locale.LC_TIME)
+    if current_locale is None or current_locale[0] is None:
+        locale.setlocale(locale.LC_TIME, 'C')
 except locale.Error:
     locale.setlocale(locale.LC_TIME, 'C')
 
