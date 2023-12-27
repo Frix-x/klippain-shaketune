@@ -14,14 +14,16 @@
 import optparse, matplotlib, sys, importlib, os
 from collections import namedtuple
 import numpy as np
-import scipy
+from scipy.interpolate import griddata
 import matplotlib.pyplot, matplotlib.dates, matplotlib.font_manager
 import matplotlib.ticker, matplotlib.gridspec, matplotlib.colors
 import matplotlib.patches
-from locale_utils import set_locale, print_with_c_locale
 from datetime import datetime
 
 matplotlib.use('Agg')
+
+from locale_utils import set_locale, print_with_c_locale
+from common_func import compute_spectrogram, detect_peaks
 
 
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" # For paired peaks names
@@ -48,12 +50,6 @@ KLIPPAIN_COLORS = {
 # Computation of the PSD graph
 ######################################################################
 
-# Calculate estimated "power spectral density" using existing Klipper tools
-def calc_freq_response(data):
-    helper = shaper_calibrate.ShaperCalibrate(printer=None)
-    return helper.process_accelerometer_data(data)
-
-
 # Calculate or estimate a "similarity" factor between two PSD curves and scale it to a percentage. This is
 # used here to quantify how close the two belts path behavior and responses are close together.
 def compute_curve_similarity_factor(signal1, signal2):
@@ -74,29 +70,6 @@ def compute_curve_similarity_factor(signal1, signal2):
     scaled_similarity = sigmoid_scale(-np.log(1 - similarity), CURVE_SIMILARITY_SIGMOID_K)
     
     return scaled_similarity
-
-
-# This find all the peaks in a curve by looking at when the derivative term goes from positive to negative
-# Then only the peaks found above a threshold are kept to avoid capturing peaks in the low amplitude noise of a signal
-def detect_peaks(psd, freqs, window_size=5, vicinity=3):
-    # Smooth the curve using a moving average to avoid catching peaks everywhere in noisy signals
-    kernel = np.ones(window_size) / window_size
-    smoothed_psd = np.convolve(psd, kernel, mode='valid')
-    mean_pad = [np.mean(psd[:window_size])] * (window_size // 2)
-    smoothed_psd = np.concatenate((mean_pad, smoothed_psd))
-    
-    # Find peaks on the smoothed curve
-    smoothed_peaks = np.where((smoothed_psd[:-2] < smoothed_psd[1:-1]) & (smoothed_psd[1:-1] > smoothed_psd[2:]))[0] + 1
-    detection_threshold = PEAKS_DETECTION_THRESHOLD * psd.max()
-    smoothed_peaks = smoothed_peaks[smoothed_psd[smoothed_peaks] > detection_threshold]
-    
-    # Refine peak positions on the original curve
-    refined_peaks = []
-    for peak in smoothed_peaks:
-        local_max = peak + np.argmax(psd[max(0, peak-vicinity):min(len(psd), peak+vicinity+1)]) - vicinity
-        refined_peaks.append(local_max)
-    
-    return np.array(refined_peaks), freqs[refined_peaks]
 
 
 # This function create pairs of peaks that are close in frequency on two curves (that are known
@@ -144,30 +117,6 @@ def pair_peaks(peaks1, freqs1, psd1, peaks2, freqs2, psd2):
 
 
 ######################################################################
-# Computation of a basic signal spectrogram
-######################################################################
-
-def compute_spectrogram(data):
-    N = data.shape[0]
-    Fs = N / (data[-1, 0] - data[0, 0])
-    # Round up to a power of 2 for faster FFT
-    M = 1 << int(.5 * Fs - 1).bit_length()
-    window = np.kaiser(M, 6.)
-
-    def _specgram(x):
-        x_detrended = x - np.mean(x)  # Detrending by subtracting the mean value
-        return scipy.signal.spectrogram(
-            x_detrended, fs=Fs, window=window, nperseg=M, noverlap=M//2,
-            detrend='constant', scaling='density', mode='psd')
-
-    d = {'x': data[:, 1], 'y': data[:, 2], 'z': data[:, 3]}
-    f, t, pdata = _specgram(d['x'])
-    for axis in 'yz':
-        pdata += _specgram(d[axis])[2]
-    return pdata, t, f
-
-
-######################################################################
 # Computation of the differential spectrogram
 ######################################################################
 
@@ -182,7 +131,7 @@ def interpolate_2d(target_x, target_y, source_x, source_y, source_data):
     source_values = source_data.flatten()
 
     # Interpolate and reshape the interpolated data to match the target grid shape and replace NaN with zeros
-    interpolated_data = scipy.interpolate.griddata(source_points, source_values, target_points, method='nearest')
+    interpolated_data = griddata(source_points, source_values, target_points, method='nearest')
     interpolated_data = interpolated_data.reshape((len(target_y), len(target_x)))
     interpolated_data = np.nan_to_num(interpolated_data)
 
@@ -425,13 +374,17 @@ def sigmoid_scale(x, k=1):
 
 # Original Klipper function to get the PSD data of a raw accelerometer signal
 def compute_signal_data(data, max_freq):
-    calibration_data = calc_freq_response(data)
+    helper = shaper_calibrate.ShaperCalibrate(printer=None)
+    calibration_data = helper.process_accelerometer_data(data)
+
     freqs = calibration_data.freq_bins[calibration_data.freq_bins <= max_freq]
     psd = calibration_data.get_psd('all')[calibration_data.freq_bins <= max_freq]
-    peaks, _ = detect_peaks(psd, freqs)
+
+    _, peaks, _ = detect_peaks(psd, freqs, PEAKS_DETECTION_THRESHOLD * psd.max())
+
     return SignalData(freqs=freqs, psd=psd, peaks=peaks, paired_peaks=None, unpaired_peaks=None)
  
-
+ 
 ######################################################################
 # Startup and main routines
 ######################################################################

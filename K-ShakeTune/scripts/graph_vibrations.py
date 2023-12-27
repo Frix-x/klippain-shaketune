@@ -17,10 +17,12 @@ from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot, matplotlib.dates, matplotlib.font_manager
 import matplotlib.ticker, matplotlib.gridspec
-from locale_utils import set_locale, print_with_c_locale
 from datetime import datetime
 
 matplotlib.use('Agg')
+
+from locale_utils import set_locale, print_with_c_locale
+from common_func import detect_peaks
 
 
 PEAKS_DETECTION_THRESHOLD = 0.05
@@ -127,38 +129,6 @@ def calc_vibration_profile(power_spectral_densities):
     return total_vibration
 
 
-# This find all the peaks in a curve by looking at when the derivative term goes from positive to negative
-# Then only the peaks found above a threshold are kept to avoid capturing peaks in the low amplitude noise of a signal
-# Additionaly, we validate that a peak is a real peak based of its neighbors as we can have pretty flat zones in vibration
-# graphs with a lot of false positive due to small "noise" in these flat zones
-def detect_peaks(power_total, speeds, window_size=10, vicinity=10):
-    # Smooth the curve using a moving average to avoid catching peaks everywhere in noisy signals
-    kernel = np.ones(window_size) / window_size
-    smoothed_psd = np.convolve(power_total, kernel, mode='valid')
-    mean_pad = [np.mean(power_total[:window_size])] * (window_size // 2)
-    smoothed_psd = np.concatenate((mean_pad, smoothed_psd))
-
-    # Find peaks on the smoothed curve (and excluding the last value of the serie often detected when in a flat zone)
-    smoothed_peaks = np.where((smoothed_psd[:-3] < smoothed_psd[1:-2]) & (smoothed_psd[1:-2] > smoothed_psd[2:-1]))[0] + 1
-    detection_threshold = PEAKS_DETECTION_THRESHOLD * power_total.max()
-    
-    valid_peaks = []
-    for peak in smoothed_peaks:
-        peak_height = smoothed_psd[peak] - np.min(smoothed_psd[max(0, peak-vicinity):min(len(smoothed_psd), peak+vicinity+1)])
-        if peak_height > PEAKS_RELATIVE_HEIGHT_THRESHOLD * smoothed_psd[peak] and smoothed_psd[peak] > detection_threshold:
-            valid_peaks.append(peak)
- 
-    # Refine peak positions on the original curve
-    refined_peaks = []
-    for peak in valid_peaks:
-        local_max = peak + np.argmax(power_total[max(0, peak-vicinity):min(len(power_total), peak+vicinity+1)]) - vicinity
-        refined_peaks.append(local_max)
-
-    num_peaks = len(refined_peaks)
-
-    return np.array(refined_peaks), num_peaks
-
-
 # The goal is to find zone outside of peaks (flat low energy zones) to advise them as good speeds range to use in the slicer
 def identify_low_energy_zones(power_total):
     valleys = []
@@ -233,9 +203,10 @@ def plot_speed_profile(ax, speeds, power_total):
     ax.plot(speeds, power_total[2], label="Y", color='green')
     ax.plot(speeds, power_total[3], label="Z", color='blue')
 
-    peaks, num_peaks = detect_peaks(resampled_power_total, resampled_speeds)
+    detection_threshold = PEAKS_DETECTION_THRESHOLD * resampled_power_total.max()
+    num_peaks, peaks, _ = detect_peaks(resampled_power_total, resampled_speeds, detection_threshold, PEAKS_RELATIVE_HEIGHT_THRESHOLD, 10, 10)
     low_energy_zones = identify_low_energy_zones(resampled_power_total)
-    
+
     peak_speeds = ["{:.1f}".format(resampled_speeds[i]) for i in peaks]
     print_with_c_locale("Vibrations peaks detected: %d @ %s mm/s (avoid setting a speed near these values in your slicer print profile)" % (num_peaks, ", ".join(map(str, peak_speeds))))
 

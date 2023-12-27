@@ -15,15 +15,15 @@
 #####################################################################
 
 import optparse, matplotlib, sys, importlib, os, math
-from textwrap import wrap
 import numpy as np
-import scipy
 import matplotlib.pyplot, matplotlib.dates, matplotlib.font_manager
 import matplotlib.ticker, matplotlib.gridspec
-from locale_utils import set_locale, print_with_c_locale
 from datetime import datetime
 
 matplotlib.use('Agg')
+
+from locale_utils import set_locale, print_with_c_locale
+from common_func import compute_spectrogram, detect_peaks
 
 
 PEAKS_DETECTION_THRESHOLD = 0.05
@@ -80,59 +80,6 @@ def compute_damping_ratio(psd, freqs):
     zeta = bandwidth / (2 * fr)
 
     return fr, zeta
-
-
-def compute_spectrogram(data):
-    N = data.shape[0]
-    Fs = N / (data[-1, 0] - data[0, 0])
-    # Round up to a power of 2 for faster FFT
-    M = 1 << int(.5 * Fs - 1).bit_length()
-    window = np.kaiser(M, 6.)
-
-    def _specgram(x):
-        x_detrended = x - np.mean(x)  # Detrending by subtracting the mean value
-        return scipy.signal.spectrogram(
-            x_detrended, fs=Fs, window=window, nperseg=M, noverlap=M//2,
-            detrend='constant', scaling='density', mode='psd')
-
-    d = {'x': data[:, 1], 'y': data[:, 2], 'z': data[:, 3]}
-    f, t, pdata = _specgram(d['x'])
-    for axis in 'yz':
-        pdata += _specgram(d[axis])[2]
-    return pdata, t, f
-
-
-# This find all the peaks in a curve by looking at when the derivative term goes from positive to negative
-# Then only the peaks found above a threshold are kept to avoid capturing peaks in the low amplitude noise of a signal
-# An added "virtual" threshold allow me to quantify in an opiniated way the peaks that "could have" effect on the printer
-# behavior and are likely known to produce or contribute to the ringing/ghosting in printed parts
-def detect_peaks(psd, freqs, window_size=5, vicinity=3):
-    # Smooth the curve using a moving average to avoid catching peaks everywhere in noisy signals
-    kernel = np.ones(window_size) / window_size
-    smoothed_psd = np.convolve(psd, kernel, mode='valid')
-    mean_pad = [np.mean(psd[:window_size])] * (window_size // 2)
-    smoothed_psd = np.concatenate((mean_pad, smoothed_psd))
-
-    # Find peaks on the smoothed curve
-    smoothed_peaks = np.where((smoothed_psd[:-2] < smoothed_psd[1:-1]) & (smoothed_psd[1:-1] > smoothed_psd[2:]))[0] + 1
-    detection_threshold = PEAKS_DETECTION_THRESHOLD * psd.max()
-    effect_threshold = PEAKS_EFFECT_THRESHOLD * psd.max()
-    smoothed_peaks = smoothed_peaks[smoothed_psd[smoothed_peaks] > detection_threshold]
- 
-    # Refine peak positions on the original curve
-    refined_peaks = []
-    for peak in smoothed_peaks:
-        local_max = peak + np.argmax(psd[max(0, peak-vicinity):min(len(psd), peak+vicinity+1)]) - vicinity
-        refined_peaks.append(local_max)
-
-    peak_freqs = ["{:.1f}".format(f) for f in freqs[refined_peaks]]
-
-    num_peaks = len(refined_peaks)
-    num_peaks_above_effect_threshold = np.sum(psd[refined_peaks] > effect_threshold)
-    
-    print_with_c_locale("Peaks detected on the graph: %d @ %s Hz (%d above effect threshold)" % (num_peaks, ", ".join(map(str, peak_freqs)), num_peaks_above_effect_threshold))
-
-    return np.array(refined_peaks), num_peaks, num_peaks_above_effect_threshold
 
 
 ######################################################################
@@ -216,11 +163,15 @@ def plot_freq_response_with_damping(ax, calibration_data, shapers, performance_s
 
     # Draw the detected peaks and name them
     # This also draw the detection threshold and warning threshold (aka "effect zone")
-    peaks, _, _ = detect_peaks(psd, freqs)
     peaks_warning_threshold = PEAKS_DETECTION_THRESHOLD * psd.max()
     peaks_effect_threshold = PEAKS_EFFECT_THRESHOLD * psd.max()
+    num_peaks, peaks, peaks_freqs = detect_peaks(psd, freqs, peaks_warning_threshold)
     
-    ax.plot(freqs[peaks], psd[peaks], "x", color='black', markersize=8)
+    peak_freqs_formated = ["{:.1f}".format(f) for f in peaks_freqs]
+    num_peaks_above_effect_threshold = np.sum(psd[peaks] > peaks_effect_threshold)
+    print_with_c_locale("Peaks detected on the graph: %d @ %s Hz (%d above effect threshold)" % (num_peaks, ", ".join(map(str, peak_freqs_formated)), num_peaks_above_effect_threshold))
+
+    ax.plot(peaks_freqs, psd[peaks], "x", color='black', markersize=8)
     for idx, peak in enumerate(peaks):
         if psd[peak] > peaks_effect_threshold:
             fontcolor = 'red'
@@ -242,7 +193,7 @@ def plot_freq_response_with_damping(ax, calibration_data, shapers, performance_s
     ax.legend(loc='upper left', prop=fontP)
     ax2.legend(loc='upper right', prop=fontP)
 
-    return freqs[peaks]
+    return peaks_freqs
 
 
 # Plot a time-frequency spectrogram to see how the system respond over time during the
