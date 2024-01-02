@@ -3,9 +3,53 @@
 # Common functions for the Shake&Tune package
 # Written by Frix_x#0161 #
 
-
+import math
+import os, sys
+from importlib import import_module
+from pathlib import Path
 import numpy as np
 from scipy.signal import spectrogram
+from git import GitCommandError, Repo
+
+
+def parse_log(logname):
+    with open(logname) as f:
+        for header in f:
+            if not header.startswith('#'):
+                break
+        if not header.startswith('freq,psd_x,psd_y,psd_z,psd_xyz'):
+            # Raw accelerometer data
+            return np.loadtxt(logname, comments='#', delimiter=',')
+    # Power spectral density data or shaper calibration data
+    raise ValueError("File %s does not contain raw accelerometer data and therefore "
+               "is not supported by Shake&Tune. Please use the official Klipper "
+               "script to process it instead." % (logname,))
+
+
+def setup_klipper_import(kdir):
+    kdir = os.path.expanduser(kdir)
+    sys.path.append(os.path.join(kdir, 'klippy'))
+    return import_module('.shaper_calibrate', 'extras')
+
+
+# This is used to print the current S&T version on top of the png graph file
+def get_git_version():
+    try:
+        # Get the absolute path of the script, resolving any symlinks
+        # Then get 2 times to parent dir to be at the git root folder
+        script_path = Path(__file__).resolve()
+        repo_path = script_path.parents[2]
+        repo = Repo(repo_path)
+
+        try:
+            version = repo.git.describe('--tags')
+        except GitCommandError:
+            # If no tag is found, use the simplified commit SHA instead
+            version = repo.head.commit.hexsha[:7]
+        return version
+
+    except Exception as e:
+        return None
 
 
 # This is Klipper's spectrogram generation function adapted to use Scipy
@@ -17,10 +61,9 @@ def compute_spectrogram(data):
     window = np.kaiser(M, 6.)
 
     def _specgram(x):
-        x_detrended = x - np.mean(x)  # Detrending by subtracting the mean value
-        return spectrogram(
-            x_detrended, fs=Fs, window=window, nperseg=M, noverlap=M//2,
-            detrend='constant', scaling='density', mode='psd')
+        x -= np.mean(x) # Detrending by subtracting the mean value
+        return spectrogram(x, fs=Fs, window=window, nperseg=M, noverlap=M//2,
+                            detrend='constant', scaling='density', mode='psd')
 
     d = {'x': data[:, 1], 'y': data[:, 2], 'z': data[:, 3]}
     f, t, pdata = _specgram(d['x'])
@@ -28,6 +71,23 @@ def compute_spectrogram(data):
         pdata += _specgram(d[axis])[2]
     return pdata, t, f
 
+
+# Compute natural resonant frequency and damping ratio by using the half power bandwidth method with interpolated frequencies
+def compute_mechanical_parameters(psd, freqs):
+    max_power_index = np.argmax(psd)
+    fr = freqs[max_power_index]
+    max_power = psd[max_power_index]
+
+    half_power = max_power / math.sqrt(2)
+    idx_below = np.where(psd[:max_power_index] <= half_power)[0][-1]
+    idx_above = np.where(psd[max_power_index:] <= half_power)[0][0] + max_power_index
+    freq_below_half_power = freqs[idx_below] + (half_power - psd[idx_below]) * (freqs[idx_below + 1] - freqs[idx_below]) / (psd[idx_below + 1] - psd[idx_below])
+    freq_above_half_power = freqs[idx_above - 1] + (half_power - psd[idx_above - 1]) * (freqs[idx_above] - freqs[idx_above - 1]) / (psd[idx_above] - psd[idx_above - 1])
+
+    bandwidth = freq_above_half_power - freq_below_half_power
+    zeta = bandwidth / (2 * fr)
+
+    return fr, zeta, max_power_index
 
 # This find all the peaks in a curve by looking at when the derivative term goes from positive to negative
 # Then only the peaks found above a threshold are kept to avoid capturing peaks in the low amplitude noise of a signal

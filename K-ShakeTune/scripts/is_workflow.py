@@ -125,7 +125,7 @@ def create_shaper_graph():
     return
 
 
-def create_vibrations_graph(axis_name):
+def create_vibrations_graph(axis_name, accel):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     lognames = []
 
@@ -155,7 +155,7 @@ def create_vibrations_graph(axis_name):
     time.sleep(5)
 
     # Generate the vibration graph and its name
-    fig = vibrations_calibration(lognames, KLIPPER_FOLDER, axis_name)
+    fig = vibrations_calibration(lognames, KLIPPER_FOLDER, axis_name, accel)
     png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], f'vibrations_{current_date}_{axis_name}.png')
     
     # Archive all the csv files in a tarball and remove them to clean up the results folder
@@ -251,7 +251,7 @@ def main():
     elif sys.argv[1].lower() == 'shaper':
         create_shaper_graph()
     elif sys.argv[1].lower() == 'vibrations':
-        create_vibrations_graph(axis_name=sys.argv[2])
+        create_vibrations_graph(axis_name=sys.argv[2], accel=sys.argv[3])
     elif sys.argv[1].lower() == 'axesmap':
         find_axesmap(accel=sys.argv[2])
     else:
