@@ -132,11 +132,11 @@ def create_shaper_graph(keep_csv):
     return
 
 
-def create_vibrations_graph(axis_name, accel, keep_csv):
+def create_vibrations_graph(axis_name, accel, chip_name, keep_csv):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     lognames = []
 
-    globbed_files = glob.glob('/tmp/adxl345-*.csv')
+    globbed_files = glob.glob(f'/tmp/{chip_name}-*.csv')
     if not globbed_files:
         print("No CSV files found in the /tmp folder to create the vibration graphs!")
         sys.exit(1)
@@ -150,7 +150,7 @@ def create_vibrations_graph(axis_name, accel, keep_csv):
             time.sleep(2)
 
         # Cleanup of the filename and moving it in the result folder
-        cleanfilename = os.path.basename(filename).replace('adxl345', f'vibr_{current_date}')
+        cleanfilename = os.path.basename(filename).replace(chip_name, f'vibr_{current_date}')
         new_file = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], cleanfilename)
         shutil.move(filename, new_file)
 
@@ -180,12 +180,12 @@ def create_vibrations_graph(axis_name, accel, keep_csv):
     return
 
 
-def find_axesmap(accel):
+def find_axesmap(accel, chip_name):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     result_filename = os.path.join(RESULTS_FOLDER, f'axes_map_{current_date}.txt')
     lognames = []
 
-    globbed_files = glob.glob('/tmp/adxl345-*.csv')
+    globbed_files = glob.glob(f'/tmp/{chip_name}-*.csv')
     if not globbed_files:
         print("No CSV files found in the /tmp folder to analyze and find the axes_map!")
         sys.exit(1)
@@ -253,10 +253,12 @@ def main():
     opts = optparse.OptionParser(usage)
     opts.add_option("-t", "--type", type="string", dest="type",
                     default=None, help="type of output graph to produce")
-    opts.add_option("-a", "--accel", type="int", default=None, dest="accel_used",
+    opts.add_option("--accel", type="int", default=None, dest="accel_used",
                     help="acceleration used during the vibration macro or axesmap macro")
-    opts.add_option("-x", "--axis_name", type="string", default=None, dest="axis_name",
+    opts.add_option("--axis_name", type="string", default=None, dest="axis_name",
                     help="axis tested during the vibration macro")
+    opts.add_option("--chip_name", type="string", default="adxl345", dest="chip_name",
+                    help="accelerometer chip name in klipper used during the vibration macro or the axesmap macro")
     opts.add_option("-n", "--keep_results", type="int", default=3, dest="keep_results",
                     help="number of results to keep in the result folder after each run of the script")
     opts.add_option("-c", "--keep_csv", action="store_true", default=False, dest="keep_csv",
@@ -283,9 +285,9 @@ def main():
     elif graph_mode.lower() == 'shaper':
         create_shaper_graph(keep_csv=options.keep_csv)
     elif graph_mode.lower() == 'vibrations':
-        create_vibrations_graph(axis_name=options.axis_name, accel=options.accel_used, keep_csv=options.keep_csv)
+        create_vibrations_graph(axis_name=options.axis_name, accel=options.accel_used, chip_name=options.chip_name, keep_csv=options.keep_csv)
     elif graph_mode.lower() == 'axesmap':
-        find_axesmap(accel=options.accel_used)
+        find_axesmap(accel=options.accel_used, chip_name=options.chip_name)
     elif graph_mode.lower() == 'clean':
         clean_files(keep_results=options.keep_results)
 
