@@ -129,7 +129,7 @@ def create_shaper_graph(keep_csv):
         if os.path.exists(new_file):
             os.remove(new_file)
     
-    return
+    return axis
 
 
 def create_vibrations_graph(axis_name, accel, chip_name, keep_csv):
@@ -282,16 +282,19 @@ def main():
 
     if graph_mode.lower() == 'belts':
         create_belts_graph(keep_csv=options.keep_csv)
+        print(f"Belt graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[0]}")
     elif graph_mode.lower() == 'shaper':
-        create_shaper_graph(keep_csv=options.keep_csv)
+        axis = create_shaper_graph(keep_csv=options.keep_csv)
+        print(f"{axis} input shaper graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[1]}")
     elif graph_mode.lower() == 'vibrations':
         create_vibrations_graph(axis_name=options.axis_name, accel=options.accel_used, chip_name=options.chip_name, keep_csv=options.keep_csv)
+        print(f"{options.axis_name} vibration graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[2]}")
     elif graph_mode.lower() == 'axesmap':
+        print(f"WARNING: AXES_MAP_CALIBRATION is currently very experimental and may produce incorrect results... Please validate the output!")
         find_axesmap(accel=options.accel_used, chip_name=options.chip_name)
     elif graph_mode.lower() == 'clean':
+        print(f"Cleaning output folder to keep only the last {options.keep_results} results...")
         clean_files(keep_results=options.keep_results)
-
-    print(f"Graphs created. You will find the results in {RESULTS_FOLDER}")
 
 
 if __name__ == '__main__':
