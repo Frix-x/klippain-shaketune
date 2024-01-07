@@ -264,12 +264,10 @@ def main():
     opts.add_option("-c", "--keep_csv", action="store_true", default=False, dest="keep_csv",
                     help="weither or not to keep the CSV files alongside the PNG graphs image results")
     options, args = opts.parse_args()
-    if len(args) < 1:
-        opts.error("Incorrect number of arguments")
     
     if options.type is None:
         opts.error("You must specify the type of output graph you want to produce (option -t)")
-    elif options.type.lower() not in ['belts', 'shaper', 'vibrations', 'axesmap', 'clean']:
+    elif options.type.lower() is None or options.type.lower() not in ['belts', 'shaper', 'vibrations', 'axesmap', 'clean']:
         opts.error("Type of output graph need to be in the list of 'belts', 'shaper', 'vibrations', 'axesmap' or 'clean'")
     else:
         graph_mode = options.type
