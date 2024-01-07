@@ -5,14 +5,11 @@
 ############################################
 # Written by Frix_x#0161 #
 
-# Usage:
-#   This script was designed to be used with gcode_shell_commands directly from Klipper
-#   Parameters availables:
-#      BELTS       - To generate belts diagrams after calling the Klipper TEST_RESONANCES AXIS=1,(-)1 OUTPUT=raw_data
-#      SHAPER      - To generate input shaper diagrams after calling the Klipper TEST_RESONANCES AXIS=X/Y OUTPUT=raw_data
-#      VIBRATIONS  - To generate vibration diagram after calling the custom (Frix_x#0161) VIBRATIONS_CALIBRATION macro
+#   This script is designed to be used with gcode_shell_commands directly from Klipper
+#   Use the provided Shake&Tune macros instead!
 
 
+import optparse
 import os
 import time
 import glob
@@ -24,7 +21,6 @@ from datetime import datetime
 #################################################################################################################
 RESULTS_FOLDER = os.path.expanduser('~/printer_data/config/K-ShakeTune_results')
 KLIPPER_FOLDER = os.path.expanduser('~/klipper')
-STORE_RESULTS = 3
 #################################################################################################################
 
 from graph_belts import belts_calibration
@@ -51,7 +47,7 @@ def is_file_open(filepath):
     return False
 
 
-def create_belts_graph():
+def create_belts_graph(keep_csv):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     lognames = []
 
@@ -86,12 +82,18 @@ def create_belts_graph():
     # Generate the belts graph and its name
     fig = belts_calibration(lognames, KLIPPER_FOLDER)
     png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[0], f'belts_{current_date}.png')
+    fig.savefig(png_filename, dpi=150)
+    
+    # Remove the CSV files if the user don't want to keep them
+    if not keep_csv:
+        for csv in lognames:
+            if os.path.exists(csv):
+                os.remove(csv)
 
-    fig.savefig(png_filename)
     return
 
 
-def create_shaper_graph():
+def create_shaper_graph(keep_csv):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     # Get all the files and sort them based on last modified time to select the most recent one
@@ -120,16 +122,21 @@ def create_shaper_graph():
     # Generate the shaper graph and its name
     fig = shaper_calibration([new_file], KLIPPER_FOLDER)
     png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[1], f'resonances_{current_date}_{axis}.png')
+    fig.savefig(png_filename, dpi=150)
+
+    # Remove the CSV file if the user don't want to keep it
+    if not keep_csv:
+        if os.path.exists(new_file):
+            os.remove(new_file)
     
-    fig.savefig(png_filename)
-    return
+    return axis
 
 
-def create_vibrations_graph(axis_name, accel):
+def create_vibrations_graph(axis_name, accel, chip_name, keep_csv):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     lognames = []
 
-    globbed_files = glob.glob('/tmp/adxl345-*.csv')
+    globbed_files = glob.glob(f'/tmp/{chip_name}-*.csv')
     if not globbed_files:
         print("No CSV files found in the /tmp folder to create the vibration graphs!")
         sys.exit(1)
@@ -143,7 +150,7 @@ def create_vibrations_graph(axis_name, accel):
             time.sleep(2)
 
         # Cleanup of the filename and moving it in the result folder
-        cleanfilename = os.path.basename(filename).replace('adxl345', f'vibr_{current_date}')
+        cleanfilename = os.path.basename(filename).replace(chip_name, f'vibr_{current_date}')
         new_file = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], cleanfilename)
         shutil.move(filename, new_file)
 
@@ -157,23 +164,28 @@ def create_vibrations_graph(axis_name, accel):
     # Generate the vibration graph and its name
     fig = vibrations_calibration(lognames, KLIPPER_FOLDER, axis_name, accel)
     png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], f'vibrations_{current_date}_{axis_name}.png')
+    fig.savefig(png_filename, dpi=150)
     
-    # Archive all the csv files in a tarball and remove them to clean up the results folder
-    with tarfile.open(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], f'vibrations_{current_date}_{axis_name}.tar.gz'), 'w:gz') as tar:
-        for csv_file in glob.glob(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], f'vibr_{current_date}*.csv')):
-            tar.add(csv_file, recursive=False)
+    # Archive all the csv files in a tarball in case the user want to keep them
+    if keep_csv:
+        with tarfile.open(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], f'vibrations_{current_date}_{axis_name}.tar.gz'), 'w:gz') as tar:
+            for csv_file in lognames:
+                tar.add(csv_file, recursive=False)
+
+    # Remove the remaining CSV files not needed anymore (tarball is safe if it was created)
+    for csv_file in lognames:
+        if os.path.exists(csv_file):
             os.remove(csv_file)
 
-    fig.savefig(png_filename)
     return
 
 
-def find_axesmap(accel):
+def find_axesmap(accel, chip_name):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     result_filename = os.path.join(RESULTS_FOLDER, f'axes_map_{current_date}.txt')
     lognames = []
 
-    globbed_files = glob.glob('/tmp/adxl345-*.csv')
+    globbed_files = glob.glob(f'/tmp/{chip_name}-*.csv')
     if not globbed_files:
         print("No CSV files found in the /tmp folder to analyze and find the axes_map!")
         sys.exit(1)
@@ -201,10 +213,10 @@ def get_old_files(folder, extension, limit):
     files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
     return files[limit:]
 
-def clean_files():
+def clean_files(keep_results):
     # Define limits based on STORE_RESULTS
-    keep1 = STORE_RESULTS + 1
-    keep2 = 2 * STORE_RESULTS + 1
+    keep1 = keep_results + 1
+    keep2 = 2 * keep_results + 1
 
     # Find old files in each directory
     old_belts_files = get_old_files(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[0]), '.png', keep1)
@@ -236,31 +248,51 @@ def clean_files():
 
 
 def main():
-    # Check if results folders are there or create them
+    # Parse command-line arguments
+    usage = "%prog [options] <logs>"
+    opts = optparse.OptionParser(usage)
+    opts.add_option("-t", "--type", type="string", dest="type",
+                    default=None, help="type of output graph to produce")
+    opts.add_option("--accel", type="int", default=None, dest="accel_used",
+                    help="acceleration used during the vibration macro or axesmap macro")
+    opts.add_option("--axis_name", type="string", default=None, dest="axis_name",
+                    help="axis tested during the vibration macro")
+    opts.add_option("--chip_name", type="string", default="adxl345", dest="chip_name",
+                    help="accelerometer chip name in klipper used during the vibration macro or the axesmap macro")
+    opts.add_option("-n", "--keep_results", type="int", default=3, dest="keep_results",
+                    help="number of results to keep in the result folder after each run of the script")
+    opts.add_option("-c", "--keep_csv", action="store_true", default=False, dest="keep_csv",
+                    help="weither or not to keep the CSV files alongside the PNG graphs image results")
+    options, args = opts.parse_args()
+    
+    if options.type is None:
+        opts.error("You must specify the type of output graph you want to produce (option -t)")
+    elif options.type.lower() is None or options.type.lower() not in ['belts', 'shaper', 'vibrations', 'axesmap', 'clean']:
+        opts.error("Type of output graph need to be in the list of 'belts', 'shaper', 'vibrations', 'axesmap' or 'clean'")
+    else:
+        graph_mode = options.type
+
+    # Check if results folders are there or create them before doing anything else
     for result_subfolder in RESULTS_SUBFOLDERS:
         folder = os.path.join(RESULTS_FOLDER, result_subfolder)
         if not os.path.exists(folder):
             os.makedirs(folder)
 
-    if len(sys.argv) < 2:
-        print("Usage: is_workflow.py [BELTS|SHAPER|VIBRATIONS|AXESMAP]")
-        sys.exit(1)
-
-    if sys.argv[1].lower() == 'belts':
-        create_belts_graph()
-    elif sys.argv[1].lower() == 'shaper':
-        create_shaper_graph()
-    elif sys.argv[1].lower() == 'vibrations':
-        create_vibrations_graph(axis_name=sys.argv[2], accel=sys.argv[3])
-    elif sys.argv[1].lower() == 'axesmap':
-        find_axesmap(accel=sys.argv[2])
-    else:
-        print("Usage: is_workflow.py [BELTS|SHAPER|VIBRATIONS|AXESMAP]")
-        sys.exit(1)
-
-
-    clean_files()
-    print(f"Graphs created. You will find the results in {RESULTS_FOLDER}")
+    if graph_mode.lower() == 'belts':
+        create_belts_graph(keep_csv=options.keep_csv)
+        print(f"Belt graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[0]}")
+    elif graph_mode.lower() == 'shaper':
+        axis = create_shaper_graph(keep_csv=options.keep_csv)
+        print(f"{axis} input shaper graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[1]}")
+    elif graph_mode.lower() == 'vibrations':
+        create_vibrations_graph(axis_name=options.axis_name, accel=options.accel_used, chip_name=options.chip_name, keep_csv=options.keep_csv)
+        print(f"{options.axis_name} vibration graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[2]}")
+    elif graph_mode.lower() == 'axesmap':
+        print(f"WARNING: AXES_MAP_CALIBRATION is currently very experimental and may produce incorrect results... Please validate the output!")
+        find_axesmap(accel=options.accel_used, chip_name=options.chip_name)
+    elif graph_mode.lower() == 'clean':
+        print(f"Cleaning output folder to keep only the last {options.keep_results} results...")
+        clean_files(keep_results=options.keep_results)
 
 
 if __name__ == '__main__':

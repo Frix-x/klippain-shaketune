@@ -27,6 +27,32 @@ function preflight_checks {
         echo "[ERROR] Klipper service not found, please install Klipper first!"
         exit -1
     fi
+
+    install_package_requirements
+}
+
+# Function to check if a package is installed
+function is_package_installed {
+    dpkg -s "$1" &> /dev/null
+    return $?
+}
+
+function install_package_requirements {
+    packages=("python3-venv" "libopenblas-dev" "libatlas-base-dev")
+    packages_to_install=""
+
+    for package in "${packages[@]}"; do
+        if is_package_installed "$package"; then
+            echo "$package is already installed"
+        else
+            packages_to_install="$packages_to_install $package"
+        fi
+    done
+
+    if [ -n "$packages_to_install" ]; then
+        echo "Installing missing packages: $packages_to_install"
+        sudo apt update && sudo apt install -y $packages_to_install
+    fi
 }
 
 function check_download {

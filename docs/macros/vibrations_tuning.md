@@ -22,6 +22,8 @@ Call the `VIBRATIONS_CALIBRATION` macro with the direction and speed range you w
 |SPEED_INCREMENT|2|speed increments of the toolhead in mm/s between every movements|
 |TRAVEL_SPEED|200|speed in mm/s used for all the travels moves|
 |ACCEL_CHIP|"adxl345"|accelerometer chip name in the config|
+|KEEP_N_RESULTS|3|Total number of results to keep in the result folder after running the test. The older results are automatically cleaned up|
+|KEEP_CSV|True|Weither or not to keep the CSV data files alonside the PNG graphs (archived in a tarball)|
 
 
 ## Graphs description

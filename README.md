@@ -21,19 +21,15 @@ Check out the **[detailed documentation of the Shake&Tune module here](./docs/RE
 
 Follow these steps to install the Shake&Tune module in your printer:
   1. Be sure to have a working accelerometer on your machine. You can follow the official [Measuring Resonances Klipper documentation](https://www.klipper3d.org/Measuring_Resonances.html) to configure one. Validate with an `ACCELEROMETER_QUERY` command that everything works correctly.
-  1. Install the system libraries that are needed to run the custom Python scripts:
-     ```bash
-     sudo apt update && sudo apt install python3-venv libopenblas-dev libatlas-base-dev -y
-     ```
-  1. Then, you can install the Shake&Tune package by running over SSH on your printer:
+  1. Install the Shake&Tune package by running over SSH on your printer:
      ```bash
      wget -O - https://raw.githubusercontent.com/Frix-x/klippain-shaketune/main/install.sh | bash
      ```
-  1. Finally, append the following to your `printer.cfg` file and restart Klipper (if prefered, you can include only the needed macros: using `*.cfg` is a convenient way to include them all at once):
+  1. Then, append the following to your `printer.cfg` file and restart Klipper (if prefered, you can include only the needed macros: using `*.cfg` is a convenient way to include them all at once):
      ```
      [include K-ShakeTune/*.cfg]
      ```
-  1. Optionally, if you want to get automatic updates, add the following to your `moonraker.cfg` file:
+  1. Finally, if you want to get automatic updates, add the following to your `moonraker.cfg` file:
      ```
      [update_manager Klippain-ShakeTune]
      type: git_repo
@@ -44,10 +40,7 @@ Follow these steps to install the Shake&Tune module in your printer:
      managed_services: klipper
      install_script: install.sh
      ```
-   
-   > **Note**:
-   >
-   > If already using my old IS workflow scripts, please remove everything before installing this new module. This include the macros, the Python scripts, the `plot_graph.sh` and the `[gcode_shell_command plot_graph]` section that are not needed anymore.
+
 
 ## Usage
 
