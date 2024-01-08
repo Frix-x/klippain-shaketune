@@ -111,7 +111,7 @@ Such graph patterns can arise from various factors, and there isn't a one-size-f
 
 ### Problematic CANBUS speed
 
-Using CANBUS toolheads with an integrated accelerometer chip can sometimes pose challenges if the CANBUS speed is set too low. While users might lower the bus speed to fix Klipper's timing errors, this change will also affect input shaping measurements. An example outcome of a low bus speed is the following graph that, though generally well-shaped, appears jagged and spiky throughout. Additional low-frequency energy might also be present. For optimal accelerometer board operation on your CANBUS toolhead, a speed setting of 500k is the minimum, but 1M is advisable.
+Using CANBUS toolheads with an integrated accelerometer chip can sometimes pose challenges if the CANBUS speed is set too low. While users might lower the bus speed to fix Klipper's timing errors, this change will also affect input shaping measurements. An example outcome of a low bus speed is the following graph that, though generally well-shaped, appears jagged and spiky throughout. Additional low-frequency energy might also be present. For optimal accelerometer board operation on your CANBUS toolhead, a speed setting of 500k is the minimum, but 1M is advisable. You might want to look at [this excellent guide by Esoterical](https://github.com/Esoterical/voron_canbus/tree/main).
 
 | CANBUS problem present | CANBUS problem solved |
 | --- | --- |
@@ -136,6 +136,18 @@ The presence of an unbalanced or badly running fan can be directly observed in t
 | Unbalanced fan running | Unbalanced fan off |
 | --- | --- |
 | ![](../images/shaper_graphs/unbalanced_fan_on.png) | ![](../images/shaper_graphs/unbalanced_fan_off.png) |
+
+### Noisy accelerometer
+
+The integration of LIS2DW as a resonance measuring device in Klipper is starting to be more and more common, particularly due to some manufacturers promoting its superiority over the established ADXL345. However, a critical analysis of their respective datasheets reveals a nuanced reality. While the LIS2DW offers a higher sampling rate, which is a marginal benefit for our purposes, it tends to be less sensitive or exhibits increased noise levels at comparable sensitivity settings compared to the ADXL345. But, given that LIS2DW chips are also 5-10 times cheaper, it definitely makes sense for mass-producing PCBs.
+
+In our use case, this elevated noise manifests mainly in the spectrogram as additional 'ghosting' resonance lines parallel to the main resonance diagonal, with some intersecting interference lines that skew across the harmonics. Fortunately, this apparent 'lightshow' do not distort the overall shape of the top graph and both the resonant frequency and damping ratio remain accurately measured as well as the input shaping filters that are also quite similar. This only makes it more challenging to discern fine details that could be masked, and it doesn't help for diagnosing mechanical issues.
+
+Finally, please note that LIS2DW are known to add a small offset all over the top graph. So the curve and peaks might be a bit higher, even at very low frequencies: in this case, this is probably not [#low-frequency-energy] but just some noise.
+
+| LIS2DW measurement | ADXL345 measurement |
+| --- | --- |
+| ![](../images/shaper_graphs/chipcomp_s2dw.png) | ![](../images/shaper_graphs/chipcomp_adxl.png) |
 
 ### Crazy graphs and miscs
 
