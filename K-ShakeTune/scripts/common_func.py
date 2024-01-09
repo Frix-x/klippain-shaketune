@@ -61,7 +61,6 @@ def compute_spectrogram(data):
     window = np.kaiser(M, 6.)
 
     def _specgram(x):
-        x -= np.mean(x) # Detrending by subtracting the mean value
         return spectrogram(x, fs=Fs, window=window, nperseg=M, noverlap=M//2,
                             detrend='constant', scaling='density', mode='psd')
 
