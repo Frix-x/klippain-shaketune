@@ -29,6 +29,7 @@ Call the `VIBRATIONS_CALIBRATION` macro with the direction and speed range you w
 ## Graphs description
 
 ![](../images/vibrations_graphs/vibration_graph_explanation.png)
+![](../images/vibrations_graphs/vibration_graph_explanation2.png)
 
 ## Improving the results
 
