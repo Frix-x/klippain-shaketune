@@ -29,18 +29,6 @@ Follow these steps to install the Shake&Tune module in your printer:
      ```
      [include K-ShakeTune/*.cfg]
      ```
-  1. Finally, if you want to get automatic updates, add the following to your `moonraker.cfg` file:
-     ```
-     [update_manager Klippain-ShakeTune]
-     type: git_repo
-     path: ~/klippain_shaketune
-     channel: beta
-     origin: https://github.com/Frix-x/klippain-shaketune.git
-     primary_branch: main
-     managed_services: klipper
-     install_script: install.sh
-     ```
-
 
 ## Usage
 
