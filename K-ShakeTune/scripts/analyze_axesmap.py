@@ -13,27 +13,11 @@
 
 import optparse
 import numpy as np
-import locale
+from locale_utils import print_with_c_locale
 from scipy.signal import butter, filtfilt
 
 
 NUM_POINTS = 500
-
-
-# Set the best locale for time and date formating (generation of the titles)
-try:
-    locale.setlocale(locale.LC_TIME, locale.getdefaultlocale())
-except locale.Error:
-    locale.setlocale(locale.LC_TIME, 'C')
-
-# Override the built-in print function to avoid problem in Klipper due to locale settings
-original_print = print
-def print_with_c_locale(*args, **kwargs):
-    original_locale = locale.setlocale(locale.LC_ALL, None)
-    locale.setlocale(locale.LC_ALL, 'C')
-    original_print(*args, **kwargs)
-    locale.setlocale(locale.LC_ALL, original_locale)
-print = print_with_c_locale
 
 
 ######################################################################
@@ -160,7 +144,7 @@ def main():
         opts.error("Invalid acceleration value. It should be a numeric value.")
 
     results = axesmap_calibration(args, accel_value)
-    print(results)
+    print_with_c_locale(results)
 
     if options.output is not None:
         with open(options.output, 'w') as f:
