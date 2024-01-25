@@ -110,7 +110,7 @@ function copy_variables {
   mkdir -p "${USER_CONFIG_PATH}/K-ShakeTune-Variables"
   for VARIABLE in ${VARIABLES[@]}; do
     if [ ! -f "${USER_CONFIG_PATH}/K-ShakeTune-Variables/${VARIABLE}.cfg" ]; then
-      cp -f "${K_SHAKETUNE_PATH}/K-ShakeTune/${VARIABLE}.cfg" "${USER_CONFIG_PATH}/K-ShakeTune-Variables/${VARIABLE}.cfg"
+      cp -f "${K_SHAKETUNE_PATH}/K-ShakeTune/${VARIABLE}" "${USER_CONFIG_PATH}/K-ShakeTune-Variables/${VARIABLE}.cfg"
     else
       echo "${VARIABLE} file already exists"
     fi
