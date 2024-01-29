@@ -84,7 +84,10 @@ def compute_mechanical_parameters(psd, freqs):
     freq_above_half_power = freqs[idx_above - 1] + (half_power - psd[idx_above - 1]) * (freqs[idx_above] - freqs[idx_above - 1]) / (psd[idx_above] - psd[idx_above - 1])
 
     bandwidth = freq_above_half_power - freq_below_half_power
-    zeta = bandwidth / (2 * fr)
+    bw1 = math.pow(bandwidth/fr,2)
+    bw2 = math.pow(bandwidth/fr,4)
+
+    zeta = math.sqrt(0.5-math.sqrt(1/(4+4*bw1-bw2)))
 
     return fr, zeta, max_power_index
 
