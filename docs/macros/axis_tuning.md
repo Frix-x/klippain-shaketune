@@ -146,17 +146,19 @@ The presence of an unbalanced or poorly running fan can be directly observed in 
 | --- | --- | --- |
 | ![](../images/shaper_graphs/fan_notproblematic.png) | ![](../images/shaper_graphs/fan_maybeproblematic.png) | ![](../images/shaper_graphs/fan_problematic.png) |
 
-### Noisy accelerometer
+### Spectrogram lightshow (LIS2DW)
 
-The integration of LIS2DW as a resonance measuring device in Klipper is starting to be more and more common, particularly due to some manufacturers promoting its superiority over the established ADXL345. A critical analysis of their respective datasheets reveals a nuanced reality: the LIS2DW offers a higher sampling rate, but also it tends to exhibit increased noise levels at comparable sensitivity settings compared to the ADXL345. But, given that LIS2DW chips are also 5-10 times cheaper, it definitely makes sense for mass-producing PCBs.
+The integration of LIS2DW as a resonance measuring device in Klipper is becoming more and more common, especially because some manufacturers are promoting its superiority over the established ADXL345. It's indeed a new generation chip that should be better to measure traditional "accelerations". However, a detailed comparison of their datasheets and practical measurements paints a more complex picture: the LIS2DW boasts greater sensitivity, but it has a lower sampling rate and produce significant aliasing that results in a "lightshow" effect on the spectrogram, characterized by multiple spurious resonance lines parallel to the main resonance, accompanied by intersecting interference lines that distort the harmonic profile.
 
-In our use case, this chip manifests aliasing in the spectrogram that can be seen as additional 'ghosting' resonance lines parallel to the main resonance diagonal, with some intersecting interference lines that skew across the harmonics. Fortunately, this apparent lightshow do not distort the overall shape of the top graph and both the resonant frequency and damping ratio remain accurately measured as well as the input shaping filters that are also quite similar. This only makes it more challenging to discern fine details that could be masked, and it doesn't help for diagnosing mechanical issues.
+While, the top resonance graph's overall shape, including resonant frequency and damping ratio, should be close with pretty similar recommendations for input shaping filters, this aliasing complicates the identification of subtle details and hampers mechanical issue diagnostics. It especially introduces a potential misinterpretation of "[binding](#low-frequency-energy)" due to a global offset of the curve.
 
-Finally, please note that LIS2DW are known to add a small offset all over the top graph due to this aliasing. So the curve and peaks might be a bit higher, even at very low frequencies: in this case, this is probably not [#low-frequency-energy] but just some noise and it's not a mechanical problem.
+  > **Note**:
+  >
+  > It seems that some LIS2DW chips are better than others: in some cases aliasing is not a problem, but it can also be very problematic and lead to bad graphs, as seen in the "Extreme Aliasing" example below.
 
-| LIS2DW measurement | ADXL345 measurement |
-| --- | --- |
-| ![](../images/shaper_graphs/chipcomp_s2dw.png) | ![](../images/shaper_graphs/chipcomp_adxl.png) |
+| ADXL345 measurement | LIS2DW measurement | LIS2DW extreme aliasing |
+| --- | --- | --- |
+| ![](../images/shaper_graphs/chipcomp_adxl.png) | ![](../images/shaper_graphs/chipcomp_s2dw.png) | ![](../images/shaper_graphs/chipcomp_s2dw_2.png) |
 
 ### Crazy graphs and miscs
 

@@ -49,3 +49,13 @@ For reference, the default settings used in Klipper are:
 #driver_HEND: 0
 #driver_HSTRT: 5
 ```
+
+### Semi-blank spectrogram (LIS2DW)
+
+The integration of LIS2DW as a resonance measuring device in Klipper is becoming more and more common, especially because some manufacturers are promoting its superiority over the established ADXL345. It's indeed a new generation chip that should be better to measure traditional "accelerations". However, a detailed comparison of their datasheets and practical measurements paints a more complex picture: the LIS2DW boasts greater sensitivity, but it has a lower sampling rate and produce significant aliasing.
+
+This lower sampling rate is problematic for the vibration graph because it only records data up to 200 Hz, which is too low to produce an accurate graph. This will be seen as a small low frequency band on the spectrogram with a blank area for higher frequencies and incorrect data printed in the speed profile and motor frequency profile.
+
+| LIS2DW vibration measurement |
+| --- |
+| ![](../images/vibrations_graphs/sd2w_spectrogram.png) |

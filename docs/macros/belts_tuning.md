@@ -60,7 +60,6 @@ The following graphs show the effect of incorrect or uneven belt tension. Rememb
 | The A belt tension is slightly lower than the B belt tension. This can be quickly remedied by tightening the screw only about one-half to one full turn. &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; | ![](../images/belt_graphs/low_A_tension.png) |
 | B belt tension is significantly lower than the A belt. If you encounter this graph, I recommend going back to the [Voron belt tensioning documentation](https://docs.vorondesign.com/tuning/secondary_printer_tuning.html#belt-tension) for a more solid base. However, you could slightly increase the B tension and decrease the A tension, but exercise caution to avoid diverging from the recommended 110Hz base. | ![](../images/belt_graphs/low_B_tension.png) |
 
-
 ### Belt path problem
 
 If there's an issue within the belt path, aligning and overlaying the curve might be unachievable even with proper belt tension. Begin by verifying that each belt has **the exact same number of teeth**. Then, inspect the belt paths, bearings, any signs of wear (like belt dust), and ensure the belt aligns correctly on all bearing flanges during motion.
@@ -70,3 +69,13 @@ If there's an issue within the belt path, aligning and overlaying the curve migh
 | On this chart, there are two peaks. The first pair of peaks seems nearly aligned, but the second peak appears solely on the B belt, significantly deviating from the A belt. This suggests an issue with the belt path, likely with the B belt. | ![](../images/belt_graphs/beltpath_problem1.png) |
 | This chart is quite complex, displaying 3 peaks. While all the pairs seem well-aligned and tension ok, there are more than just two total peaks because `[1]` is split in two smaller peaks. This could be an issue, but it's not certain. It's recommended to generate the [Axis Input Shaper Graphs](./axis_tuning.md) to determine its impact. | ![](../images/belt_graphs/beltpath_problem2.png) |
 | This graph might indicate too low belt tension, but also potential binding, friction or something impeding the toolhead's smooth movement. Indeed, the signal strength is considerably low (with a peak around 300k, compared to the typical ~1M) and is primarily filled with noise. Start by going back [here](https://docs.vorondesign.com/tuning/secondary_printer_tuning.html#belt-tension) to establish a robust tension foundation. Next, produce the [Axis Input Shaper Graphs](./axis_tuning.md) to identify any binding and address the issue. | ![](../images/belt_graphs/beltpath_problem3.png) |
+
+### Spectrogram lightshow (LIS2DW)
+
+The integration of LIS2DW as a resonance measuring device in Klipper is becoming more and more common, especially because some manufacturers are promoting its superiority over the established ADXL345. It's indeed a new generation chip that should be better to measure traditional "accelerations". However, a detailed comparison of their datasheets and practical measurements paints a more complex picture: the LIS2DW boasts greater sensitivity, but it has a lower sampling rate and produce significant aliasing that results in a "lightshow" effect on the spectrogram, characterized by multiple spurious resonance lines parallel to the main resonance, accompanied by intersecting interference lines that distort the harmonic profile.
+
+For the belt graph, this can be problematic because it can introduce a lot of noise into the results and make them difficult to interpret, and it will probably tell you that there is a mechanical problem when there isn't.
+
+| ADXL345 measurement | LIS2DW measurement |
+| --- | --- |
+| ![](../images/belt_graphs/chipcomp_adxl.png) | ![](../images/belt_graphs/chipcomp_s2dw.png) |
