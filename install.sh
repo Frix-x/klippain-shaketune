@@ -7,6 +7,8 @@ KLIPPER_PATH="${HOME}/klipper"
 K_SHAKETUNE_PATH="${HOME}/klippain_shaketune"
 K_SHAKETUNE_VENV_PATH="${HOME}/klippain_shaketune-env"
 
+VARIABLES=("variables")
+
 set -eu
 export LC_ALL=C
 
@@ -102,6 +104,19 @@ function link_extension {
     fi
 }
 
+function copy_variables {
+  echo "[INSTALL] Copying variables files to your config directory..."
+
+  mkdir -p "${USER_CONFIG_PATH}/K-ShakeTune-Variables"
+  for VARIABLE in ${VARIABLES[@]}; do
+    if [ ! -f "${USER_CONFIG_PATH}/K-ShakeTune-Variables/${VARIABLE}.cfg" ]; then
+      cp -f "${K_SHAKETUNE_PATH}/K-ShakeTune/${VARIABLE}" "${USER_CONFIG_PATH}/K-ShakeTune-Variables/${VARIABLE}.cfg"
+    else
+      echo "${VARIABLE} file already exists"
+    fi
+  done
+}
+
 function link_gcodeshellcommandpy {
     if [ ! -f "${KLIPPER_PATH}/klippy/extras/gcode_shell_command.py" ]; then
         echo "[INSTALL] Downloading gcode_shell_command.py Klipper extension needed for this module"
@@ -140,6 +155,7 @@ preflight_checks
 check_download
 setup_venv
 link_extension
+copy_variables
 add_updater
 link_gcodeshellcommandpy
 restart_klipper

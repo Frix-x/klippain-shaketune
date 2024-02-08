@@ -1,0 +1,12 @@
+[gcode_macro _K-SHAKETUNE-VARIABLES]
+variable_keep_csv: True
+variable_keep_results: 3
+# variable_accel_chips:
+
+
+# DO NOT EDIT
+# Defines the Version of the variables to prevent compatibility problems
+variable_version: 1
+
+gcode:
+  # Do Nothing
