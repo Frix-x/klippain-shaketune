@@ -15,6 +15,8 @@ Then, call the `AXES_SHAPER_CALIBRATION` macro and look for the graphs in the re
 |FREQ_END|133|Maximum excitation frequency|
 |HZ_PER_SEC|1|Number of Hz per seconds for the test|
 |AXIS|"all"|Axis you want to test in the list of "all", "X" or "Y"|
+|SCV|printer square corner velocity|Square corner velocity you want to use to calculate shaper recommendations. Using higher SCV values usually results in more smoothing and lower maximum accelerations|
+|MAX_SMOOTHING|None|Max smoothing allowed when calculating shaper recommendations|
 |KEEP_N_RESULTS|3|Total number of results to keep in the result folder after running the test. The older results are automatically cleaned up|
 |KEEP_CSV|True|Weither or not to keep the CSV data file alonside the PNG graphs|
 
@@ -39,13 +41,13 @@ For setting your Input Shaping filters, rely on the auto-computed values display
     * `MZV` is usually the top pick for well-adjusted machines. It's a good compromise for low remaining vibrations while still allowing pretty good acceleration values. Keep in mind, `MZV` is only recommended by Klipper on good graphs.
     * `EI` can be used as a fallback for challenging graphs. But first, try to fix your mechanical issues before using it: almost every printer should be able to run `MZV` instead.
     * `2HUMP_EI` and `3HUMP_EI` are last-resort choices. Usually, they lead to a high level of smoothing in order to suppress the ringing while also using relatively low acceleration values. If they pop up as suggestions, it's likely your machine has underlying mechanical issues (that lead to pretty bad or "wide" graphs).
-  - **Recommended Acceleration** (`accel<=...`): This isn't a standalone figure. It's essential to also consider the `vibr` and `sm` values as it's a compromise between the three. They will give you the percentage of remaining vibrations and the smoothing after Input Shaping, when using the recommended acceleration. Nothing will prevent you from using higher acceleration values; they are not a limit. However, when doing so, Input Shaping may not be able to suppress all the ringing on your parts. Finally, keep in mind that high acceleration values are not useful at all if there is still a high level of remaining vibrations: you should address any mechanical issues first.
-  - **The remaining vibrations** (`vibr`): This directly correlates with ringing. It correspond to the total value of the blue "after shaper" signal. Ideally, you want a filter with minimal or zero vibrations.
+  - **Recommended Acceleration** (`accel<=...`): This isn't a standalone figure. It's essential to also consider the `vibr` and `sm` values as it's a compromise between the three. They will give you the percentage of remaining vibrations and the smoothing after Input Shaping, when using the recommended acceleration. Nothing will prevent you from using higher acceleration values; they are not a limit. However, in this case, Input Shaping may not be able to suppress all the ringing on your parts, and more smoothing will occur. Finally, keep in mind that high acceleration values are not useful at all if there is still a high level of remaining vibrations: you should address any mechanical issues first.
+  - **The remaining vibrations** (`vibr`): This directly correlates with ringing. It correspond to the total value of the "after shaper" signal. Ideally, you want a filter with minimal remaining vibrations.
   - **Shaper recommendations**: This script will give you some tailored recommendations based on your graphs. Pick the one that suit your needs:
-    * The "performance" shaper is Klipper's original suggestion that is good for high acceleration while also sometimes allowing a little bit of remaining vibrations. Use it if your goal is speed printing and you don't care much about some remaining ringing.
+    * The "performance" shaper is Klipper's original suggestion, which is good for high acceleration, but sometimes allows a little residual vibration while minimizing smoothing. Use it if your goal is speed printing and you don't care much about some remaining ringing.
     * The "low vibration" shaper aims for the lowest level of remaining vibration to ensure the best print quality with minimal ringing. This should be the best bet for most users.
-    * Sometimes, only a single recommendation called "best" shaper is presented. This means that either no suitable "low vibration" shaper was found (due to a high level of vibration or with too much smoothing) or because the "performance" shaper is also the one with the lowest vibration level.
-  - **Damping Ratio**: Displayed at the end, this estimatation is only reliable when the graph shows a distinct, standalone and clean peak. On a well tuned machine, setting the damping ratio (instead of Klipper's 0.1 default value) can further reduce the ringing at high accelerations and with higher square corner velocities.
+    * Sometimes only a single recommendation is given as the "best" shaper. This means that either no suitable "low vibration" shaper was found (due to a high level of residual vibration or too much smoothing), or that the "performance" shaper is also the one with the lowest vibration level.
+  - **Damping Ratio**: Displayed at the end, this is an estimate based on your data that is used to improve the shaper recommendations for your machine. Defining it in the `[input_shaper]` section (instead of Klipper's default value of 0.1) can further reduce ringing at high accelerations and higher square corner velocities.
 
 Then, add to your configuration:
 ```

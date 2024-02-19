@@ -93,7 +93,7 @@ def create_belts_graph(keep_csv):
     return
 
 
-def create_shaper_graph(keep_csv):
+def create_shaper_graph(keep_csv, max_smoothing, scv):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     # Get all the files and sort them based on last modified time to select the most recent one
@@ -120,7 +120,7 @@ def create_shaper_graph(keep_csv):
         time.sleep(2)
     
     # Generate the shaper graph and its name
-    fig = shaper_calibration([new_file], KLIPPER_FOLDER)
+    fig = shaper_calibration([new_file], KLIPPER_FOLDER, max_smoothing=max_smoothing, scv=scv)
     png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[1], f'resonances_{current_date}_{axis}.png')
     fig.savefig(png_filename, dpi=150)
 
@@ -263,6 +263,10 @@ def main():
                     help="number of results to keep in the result folder after each run of the script")
     opts.add_option("-c", "--keep_csv", action="store_true", default=False, dest="keep_csv",
                     help="weither or not to keep the CSV files alongside the PNG graphs image results")
+    opts.add_option("--scv", "--square_corner_velocity", type="float", dest="scv", default=5.,
+                    help="square corner velocity used to compute max accel for axis shapers graphs")
+    opts.add_option("--max_smoothing", type="float", dest="max_smoothing", default=None,
+                    help="maximum shaper smoothing to allow")
     options, args = opts.parse_args()
     
     if options.type is None:
@@ -282,7 +286,7 @@ def main():
         create_belts_graph(keep_csv=options.keep_csv)
         print(f"Belt graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[0]}")
     elif graph_mode.lower() == 'shaper':
-        axis = create_shaper_graph(keep_csv=options.keep_csv)
+        axis = create_shaper_graph(keep_csv=options.keep_csv, max_smoothing=options.max_smoothing, scv=options.scv)
         print(f"{axis} input shaper graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[1]}")
     elif graph_mode.lower() == 'vibrations':
         create_vibrations_graph(axis_name=options.axis_name, accel=options.accel_used, chip_name=options.chip_name, keep_csv=options.keep_csv)
