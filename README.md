@@ -34,6 +34,10 @@ Follow these steps to install the Shake&Tune module in your printer:
      [include K-ShakeTune/*.cfg]
      ```
 
+  > **Note**:
+  >
+  > Due to some breaking changes in the resonance testing code on the Klipper side, Shake&Tune has been modified to take advantage of this, and thus S&T v2.6+ will only support a Klipper version from Feb 17th 2024. If you are using an older version of Klipper, you must use S&T <=2.5.x
+
 ## Usage
 
 Ensure your machine is homed, then invoke one of the following macros as needed:
