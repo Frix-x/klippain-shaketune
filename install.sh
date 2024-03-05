@@ -1,11 +1,19 @@
 #!/bin/bash
 
-USER_CONFIG_PATH="${HOME}/printer_data/config"
-MOONRAKER_CONFIG="${HOME}/printer_data/config/moonraker.conf"
+PRINTER_NAME=printer
+# Where the user Klipper config is located (ie. the one used by Klipper to work)
+USER_CONFIG_PATH="${HOME}/${PRINTER_NAME}_data/config"
+MOONRAKER_CONFIG="${USER_CONFIG_PATH}/moonraker.conf"
 KLIPPER_PATH="${HOME}/klipper"
 
 K_SHAKETUNE_PATH="${HOME}/klippain_shaketune"
 K_SHAKETUNE_VENV_PATH="${HOME}/klippain_shaketune-env"
+
+KLIPPER_SERVICE_NAME=klipper
+MOONRAKER_SERVICE_NAME=moonraker
+
+
+FORCE_PRINTER_NAME=$1
 
 set -eu
 export LC_ALL=C
@@ -22,10 +30,24 @@ function preflight_checks {
         exit -1
     fi
 
-    if [ "$(sudo systemctl list-units --full -all -t service --no-legend | grep -F 'klipper.service')" ]; then
-        printf "[PRE-CHECK] Klipper service found! Continuing...\n\n"
+    if [ "$FORCE_PRINTER_NAME" != "" ]; then
+      if [ -d "${HOME}/${FORCE_PRINTER_NAME}_data" ]; then
+        PRINTER_NAME=$FORCE_PRINTER_NAME
+        echo "[PRE-CHECK] Installing Klippain-shaketune for printer: '${PRINTER_NAME}'"
+        USER_CONFIG_PATH="${HOME}/${PRINTER_NAME}_data/config"
+        MOONRAKER_CONFIG="${USER_CONFIG_PATH}/moonraker.conf"
+        KLIPPER_SERVICE_NAME=klipper-${PRINTER_NAME#printer_}      #remove any "printer_" prefix from Kiauh multi-installs
+        MOONRAKER_SERVICE_NAME=moonraker-${PRINTER_NAME#printer_}  #remove any "printer_" prefix from Kiauh multi-installs
+      else
+        echo "[PRE-CHECK] target directory '${HOME}/${FORCE_PRINTER_NAME}_data' does not exist."
+        exit -1
+      fi
+    fi
+
+    if [ "$(sudo systemctl list-units --full -all -t service --no-legend | grep -F "${KLIPPER_SERVICE_NAME}")" ]; then
+        printf "[PRE-CHECK] ${KLIPPER_SERVICE_NAME} service found! Continuing...\n\n"
     else
-        echo "[ERROR] Klipper service not found, please install Klipper first!"
+        echo "[ERROR] ${KLIPPER_SERVICE_NAME} service not found, please install Klipper first!"
         exit -1
     fi
 
@@ -116,17 +138,19 @@ function add_updater {
     if [ "$update_section" -eq 0 ]; then
         echo -n "[INSTALL] Adding update manager to moonraker.conf..."
         cat ${K_SHAKETUNE_PATH}/moonraker.conf >> $MOONRAKER_CONFIG
+        # Replace default klipper service name with custom name in moonraker.conf
+        sed -i -e 's/managed_services: klipper/managed_services: '${KLIPPER_SERVICE_NAME}'/g' $MOONRAKER_CONFIG
     fi
 }
 
 function restart_klipper {
-    echo "[POST-INSTALL] Restarting Klipper..."
-    sudo systemctl restart klipper
+    echo "[POST-INSTALL] Restarting ${KLIPPER_SERVICE_NAME}..."
+    sudo systemctl restart ${KLIPPER_SERVICE_NAME}
 }
 
 function restart_moonraker {
-    echo "[POST-INSTALL] Restarting Moonraker..."
-    sudo systemctl restart moonraker
+    echo "[POST-INSTALL] Restarting ${MOONRAKER_SERVICE_NAME}..."
+    sudo systemctl restart ${MOONRAKER_SERVICE_NAME}
 }
 
 
