@@ -343,7 +343,7 @@ def sort_and_slice(raw_speeds, raw_datas, remove):
     return raw_speeds, sliced_datas
 
 
-def vibrations_calibration(lognames, klipperdir="~/klipper", axisname=None, accel=None, max_freq=1000., remove=0):
+def speed_vibrations_profile(lognames, klipperdir="~/klipper", axisname=None, accel=None, max_freq=1000., remove=0):
     set_locale()
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
@@ -458,7 +458,7 @@ def main():
     if options.remove > 50 or options.remove < 0:
         opts.error("You must specify a correct percentage (option -r) in the 0-50 range")
 
-    fig = vibrations_calibration(args, options.klipperdir, options.axisname, options.accel, options.max_freq, options.remove)
+    fig = speed_vibrations_profile(args, options.klipperdir, options.axisname, options.accel, options.max_freq, options.remove)
     fig.savefig(options.output, dpi=150)
 
 

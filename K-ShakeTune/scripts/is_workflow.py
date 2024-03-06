@@ -25,7 +25,7 @@ KLIPPER_FOLDER = os.path.expanduser('~/klipper')
 
 from graph_belts import belts_calibration
 from graph_shaper import shaper_calibration
-from graph_vibrations import vibrations_calibration
+from graph_speed_vibrations import speed_vibrations_profile
 from analyze_axesmap import axesmap_calibration
 
 RESULTS_SUBFOLDERS = ['belts', 'inputshaper', 'vibrations']
@@ -162,7 +162,7 @@ def create_vibrations_graph(axis_name, accel, chip_name, keep_csv):
     time.sleep(5)
 
     # Generate the vibration graph and its name
-    fig = vibrations_calibration(lognames, KLIPPER_FOLDER, axis_name, accel)
+    fig = speed_vibrations_profile(lognames, KLIPPER_FOLDER, axis_name, accel)
     png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], f'vibrations_{current_date}_{axis_name}.png')
     fig.savefig(png_filename, dpi=150)
     

@@ -1,6 +1,6 @@
-# Vibrations measurements
+# Machine vibrations profiles
 
-The `VIBRATIONS_CALIBRATION` macro helps you to identify the speed settings that exacerbate the vibrations of the machine (ie. where the frame and motors resonate badly). This will help you to find the clean speed ranges where the machine is more silent and less prone to vertical fine artifacts on the prints.
+The `SPEED_VIBRATIONS_PROFILE` macro helps you to identify the speed settings that exacerbate the vibrations of the machine (ie. where the frame and motors resonate badly). This will help you to find the clean speed ranges where the machine is more silent and less prone to vertical fine artifacts on the prints.
 
   > **Warning**
   >
@@ -9,7 +9,7 @@ The `VIBRATIONS_CALIBRATION` macro helps you to identify the speed settings that
 
 ## Usage
 
-Call the `VIBRATIONS_CALIBRATION` macro with the direction and speed range you want to measure. Here are the parameters available:
+Call the `SPEED_VIBRATIONS_PROFILE` macro with the direction and speed range you want to measure. Here are the parameters available:
 
 | parameters | default value | description |
 |-----------:|---------------|-------------|

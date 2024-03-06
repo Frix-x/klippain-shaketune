@@ -105,7 +105,7 @@ Here's how to troubleshoot the issue:
 
 Such graph patterns can arise from various factors, and there isn't a one-size-fits-all solution. To address them:
   1. A wobbly table can be the cause. So first thing to do is to try with the printer directly on the floor.
-  1. Ensure optimal belt tension using the [`BELTS_SHAPER_CALIBRATION` macro](./belts_tuning.md).
+  1. Ensure optimal belt tension using the [`COMPARE_BELTS_RESPONSES` macro](./belts_tuning.md).
   1. If problems persist, it might be due to an improperly squared gantry. For correction, refer to [Nero3D's de-racking video](https://youtu.be/cOn6u9kXvy0?si=ZCSdWU6br3Y9rGsy).
   1. If it's still there... you will need to find out what is resonating to fix it. You can use the `EXCITATE_AXIS_AT_FREQ` macro to help you find it.
 

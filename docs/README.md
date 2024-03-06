@@ -8,9 +8,9 @@ First, check out the **[input shaping and tuning generalities](./is_tuning_gener
 
 Then look at the documentation for each type of graph by clicking on them below tu run the tests and better understand your results to tune your machine!
 
-| [Belts graph](./macros/belts_tuning.md) | [Axis input shaper graphs](./macros/axis_tuning.md) | [Vibrations graph](./macros/vibrations_tuning.md) |
+| [Belts graph](./macros/belts_tuning.md) | [Axis input shaper graphs](./macros/axis_tuning.md) | [Vibrations graph](./macros/vibrations_profile.md) |
 |:----------------:|:------------:|:---------------------:|
-| [<img src="./images/belts_example.png">](./macros/belts_tuning.md) | [<img src="./images/axis_example.png">](./macros/axis_tuning.md) | [<img src="./images/vibrations_example.png">](./macros/vibrations_tuning.md) |
+| [<img src="./images/belts_example.png">](./macros/belts_tuning.md) | [<img src="./images/axis_example.png">](./macros/axis_tuning.md) | [<img src="./images/vibrations_example.png">](./macros/vibrations_profile.md) |
 
 
 ## Additional macros
