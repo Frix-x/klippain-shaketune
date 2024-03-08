@@ -33,8 +33,10 @@ MAX_SMOOTHING = 0.1
 
 KLIPPAIN_COLORS = {
     "purple": "#70088C",
+    "orange": "#FF8D32",
     "dark_purple": "#150140",
-    "dark_orange": "#F24130"
+    "dark_orange": "#F24130",
+    "red_pink": "#F2055C"
 }
 
 

@@ -5,7 +5,7 @@
 ##################################################
 # Written by Frix_x#0161 #
 
-# Be sure to make this script executable using SSH: type 'chmod +x ./graph_vibrations.py' when in the folder !
+# Be sure to make this script executable using SSH: type 'chmod +x ./graph_speed_vibrations.py' when in the folder !
 
 #####################################################################
 ################ !!! DO NOT EDIT BELOW THIS LINE !!! ################
@@ -21,7 +21,7 @@ import matplotlib.font_manager, matplotlib.ticker, matplotlib.gridspec
 matplotlib.use('Agg')
 
 from locale_utils import set_locale, print_with_c_locale
-from common_func import compute_mechanical_parameters, detect_peaks, get_git_version, parse_log, setup_klipper_import
+from common_func import compute_mechanical_parameters, detect_peaks, get_git_version, parse_log, setup_klipper_import, identify_low_energy_zones
 
 
 PEAKS_DETECTION_THRESHOLD = 0.05
@@ -141,46 +141,6 @@ def compute_motor_profile(power_spectral_densities):
     return smoothed_motor_total_vibration
 
 
-# The goal is to find zone outside of peaks (flat low energy zones) to advise them as good speeds range to use in the slicer
-def identify_low_energy_zones(power_total):
-    valleys = []
-
-    # Calculate the mean and standard deviation of the entire power_total
-    mean_energy = np.mean(power_total)
-    std_energy = np.std(power_total)
-
-    # Define a threshold value as mean minus a certain number of standard deviations
-    threshold_value = mean_energy - VALLEY_DETECTION_THRESHOLD * std_energy
-
-    # Find valleys in power_total based on the threshold
-    in_valley = False
-    start_idx = 0
-    for i, value in enumerate(power_total):
-        if not in_valley and value < threshold_value:
-            in_valley = True
-            start_idx = i
-        elif in_valley and value >= threshold_value:
-            in_valley = False
-            valleys.append((start_idx, i))
-
-    # If the last point is still in a valley, close the valley
-    if in_valley:
-        valleys.append((start_idx, len(power_total) - 1))
-
-    max_signal = np.max(power_total)
-
-    # Calculate mean energy for each valley as a percentage of the maximum of the signal
-    valley_means_percentage = []
-    for start, end in valleys:
-        if not np.isnan(np.mean(power_total[start:end])):
-            valley_means_percentage.append((start, end, (np.mean(power_total[start:end]) / max_signal) * 100))
-
-    # Sort valleys based on mean percentage values
-    sorted_valleys = sorted(valley_means_percentage, key=lambda x: x[2])
-
-    return sorted_valleys
-
-
 # Resample the signal to achieve denser data points in order to get more precise valley placing and
 # avoid having to use the original sampling of the signal (that is equal to the speed increment used for the test)
 def resample_signal(speeds, power_total, new_spacing=0.1):
@@ -249,7 +209,7 @@ def plot_vibration_spectrogram(ax, speeds, freqs, power_spectral_densities, peak
         for j in range(len(freqs)):
             spectrum[j, i] = power_spectral_densities[i][0][j]
 
-    ax.set_title("Vibrations spectrogram", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
+    ax.set_title("Speed vibrations spectrogram", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     # ax.pcolormesh(speeds, freqs, spectrum, norm=matplotlib.colors.LogNorm(),
     #         cmap='inferno', shading='gouraud')
     
@@ -372,7 +332,7 @@ def speed_vibrations_profile(lognames, klipperdir="~/klipper", axisname=None, ac
         PEAKS_DETECTION_THRESHOLD * speeds_powers[0].max(),
         PEAKS_RELATIVE_HEIGHT_THRESHOLD, 10, 10
         )
-    low_energy_zones = identify_low_energy_zones(speeds_powers[0])
+    low_energy_zones = identify_low_energy_zones(speeds_powers[0], VALLEY_DETECTION_THRESHOLD)
 
     # Print the vibration peaks info in the console
     formated_peaks_speeds = ["{:.1f}".format(pspeed) for pspeed in peaks_speeds]
@@ -401,7 +361,7 @@ def speed_vibrations_profile(lognames, klipperdir="~/klipper", axisname=None, ac
     fig.set_size_inches(14, 11.6)
 
     # Add title
-    title_line1 = "VIBRATIONS MEASUREMENT TOOL"
+    title_line1 = "SPEED VIBRATIONS ANALYSIS"
     fig.text(0.075, 0.965, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold')
     try:
         filename_parts = (lognames[0].split('/')[-1]).split('_')

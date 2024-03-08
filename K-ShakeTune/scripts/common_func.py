@@ -122,3 +122,65 @@ def detect_peaks(data, indices, detection_threshold, relative_height_threshold=N
     num_peaks = len(refined_peaks)
     
     return num_peaks, np.array(refined_peaks), indices[refined_peaks]
+
+
+# The goal is to find zone outside of peaks (flat low energy zones) in a signal
+def identify_low_energy_zones(power_total, detection_threshold=0.1):
+    valleys = []
+
+    # Calculate the a "mean + 1/4" and standard deviation of the entire power_total
+    mean_energy = np.mean(power_total) + (np.max(power_total) - np.min(power_total))/4
+    std_energy = np.std(power_total)
+
+    # Define a threshold value as "mean + 1/4" minus a certain number of standard deviations
+    threshold_value = mean_energy - detection_threshold * std_energy
+
+    # Find valleys in power_total based on the threshold
+    in_valley = False
+    start_idx = 0
+    for i, value in enumerate(power_total):
+        if not in_valley and value < threshold_value:
+            in_valley = True
+            start_idx = i
+        elif in_valley and value >= threshold_value:
+            in_valley = False
+            valleys.append((start_idx, i))
+
+    # If the last point is still in a valley, close the valley
+    if in_valley:
+        valleys.append((start_idx, len(power_total) - 1))
+
+    max_signal = np.max(power_total)
+
+    # Calculate mean energy for each valley as a percentage of the maximum of the signal
+    valley_means_percentage = []
+    for start, end in valleys:
+        if not np.isnan(np.mean(power_total[start:end])):
+            valley_means_percentage.append((start, end, (np.mean(power_total[start:end]) / max_signal) * 100))
+
+    # Sort valleys based on mean percentage values
+    sorted_valleys = sorted(valley_means_percentage, key=lambda x: x[2])
+
+    return sorted_valleys
+
+
+# Calculate or estimate a "similarity" factor between two PSD curves and scale it to a percentage. This is
+# used here to quantify how close the two belts path behavior and responses are close together.
+def compute_curve_similarity_factor(x1, y1, x2, y2, sim_sigmoid_k=0.6):
+    # Interpolate PSDs to match the same frequency bins and do a cross-correlation
+    y2_interp = np.interp(x1, x2, y2)
+    cross_corr = np.correlate(y1, y2_interp, mode='full')
+    
+    # Find the peak of the cross-correlation and compute a similarity normalized by the energy of the signals
+    peak_value = np.max(cross_corr)
+    similarity = peak_value / (np.sqrt(np.sum(y1**2) * np.sum(y2_interp**2)))
+
+    # Apply sigmoid scaling to get better numbers and get a final percentage value
+    scaled_similarity = sigmoid_scale(-np.log(1 - similarity), sim_sigmoid_k)
+    
+    return scaled_similarity
+
+
+# Simple helper to compute a sigmoid scalling (from 0 to 100%)
+def sigmoid_scale(x, k=1):
+    return 1 / (1 + np.exp(-k * x)) * 100

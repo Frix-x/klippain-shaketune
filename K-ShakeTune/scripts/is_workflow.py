@@ -28,7 +28,7 @@ from graph_shaper import shaper_calibration
 from graph_speed_vibrations import speed_vibrations_profile
 from analyze_axesmap import axesmap_calibration
 
-RESULTS_SUBFOLDERS = ['belts', 'inputshaper', 'vibrations']
+RESULTS_SUBFOLDERS = ['belts', 'inputshaper', 'speed_vibrations', 'dir_vibrations']
 
 
 def is_file_open(filepath):
@@ -132,7 +132,7 @@ def create_shaper_graph(keep_csv, max_smoothing, scv):
     return axis
 
 
-def create_vibrations_graph(axis_name, accel, chip_name, keep_csv):
+def create_speed_vibrations_graph(axis_name, accel, chip_name, keep_csv):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     lognames = []
 
@@ -221,7 +221,7 @@ def clean_files(keep_results):
     # Find old files in each directory
     old_belts_files = get_old_files(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[0]), '.png', keep1)
     old_inputshaper_files = get_old_files(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[1]), '.png', keep2)
-    old_vibrations_files = get_old_files(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2]), '.png', keep1)
+    old_speed_vibr_files = get_old_files(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2]), '.png', keep1)
 
     # Remove the old belt files
     for old_file in old_belts_files:
@@ -240,7 +240,7 @@ def clean_files(keep_results):
         os.remove(old_file)
 
     # Remove the old vibrations files
-    for old_file in old_vibrations_files:
+    for old_file in old_speed_vibr_files:
         os.remove(old_file)
         tar_file = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], os.path.splitext(os.path.basename(old_file))[0] + ".tar.gz")
         if os.path.exists(tar_file):
@@ -271,8 +271,8 @@ def main():
     
     if options.type is None:
         opts.error("You must specify the type of output graph you want to produce (option -t)")
-    elif options.type.lower() is None or options.type.lower() not in ['belts', 'shaper', 'vibrations', 'axesmap', 'clean']:
-        opts.error("Type of output graph need to be in the list of 'belts', 'shaper', 'vibrations', 'axesmap' or 'clean'")
+    elif options.type.lower() is None or options.type.lower() not in ['belts', 'shaper', 'speed_vibrations', 'axesmap', 'clean']:
+        opts.error("Type of output graph need to be in the list of 'belts', 'shaper', 'speed_vibrations', 'axesmap' or 'clean'")
     else:
         graph_mode = options.type
 
@@ -288,8 +288,8 @@ def main():
     elif graph_mode.lower() == 'shaper':
         axis = create_shaper_graph(keep_csv=options.keep_csv, max_smoothing=options.max_smoothing, scv=options.scv)
         print(f"{axis} input shaper graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[1]}")
-    elif graph_mode.lower() == 'vibrations':
-        create_vibrations_graph(axis_name=options.axis_name, accel=options.accel_used, chip_name=options.chip_name, keep_csv=options.keep_csv)
+    elif graph_mode.lower() == 'speed_vibrations':
+        create_speed_vibrations_graph(axis_name=options.axis_name, accel=options.accel_used, chip_name=options.chip_name, keep_csv=options.keep_csv)
         print(f"{options.axis_name} vibration graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[2]}")
     elif graph_mode.lower() == 'axesmap':
         print(f"WARNING: AXES_MAP_CALIBRATION is currently very experimental and may produce incorrect results... Please validate the output!")
