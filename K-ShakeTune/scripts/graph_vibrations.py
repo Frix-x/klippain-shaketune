@@ -255,7 +255,7 @@ def plot_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_avg_ener
         ax2.plot(all_speeds[peaks], sp_energy_variance[peaks], "x", color='black', markersize=8, zorder=10)
         for idx, peak in enumerate(peaks):
             ax2.annotate(f"{idx+1}", (all_speeds[peak], sp_energy_variance[peak]),
-                        textcoords="offset points", xytext=(8, 5), fontweight='bold',
+                        textcoords="offset points", xytext=(5, 5), fontweight='bold',
                         ha='left', fontsize=13, color=KLIPPAIN_COLORS['red_pink'], zorder=10)
 
     for idx, (start, end, _) in enumerate(low_energy_zones):
@@ -275,7 +275,7 @@ def plot_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_avg_ener
 
     return
 
-def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_profile):
+def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_profile, max_freq):
     ax.set_title("Motor frequency profile", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_ylabel('Energy')
     ax.set_xlabel('Frequency (Hz)')
@@ -291,7 +291,7 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
             max_value = profile_max
         ax.plot(freqs, motor_profiles[angle], linestyle='--', label=f'{angle} deg', zorder=2)
 
-    ax.set_xlim([0, 400])
+    ax.set_xlim([0, max_freq])
     ax.set_ylim([0, max_value * 1.1])
 
     # Then add the motor resonance peak to the graph and print some infos about it
@@ -302,15 +302,15 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
         print_with_c_locale("The detected resonance frequency of the motors is too low (%.1fHz). This is probably due to the test run with too high acceleration!" % motor_fr)
         print_with_c_locale("Try lowering the ACCEL value before restarting the macro to ensure that only constant speeds are recorded and that the dynamic behavior of the machine is not impacting the measurements.")
 
-    ax.plot(freqs[motor_res_idx], global_motor_profile[motor_res_idx], "x", color='black', markersize=8)
+    ax.plot(freqs[motor_res_idx], global_motor_profile[motor_res_idx], "x", color='black', markersize=10)
     ax.annotate(f"R", (freqs[motor_res_idx], global_motor_profile[motor_res_idx]), 
-                textcoords="offset points", xytext=(10, 5), 
-                ha='right', fontsize=13, color=KLIPPAIN_COLORS['purple'], weight='bold')
+                textcoords="offset points", xytext=(15, 5), 
+                ha='right', fontsize=14, color=KLIPPAIN_COLORS['red_pink'], weight='bold')
 
-    legend_texts = ["Motor resonant frequency (ω0): %.1fHz" % (motor_fr), 
-                    "Motor damping ratio (ζ): %.3f" % (motor_zeta)]
+    legend_texts = ["Resonant frequency (ω0): %.1fHz" % (motor_fr),
+                    "Damping ratio (ζ): %.3f" % (motor_zeta)]
     for i, text in enumerate(legend_texts):
-        ax.text(0.90 + i*0.05, 0.98, text, transform=ax.transAxes, color=KLIPPAIN_COLORS['red_pink'], fontsize=12,
+        ax.text(0.90 + i*0.05, 0.85, text, transform=ax.transAxes, color=KLIPPAIN_COLORS['red_pink'], fontsize=12,
                  fontweight='bold', verticalalignment='top', rotation='vertical', zorder=10)
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
@@ -320,7 +320,7 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
 
     fontP = matplotlib.font_manager.FontProperties()
     fontP.set_size('small')
-    ax.legend(loc='upper left', prop=fontP)
+    ax.legend(loc='upper right', prop=fontP)
 
     return
 
@@ -382,7 +382,7 @@ def extract_angle_and_speed(logname):
     return float(angle), float(speed)
 
 
-def dir_vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian", accel=None, max_freq=1000.):
+def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian", accel=None, max_freq=1000.):
     set_locale()
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
@@ -484,7 +484,7 @@ def dir_vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesi
         if accel is not None:
             title_line2 += ' at ' + str(accel) + ' mm/s²'
     except:
-        print_with_c_locale("Warning: CSV filename look to be different than expected (%s)" % (lognames[0]))
+        print_with_c_locale("Warning: CSV filenames appear to be different than expected (%s)" % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
     fig.text(0.060, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
@@ -492,7 +492,7 @@ def dir_vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesi
     plot_angle_profile_polar(ax3, all_angles, all_angles_energy, good_angles, symmetry_factor)
     plot_vibration_spectrogram_polar(ax4, all_angles, all_speeds, spectrogram_data)
 
-    plot_motor_profiles(ax1, target_freqs, main_angles, motor_profiles, global_motor_profile)
+    plot_motor_profiles(ax1, target_freqs, main_angles, motor_profiles, global_motor_profile, max_freq)
     plot_angle_profile(ax6, all_angles, all_angles_energy, good_angles)
     plot_speed_profile(ax2, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_energy_variance, num_peaks, vibration_peaks, good_speeds)
 
@@ -533,7 +533,7 @@ def main():
     if options.kinematics not in ["cartesian", "corexy"]:
         opts.error("Only Cartesian and CoreXY kinematics are supported by this tool at the moment!")
 
-    fig = dir_vibrations_profile(args, options.klipperdir, options.kinematics, options.accel, options.max_freq)
+    fig = vibrations_profile(args, options.klipperdir, options.kinematics, options.accel, options.max_freq)
     fig.savefig(options.output, dpi=150)
 
 
