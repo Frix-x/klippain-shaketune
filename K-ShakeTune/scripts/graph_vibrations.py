@@ -382,7 +382,7 @@ def extract_angle_and_speed(logname):
     return float(angle), float(speed)
 
 
-def dir_vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian", accel=None, max_freq=1000.):
+def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian", accel=None, max_freq=1000.):
     set_locale()
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
@@ -533,7 +533,7 @@ def main():
     if options.kinematics not in ["cartesian", "corexy"]:
         opts.error("Only Cartesian and CoreXY kinematics are supported by this tool at the moment!")
 
-    fig = dir_vibrations_profile(args, options.klipperdir, options.kinematics, options.accel, options.max_freq)
+    fig = vibrations_profile(args, options.klipperdir, options.kinematics, options.accel, options.max_freq)
     fig.savefig(options.output, dpi=150)
 
 
