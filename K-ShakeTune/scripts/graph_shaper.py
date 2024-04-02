@@ -53,13 +53,16 @@ def calibrate_shaper(datas, max_smoothing, scv, max_freq):
 
     fr, zeta, _ = compute_mechanical_parameters(calibration_data.psd_sum, calibration_data.freq_bins)
 
+    # If the damping ratio computation fail, we use Klipper default value instead
+    if zeta is None: zeta = 0.1
+
     shaper, all_shapers = helper.find_best_shaper(
             calibration_data, shapers=None, damping_ratio=zeta,
             scv=scv, shaper_freqs=None, max_smoothing=max_smoothing,
             test_damping_ratios=None, max_freq=max_freq,
             logger=print_with_c_locale)
 
-    print_with_c_locale("\n-> Recommended shaper is %s @ %.1f Hz (when using a square corner velocity of %.1f and a computed damping ratio of %.3f)" % (shaper.name.upper(), shaper.freq, scv, zeta))
+    print_with_c_locale("\n-> Recommended shaper is %s @ %.1f Hz (when using a square corner velocity of %.1f and a damping ratio of %.3f)" % (shaper.name.upper(), shaper.freq, scv, zeta))
 
     return shaper.name, all_shapers, calibration_data, fr, zeta
 

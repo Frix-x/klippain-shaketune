@@ -131,18 +131,25 @@ def compute_angle_powers(spectrogram_data):
     return convolved_extended[9:-9]
 
 
-def compute_speed_powers(spectrogram_data):
+def compute_speed_powers(spectrogram_data, smoothing_window=15):
     min_values = np.amin(spectrogram_data, axis=0)
     max_values = np.amax(spectrogram_data, axis=0)
     avg_values = np.mean(spectrogram_data, axis=0)
-    energy_variance = np.var(spectrogram_data, axis=0)
+    composite_variance = max_values * np.var(spectrogram_data, axis=0)
 
-    min_values_smooth = np.convolve(min_values, np.ones(15)/15, mode='same')
-    max_values_smooth = np.convolve(max_values, np.ones(15)/15, mode='same')
-    avg_values_smooth = np.convolve(avg_values, np.ones(15)/15, mode='same')
-    energy_variance_smooth = np.convolve(energy_variance, np.ones(15)/15, mode='same')
+    # Apply padding to mitigate edge effects of the future convolution
+    min_values_padded = np.pad(min_values, int(smoothing_window/2), mode='edge')
+    max_values_padded = np.pad(max_values, int(smoothing_window/2), mode='edge')
+    avg_values_padded = np.pad(avg_values, int(smoothing_window/2), mode='edge')
+    composite_variance_padded = np.pad(composite_variance, int(smoothing_window/2), mode='edge')
 
-    return min_values_smooth, max_values_smooth, avg_values_smooth, energy_variance_smooth
+    # Apply convolution on padded arrays
+    min_values_smooth = np.convolve(min_values_padded, np.ones(smoothing_window)/smoothing_window, mode='valid')
+    max_values_smooth = np.convolve(max_values_padded, np.ones(smoothing_window)/smoothing_window, mode='valid')
+    avg_values_smooth = np.convolve(avg_values_padded, np.ones(smoothing_window)/smoothing_window, mode='valid')
+    composite_variance_smooth = np.convolve(composite_variance_padded, np.ones(smoothing_window)/smoothing_window, mode='valid')
+
+    return min_values_smooth, max_values_smooth, avg_values_smooth, composite_variance_smooth
 
 
 # This function uses a nuanced approach to allow the computation of a score that reflect both the shape
@@ -198,7 +205,7 @@ def plot_angle_profile_polar(ax, angles, angles_powers, low_energy_zones, symmet
     for _, (start, end, _) in enumerate(low_energy_zones):
         ax.axvline(angles_radians[start], angles_powers[start]/ymax, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
         ax.axvline(angles_radians[end], angles_powers[end]/ymax, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
-        ax.fill_between(angles_radians[start:end], angles_powers[start:end], angles_powers.max() * 1.05, color='green', alpha=0.3)
+        ax.fill_between(angles_radians[start:end], angles_powers[start:end], angles_powers.max() * 1.05, color='green', alpha=0.2)
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
     ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
@@ -225,7 +232,7 @@ def plot_angle_profile(ax, angles, angles_powers, low_energy_zones):
     for _, (start, end, _) in enumerate(low_energy_zones):
         ax.axhline(angles[start], 0, angles_powers[start]/xmax, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
         ax.axhline(angles[end], 0, angles_powers[end]/xmax, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
-        ax.fill_betweenx(angles[start:end], 0, angles_powers[start:end], color='green', alpha=0.3)
+        ax.fill_betweenx(angles[start:end], 0, angles_powers[start:end], color='green', alpha=0.2)
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
     ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
@@ -234,7 +241,7 @@ def plot_angle_profile(ax, angles, angles_powers, low_energy_zones):
 
     return
 
-def plot_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_energy_variance, num_peaks, peaks, low_energy_zones):
+def plot_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance, num_peaks, peaks, low_energy_zones):
     ax.set_title("Speed energy profile", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_xlabel('Speed (mm/s)')
     ax.set_ylabel('Energy')
@@ -244,24 +251,26 @@ def plot_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_avg_ener
     ax.plot(all_speeds, sp_avg_energy, label='Average energy', color=KLIPPAIN_COLORS['dark_orange'], zorder=5)
     ax.plot(all_speeds, sp_min_energy, label='Minimum energy', color=KLIPPAIN_COLORS['dark_purple'], zorder=5)
     ax.plot(all_speeds, sp_max_energy, label='Maximum energy', color=KLIPPAIN_COLORS['purple'], zorder=5)
-    ax2.plot(all_speeds, sp_energy_variance, label=f'Energy variance ({num_peaks} peaks)', color=KLIPPAIN_COLORS['orange'], zorder=5)
+    ax2.plot(all_speeds, sp_composite_variance, label=f'Bad speed indicator ({num_peaks} peaks)', color=KLIPPAIN_COLORS['orange'], zorder=5)
 
     ax.set_xlim([all_speeds.min(), all_speeds.max()])
     ax.set_ylim([0, sp_max_energy.max() * 1.1])
-    ymax = sp_energy_variance.max() * 1.1
-    ax2.set_ylim([0, ymax])
+
+    y2min = -(sp_composite_variance.max() * 0.025)
+    y2max = sp_composite_variance.max() * 1.1
+    ax2.set_ylim([y2min, y2max])
 
     if peaks is not None:
-        ax2.plot(all_speeds[peaks], sp_energy_variance[peaks], "x", color='black', markersize=8, zorder=10)
+        ax2.plot(all_speeds[peaks], sp_composite_variance[peaks], "x", color='black', markersize=8, zorder=10)
         for idx, peak in enumerate(peaks):
-            ax2.annotate(f"{idx+1}", (all_speeds[peak], sp_energy_variance[peak]),
+            ax2.annotate(f"{idx+1}", (all_speeds[peak], sp_composite_variance[peak]),
                         textcoords="offset points", xytext=(5, 5), fontweight='bold',
                         ha='left', fontsize=13, color=KLIPPAIN_COLORS['red_pink'], zorder=10)
 
     for idx, (start, end, _) in enumerate(low_energy_zones):
-        ax2.axvline(all_speeds[start], 0, sp_energy_variance[start]/ymax, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
-        ax2.axvline(all_speeds[end], 0, sp_energy_variance[start]/ymax, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
-        ax2.fill_between(all_speeds[start:end], 0, sp_energy_variance[start:end], color='green', alpha=0.3, label=f'Zone {idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
+        ax2.axvline(all_speeds[start], y2min, sp_composite_variance[start]/y2max, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
+        ax2.axvline(all_speeds[end], y2min, sp_composite_variance[start]/y2max, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
+        ax2.fill_between(all_speeds[start:end], y2min, sp_composite_variance[start:end], color='green', alpha=0.2, label=f'Zone {idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
     ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
@@ -297,7 +306,10 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
     # Then add the motor resonance peak to the graph and print some infos about it
     motor_fr, motor_zeta, motor_res_idx = compute_mechanical_parameters(global_motor_profile, freqs)
     if motor_fr > 25:
-        print_with_c_locale("Motors have a main resonant frequency at %.1fHz with an estimated damping ratio of %.3f" % (motor_fr, motor_zeta))
+        if motor_zeta is not None:
+            print_with_c_locale("Motors have a main resonant frequency at %.1fHz with an estimated damping ratio of %.3f" % (motor_fr, motor_zeta))
+        else:
+            print_with_c_locale("Motors have a main resonant frequency at %.1fHz but it was impossible to estimate a damping ratio." % (motor_fr))
     else:
         print_with_c_locale("The detected resonance frequency of the motors is too low (%.1fHz). This is probably due to the test run with too high acceleration!" % motor_fr)
         print_with_c_locale("Try lowering the ACCEL value before restarting the macro to ensure that only constant speeds are recorded and that the dynamic behavior of the machine is not impacting the measurements.")
@@ -307,8 +319,11 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
                 textcoords="offset points", xytext=(15, 5), 
                 ha='right', fontsize=14, color=KLIPPAIN_COLORS['red_pink'], weight='bold')
 
-    legend_texts = ["Resonant frequency (ω0): %.1fHz" % (motor_fr),
-                    "Damping ratio (ζ): %.3f" % (motor_zeta)]
+    legend_texts = ["Resonant frequency (ω0): %.1fHz" % (motor_fr)]
+    if motor_zeta is not None:
+        legend_texts.append("Damping ratio (ζ): %.3f" % (motor_zeta))
+    else:
+        legend_texts.append("No damping ratio computed")
     for i, text in enumerate(legend_texts):
         ax.text(0.90 + i*0.05, 0.85, text, transform=ax.transAxes, color=KLIPPAIN_COLORS['red_pink'], fontsize=12,
                  fontweight='bold', verticalalignment='top', rotation='vertical', zorder=10)
@@ -424,7 +439,7 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
     # Precompute the variables used in plot functions
     all_angles, all_speeds, spectrogram_data = compute_dir_speed_spectrogram(measured_speeds, psds_sum, kinematics, main_angles)
     all_angles_energy = compute_angle_powers(spectrogram_data)
-    sp_min_energy, sp_max_energy, sp_avg_energy, sp_energy_variance = compute_speed_powers(spectrogram_data)
+    sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance = compute_speed_powers(spectrogram_data)
     motor_profiles, global_motor_profile = compute_motor_profiles(target_freqs, psds, all_angles_energy, main_angles)
 
     symmetry_factor = compute_symmetry_analysis(all_angles, all_angles_energy)
@@ -433,14 +448,14 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
     # Analyze low variance ranges of vibration energy across all angles for each speed to identify clean speeds
     # and highlight them. Also find the peaks to identify speeds to avoid due to high resonances
     num_peaks, vibration_peaks, peaks_speeds = detect_peaks(
-        sp_energy_variance, all_speeds,
-        PEAKS_DETECTION_THRESHOLD * sp_energy_variance.max(),
+        sp_composite_variance, all_speeds,
+        PEAKS_DETECTION_THRESHOLD * sp_composite_variance.max(),
         PEAKS_RELATIVE_HEIGHT_THRESHOLD, 10, 10
         )
     formated_peaks_speeds = ["{:.1f}".format(pspeed) for pspeed in peaks_speeds]
     print_with_c_locale("Vibrations peaks detected: %d @ %s mm/s (avoid setting a speed near these values in your slicer print profile)" % (num_peaks, ", ".join(map(str, formated_peaks_speeds))))
     
-    good_speeds = identify_low_energy_zones(sp_energy_variance, SPEEDS_VALLEY_DETECTION_THRESHOLD)
+    good_speeds = identify_low_energy_zones(sp_composite_variance, SPEEDS_VALLEY_DETECTION_THRESHOLD)
     if good_speeds is not None:
         print_with_c_locale(f'Lowest vibrations speeds ({len(good_speeds)} ranges sorted from best to worse):')
         for idx, (start, end, energy) in enumerate(good_speeds):
@@ -494,7 +509,7 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
 
     plot_motor_profiles(ax1, target_freqs, main_angles, motor_profiles, global_motor_profile, max_freq)
     plot_angle_profile(ax6, all_angles, all_angles_energy, good_angles)
-    plot_speed_profile(ax2, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_energy_variance, num_peaks, vibration_peaks, good_speeds)
+    plot_speed_profile(ax2, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance, num_peaks, vibration_peaks, good_speeds)
 
     plot_vibration_spectrogram(ax5, all_angles, all_speeds, spectrogram_data, vibration_peaks)
 

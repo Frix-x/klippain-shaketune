@@ -78,16 +78,23 @@ def compute_mechanical_parameters(psd, freqs):
     max_power = psd[max_power_index]
 
     half_power = max_power / math.sqrt(2)
-    idx_below = np.where(psd[:max_power_index] <= half_power)[0][-1]
-    idx_above = np.where(psd[max_power_index:] <= half_power)[0][0] + max_power_index
+    indices_below = np.where(psd[:max_power_index] <= half_power)[0]
+    indices_above = np.where(psd[max_power_index:] <= half_power)[0]
+
+    if len(indices_below) == 0 or len(indices_above) == 0:
+        # If we are not able to find points around the half power, we can't compute the damping ratio and return None instead
+        return fr, None, max_power_index
+
+    idx_below = indices_below[-1]
+    idx_above = indices_above[0] + max_power_index
     freq_below_half_power = freqs[idx_below] + (half_power - psd[idx_below]) * (freqs[idx_below + 1] - freqs[idx_below]) / (psd[idx_below + 1] - psd[idx_below])
     freq_above_half_power = freqs[idx_above - 1] + (half_power - psd[idx_above - 1]) * (freqs[idx_above] - freqs[idx_above - 1]) / (psd[idx_above] - psd[idx_above - 1])
 
     bandwidth = freq_above_half_power - freq_below_half_power
-    bw1 = math.pow(bandwidth/fr,2)
-    bw2 = math.pow(bandwidth/fr,4)
+    bw1 = math.pow(bandwidth/fr, 2)
+    bw2 = math.pow(bandwidth/fr, 4)
 
-    zeta = math.sqrt(0.5-math.sqrt(1/(4+4*bw1-bw2)))
+    zeta = math.sqrt(0.5 - math.sqrt(1 / (4 + 4 * bw1 - bw2)))
 
     return fr, zeta, max_power_index
 
