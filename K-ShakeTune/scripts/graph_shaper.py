@@ -56,15 +56,22 @@ def calibrate_shaper(datas, max_smoothing, scv, max_freq):
     # If the damping ratio computation fail, we use Klipper default value instead
     if zeta is None: zeta = 0.1
 
-    shaper, all_shapers = helper.find_best_shaper(
-            calibration_data, shapers=None, damping_ratio=zeta,
-            scv=scv, shaper_freqs=None, max_smoothing=max_smoothing,
-            test_damping_ratios=None, max_freq=max_freq,
-            logger=print_with_c_locale)
+    compat = False
+    try:
+        shaper, all_shapers = helper.find_best_shaper(
+                calibration_data, shapers=None, damping_ratio=zeta,
+                scv=scv, shaper_freqs=None, max_smoothing=max_smoothing,
+                test_damping_ratios=None, max_freq=max_freq,
+                logger=print_with_c_locale)
+    except TypeError:
+        print_with_c_locale("[WARNING] You seem to be using an older version of Klipper that is not compatible with all the latest Shake&Tune features!")
+        print_with_c_locale("Shake&Tune now runs in compatibility mode: be aware that the results may be slightly off, since the real damping ratio cannot be used to create the filter recommendations")
+        compat = True
+        shaper, all_shapers = helper.find_best_shaper(calibration_data, max_smoothing, print_with_c_locale)
 
     print_with_c_locale("\n-> Recommended shaper is %s @ %.1f Hz (when using a square corner velocity of %.1f and a damping ratio of %.3f)" % (shaper.name.upper(), shaper.freq, scv, zeta))
 
-    return shaper.name, all_shapers, calibration_data, fr, zeta
+    return shaper.name, all_shapers, calibration_data, fr, zeta, compat
 
 
 ######################################################################
@@ -219,7 +226,7 @@ def shaper_calibration(lognames, klipperdir="~/klipper", max_smoothing=None, scv
         print_with_c_locale("Warning: incorrect number of .csv files detected. Only the first one will be used!")
 
     # Compute shapers, PSD outputs and spectrogram
-    performance_shaper, shapers, calibration_data, fr, zeta = calibrate_shaper(datas[0], max_smoothing, scv, max_freq)
+    performance_shaper, shapers, calibration_data, fr, zeta, compat = calibrate_shaper(datas[0], max_smoothing, scv, max_freq)
     pdata, bins, t = compute_spectrogram(datas[0])
     del datas
 
@@ -262,8 +269,12 @@ def shaper_calibration(lognames, klipperdir="~/klipper", max_smoothing=None, scv
         filename_parts = (lognames[0].split('/')[-1]).split('_')
         dt = datetime.strptime(f"{filename_parts[1]} {filename_parts[2]}", "%Y%m%d %H%M%S")
         title_line2 = dt.strftime('%x %X') + ' -- ' + filename_parts[3].upper().split('.')[0] + ' axis'
-        title_line3 = '| Square corner velocity: ' + str(scv) + 'mm/s'
-        title_line4 = '| Max allowed smoothing: ' + str(max_smoothing)
+        if compat:
+            title_line3: '| Compatibility mode with older Klipper,'
+            title_line4: '| and no custom S&T parameters are used!'
+        else:
+            title_line3 = '| Square corner velocity: ' + str(scv) + 'mm/s'
+            title_line4 = '| Max allowed smoothing: ' + str(max_smoothing)
     except:
         print_with_c_locale("Warning: CSV filename look to be different than expected (%s)" % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
