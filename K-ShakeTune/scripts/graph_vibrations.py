@@ -86,7 +86,7 @@ def compute_motor_profiles(freqs, psds, all_angles_energy, measured_angles=[0, 9
 def compute_dir_speed_spectrogram(measured_speeds, data, kinematics="cartesian", measured_angles=[0, 90]):
     # We want to project the motor vibrations measured on their own axes on the [0, 360] range
     spectrum_angles = np.linspace(0, 360, 720) # One point every 0.5 degrees
-    spectrum_speeds = np.linspace(min(measured_speeds), max(measured_speeds), len(measured_speeds) * 5) # 5 points between each speed measurements
+    spectrum_speeds = np.linspace(min(measured_speeds), max(measured_speeds), len(measured_speeds) * 6)
     spectrum_vibrations = np.zeros((len(spectrum_angles), len(spectrum_speeds)))
 
     def get_interpolated_vibrations(data, speed, speeds):
@@ -269,8 +269,8 @@ def plot_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_avg_ener
                         ha='left', fontsize=13, color=KLIPPAIN_COLORS['red_pink'], zorder=10)
 
     for idx, (start, end, _) in enumerate(low_energy_zones):
-        ax2.axvline(all_speeds[start], y2min, sp_composite_variance[start]/y2max, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
-        ax2.axvline(all_speeds[end], y2min, sp_composite_variance[start]/y2max, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
+        ax2.axvline(all_speeds[start], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
+        ax2.axvline(all_speeds[end], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
         ax2.fill_between(all_speeds[start:end], y2min, sp_composite_variance[start:end], color='green', alpha=0.2, label=f'Zone {idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
@@ -305,19 +305,18 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
     ax.set_ylim([0, max_value * 1.1])
 
     # Then add the motor resonance peak to the graph and print some infos about it
-    motor_fr, motor_zeta, motor_res_idx = compute_mechanical_parameters(global_motor_profile, freqs)
-    if motor_fr > 25:
-        if motor_zeta is not None:
-            print_with_c_locale("Motors have a main resonant frequency at %.1fHz with an estimated damping ratio of %.3f" % (motor_fr, motor_zeta))
-        else:
-            print_with_c_locale("Motors have a main resonant frequency at %.1fHz but it was impossible to estimate a damping ratio." % (motor_fr))
+    motor_fr, motor_zeta, motor_res_idx, lowfreq_max = compute_mechanical_parameters(global_motor_profile, freqs, 30)
+    if lowfreq_max:
+        print_with_c_locale("[WARNING] There are a lot of low frequency vibrations that can alter the readings. This is probably due to the test being performed at too high an acceleration!")
+        print_with_c_locale("Try lowering the ACCEL value and/or increasing the SIZE value before restarting the macro to ensure that only constant speeds are being recorded and that the dynamic behavior of the machine is not affecting the measurements")
+    if motor_zeta is not None:
+        print_with_c_locale("Motors have a main resonant frequency at %.1fHz with an estimated damping ratio of %.3f" % (motor_fr, motor_zeta))
     else:
-        print_with_c_locale("The detected resonance frequency of the motors is too low (%.1fHz). This is probably due to the test run with too high acceleration!" % motor_fr)
-        print_with_c_locale("Try lowering the ACCEL value before restarting the macro to ensure that only constant speeds are recorded and that the dynamic behavior of the machine is not impacting the measurements.")
+        print_with_c_locale("Motors have a main resonant frequency at %.1fHz but it was impossible to estimate a damping ratio." % (motor_fr))
 
     ax.plot(freqs[motor_res_idx], global_motor_profile[motor_res_idx], "x", color='black', markersize=10)
-    ax.annotate(f"R", (freqs[motor_res_idx], global_motor_profile[motor_res_idx]), 
-                textcoords="offset points", xytext=(15, 5), 
+    ax.annotate(f"R", (freqs[motor_res_idx], global_motor_profile[motor_res_idx]),
+                textcoords="offset points", xytext=(15, 5),
                 ha='right', fontsize=14, color=KLIPPAIN_COLORS['red_pink'], weight='bold')
 
     legend_texts = ["Resonant frequency (ω0): %.1fHz" % (motor_fr)]

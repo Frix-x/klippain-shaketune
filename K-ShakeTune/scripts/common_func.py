@@ -72,8 +72,25 @@ def compute_spectrogram(data):
 
 
 # Compute natural resonant frequency and damping ratio by using the half power bandwidth method with interpolated frequencies
-def compute_mechanical_parameters(psd, freqs):
-    max_power_index = np.argmax(psd)
+def compute_mechanical_parameters(psd, freqs, min_freq=None):
+    max_under_min_freq = False
+
+    if min_freq is not None:
+        min_freq_index = np.searchsorted(freqs, min_freq, side='left')
+        if min_freq_index >= len(freqs):
+            return None, None, None, max_under_min_freq
+        if np.argmax(psd) < min_freq_index:
+            max_under_min_freq = True
+    else:
+        min_freq_index = 0
+    
+    # Consider only the part of the signal above min_freq
+    psd_above_min_freq = psd[min_freq_index:]
+    if len(psd_above_min_freq) == 0:
+        return None, None, None, max_under_min_freq
+
+    max_power_index_above_min_freq = np.argmax(psd_above_min_freq)
+    max_power_index = max_power_index_above_min_freq + min_freq_index
     fr = freqs[max_power_index]
     max_power = psd[max_power_index]
 
@@ -81,9 +98,9 @@ def compute_mechanical_parameters(psd, freqs):
     indices_below = np.where(psd[:max_power_index] <= half_power)[0]
     indices_above = np.where(psd[max_power_index:] <= half_power)[0]
 
+    # If we are not able to find points around the half power, we can't compute the damping ratio and return None instead
     if len(indices_below) == 0 or len(indices_above) == 0:
-        # If we are not able to find points around the half power, we can't compute the damping ratio and return None instead
-        return fr, None, max_power_index
+        return fr, None, max_power_index, max_under_min_freq
 
     idx_below = indices_below[-1]
     idx_above = indices_above[0] + max_power_index
@@ -96,7 +113,7 @@ def compute_mechanical_parameters(psd, freqs):
 
     zeta = math.sqrt(0.5 - math.sqrt(1 / (4 + 4 * bw1 - bw2)))
 
-    return fr, zeta, max_power_index
+    return fr, zeta, max_power_index, max_under_min_freq
 
 # This find all the peaks in a curve by looking at when the derivative term goes from positive to negative
 # Then only the peaks found above a threshold are kept to avoid capturing peaks in the low amplitude noise of a signal

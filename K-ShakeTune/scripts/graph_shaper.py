@@ -51,7 +51,7 @@ def calibrate_shaper(datas, max_smoothing, scv, max_freq):
     calibration_data = helper.process_accelerometer_data(datas)
     calibration_data.normalize_to_frequencies()
 
-    fr, zeta, _ = compute_mechanical_parameters(calibration_data.psd_sum, calibration_data.freq_bins)
+    fr, zeta, _, _ = compute_mechanical_parameters(calibration_data.psd_sum, calibration_data.freq_bins)
 
     # If the damping ratio computation fail, we use Klipper default value instead
     if zeta is None: zeta = 0.1
