@@ -152,35 +152,36 @@ def compute_speed_powers(spectrogram_data, smoothing_window=15):
     return min_values_smooth, max_values_smooth, avg_values_smooth, composite_variance_smooth
 
 
-# This function uses a nuanced approach to allow the computation of a score that reflect both the shape
-# similarity of a signal (via cross-correlation) and the energy level consistency across the signal
-def compute_symmetry_analysis(all_angles, angles_energy):
-    # Split the signal in half
-    first_half_indices = (0 <= all_angles) & (all_angles < 90)
-    second_half_indices = (90 <= all_angles) & (all_angles < 180)
-    x1, y1 = all_angles[first_half_indices], angles_energy[first_half_indices]
-    x2, y2 = all_angles[second_half_indices], angles_energy[second_half_indices]
+# This function allow the computation of a symmetry score that reflect the spectrogram apparent symmetry between
+# measured axes on both the shape of the signal and the energy level consistency across both side of the signal
+def compute_symmetry_analysis(all_angles, spectrogram_data, measured_angles=[0, 90]):
+    total_angles = len(all_angles)
+    angles_per_degree = total_angles / 360
+    midpoint_angle = np.mean(measured_angles)
 
-    # Reverse the second signal to compare them on a real symmetry
-    x2, y2 = x2[::-1], y2[::-1]
+    # Extend the spectrogram by adding half to the beginning (in order to not get an out of bounds error later)
+    half_spectrogram_length = total_angles // 2
+    extended_spectrogram = np.concatenate((spectrogram_data[-half_spectrogram_length:],
+                                           spectrogram_data), axis=0)
 
-    # Compute the similarity (using cross-correlation of the signals)
-    similarity_factor = compute_curve_similarity_factor(x1, y1, x2, y2, CURVE_SIMILARITY_SIGMOID_K)
+    # Calculate the split index in center part of the extended spectrogram and get the segments bounds
+    split_index = int(midpoint_angle * angles_per_degree + half_spectrogram_length)
+    start_index = split_index - half_spectrogram_length // 2
+    end_index = split_index + half_spectrogram_length // 2
 
-    # Because the signal of both half have approximately the same shape, this is not enough and we need to
-    # add the total energy of each side in the equation to help discriminate differences in the symmetry
-    energy_first_half = np.sum(y1**2)
-    energy_second_half = np.sum(y2**2)
-    energy_gap = np.abs(energy_first_half/energy_second_half - 1)
+    # Slice out the two segments for comparison and flatten them for comparison
+    segment_1 = extended_spectrogram[start_index:split_index]
+    segment_2 = extended_spectrogram[split_index:end_index]
+    segment_1_flattened = segment_1.flatten()
+    segment_2_flattened = segment_2.flatten()
 
-    # Compute an adjustement factor where close energies slightly increase the score and farther energies decrease the score
-    if energy_gap <= 0.1: adjustment_factor = 1 + energy_gap
-    else: adjustment_factor = 1 / (1 + 3 * (energy_gap - 0.1))
+    # Compute the correlation coefficient between the two halves of spectrogram
+    correlation = np.corrcoef(segment_1_flattened, segment_2_flattened)[0, 1]
+    adjusted_correlation = np.power(correlation, 0.75)
+    percentage_correlation_biased = (100 * adjusted_correlation) + 10
+    
+    return np.clip(0, 100, percentage_correlation_biased)
 
-    # Adjust the similarity factor with the energy disparity
-    adjusted_similarity_factor = similarity_factor * adjustment_factor
-
-    return np.clip(adjusted_similarity_factor, 0, 100)
 
 ######################################################################
 # Graphing
@@ -442,7 +443,8 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
     sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance = compute_speed_powers(spectrogram_data)
     motor_profiles, global_motor_profile = compute_motor_profiles(target_freqs, psds, all_angles_energy, main_angles)
 
-    symmetry_factor = compute_symmetry_analysis(all_angles, all_angles_energy)
+    # symmetry_factor = compute_symmetry_analysis(all_angles, all_angles_energy)
+    symmetry_factor = compute_symmetry_analysis(all_angles, spectrogram_data, main_angles)
     print_with_c_locale(f"Machine estimated vibration symmetry: {symmetry_factor:.1f}%")
 
     # Analyze low variance ranges of vibration energy across all angles for each speed to identify clean speeds
