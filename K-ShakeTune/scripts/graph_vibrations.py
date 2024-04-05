@@ -30,6 +30,7 @@ PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_RELATIVE_HEIGHT_THRESHOLD = 0.04
 CURVE_SIMILARITY_SIGMOID_K = 0.5
 SPEEDS_VALLEY_DETECTION_THRESHOLD = 0.7 # Lower is more sensitive
+SPEEDS_AROUND_PEAK_DELETION = 3 # to delete +-3mm/s around a peak
 ANGLES_VALLEY_DETECTION_THRESHOLD = 1.1 # Lower is more sensitive
 
 KLIPPAIN_COLORS = {
@@ -57,25 +58,26 @@ def compute_motor_profiles(freqs, psds, all_angles_energy, measured_angles=[0, 9
     motor_profiles = {}
     weighted_sum_profiles = np.zeros_like(freqs)
     total_weight = 0
+    conv_filter = np.ones(20) / 20
 
     # Creating the PSD motor profiles for each angles
     for angle in measured_angles:
-        sum_curve = np.zeros_like(freqs)
-        for speed in psds[angle]:
-            sum_curve += psds[angle][speed]
+        # Calculate the sum of PSDs for the current angle and then convolve
+        sum_curve = np.sum(np.array([psds[angle][speed] for speed in psds[angle]]), axis=0)
+        motor_profiles[angle] = np.convolve(sum_curve / len(psds[angle]), conv_filter, mode='same')
 
-        motor_profiles[angle] = np.convolve(sum_curve / len(psds[angle]), np.ones(20)/20, mode='same')
-        angle_energy = all_angles_energy[angle] ** energy_amplification_factor # First weighting factor based on the total vibrations of the machine at the specified angle
-        curve_area = np.trapz(motor_profiles[angle], freqs) ** energy_amplification_factor # Additional weighting factor based on the area under the current motor profile at this specified angle
+        # Calculate weights
+        angle_energy = all_angles_energy[angle] ** energy_amplification_factor # First weighting factor is based on the total vibrations of the machine at the specified angle
+        curve_area = np.trapz(motor_profiles[angle], freqs) ** energy_amplification_factor # Additional weighting factor is based on the area under the current motor profile at this specified angle
         total_angle_weight = angle_energy * curve_area
-    
+
+        # Update weighted sum profiles to get the global motor profile
         weighted_sum_profiles += motor_profiles[angle] * total_angle_weight
         total_weight += total_angle_weight
 
     # Creating a global average motor profile that is the weighted average of all the PSD motor profiles
     global_motor_profile = weighted_sum_profiles / total_weight if total_weight != 0 else weighted_sum_profiles
 
-    # return motor_profiles, np.convolve(global_motor_profile, np.ones(15)/15, mode='same')
     return motor_profiles, global_motor_profile
 
 
@@ -90,25 +92,28 @@ def compute_dir_speed_spectrogram(measured_speeds, data, kinematics="cartesian",
     spectrum_vibrations = np.zeros((len(spectrum_angles), len(spectrum_speeds)))
 
     def get_interpolated_vibrations(data, speed, speeds):
-        idx = np.searchsorted(speeds, speed, side="left")
-        if idx == 0: return data[speeds[0]]
-        if idx == len(speeds): return data[speeds[-1]]
+        idx = np.clip(np.searchsorted(speeds, speed, side="left"), 1, len(speeds) - 1)
         lower_speed = speeds[idx - 1]
         upper_speed = speeds[idx]
         lower_vibrations = data.get(lower_speed, 0)
         upper_vibrations = data.get(upper_speed, 0)
-        interpolated_vibrations = lower_vibrations + (speed - lower_speed) * (upper_vibrations - lower_vibrations) / (upper_speed - lower_speed)
-        return interpolated_vibrations
+        return lower_vibrations + (speed - lower_speed) * (upper_vibrations - lower_vibrations) / (upper_speed - lower_speed)
+    
+    # Precompute trigonometric values and constant before the loop
+    angle_radians = np.deg2rad(spectrum_angles)
+    cos_vals = np.cos(angle_radians)
+    sin_vals = np.sin(angle_radians)
+    sqrt_2_inv = 1 / math.sqrt(2)
 
-    for target_angle_idx, target_angle in enumerate(spectrum_angles):
-        target_angle_rad = np.deg2rad(target_angle)
+    # Compute the spectrum vibrations for each angle and speed combination
+    for target_angle_idx, (cos_val, sin_val) in enumerate(zip(cos_vals, sin_vals)):
         for target_speed_idx, target_speed in enumerate(spectrum_speeds):
             if kinematics == "cartesian":
-                speed_1 = np.abs(target_speed * np.cos(target_angle_rad))
-                speed_2 = np.abs(target_speed * np.sin(target_angle_rad))
+                speed_1 = np.abs(target_speed * cos_val)
+                speed_2 = np.abs(target_speed * sin_val)
             elif kinematics == "corexy":
-                speed_1 = np.abs(target_speed * (np.cos(target_angle_rad) + np.sin(target_angle_rad)) / math.sqrt(2))
-                speed_2 = np.abs(target_speed * (np.cos(target_angle_rad) - np.sin(target_angle_rad)) / math.sqrt(2))
+                speed_1 = np.abs(target_speed * (cos_val + sin_val) * sqrt_2_inv)
+                speed_2 = np.abs(target_speed * (cos_val - sin_val) * sqrt_2_inv)
 
             vibrations_1 = get_interpolated_vibrations(data[measured_angles[0]], speed_1, measured_speeds)
             vibrations_2 = get_interpolated_vibrations(data[measured_angles[1]], speed_2, measured_speeds)
@@ -123,9 +128,7 @@ def compute_angle_powers(spectrogram_data):
     # Since we want to plot it on a continuous polar plot later on, we need to append parts of
     # the array to start and end of it to smooth transitions when doing the convolution
     # and get the same value at modulo 360. Then we return the array without the extras
-    extra_start = angles_powers[-9:]
-    extra_end = angles_powers[:9]
-    extended_angles_powers = np.concatenate([extra_start, angles_powers, extra_end])
+    extended_angles_powers = np.concatenate([angles_powers[-9:], angles_powers, angles_powers[:9]])
     convolved_extended = np.convolve(extended_angles_powers, np.ones(15)/15, mode='same')
 
     return convolved_extended[9:-9]
@@ -137,49 +140,43 @@ def compute_speed_powers(spectrogram_data, smoothing_window=15):
     avg_values = np.mean(spectrogram_data, axis=0)
     composite_variance = max_values * np.var(spectrogram_data, axis=0)
 
-    # Apply padding to mitigate edge effects of the future convolution
-    min_values_padded = np.pad(min_values, int(smoothing_window/2), mode='edge')
-    max_values_padded = np.pad(max_values, int(smoothing_window/2), mode='edge')
-    avg_values_padded = np.pad(avg_values, int(smoothing_window/2), mode='edge')
-    composite_variance_padded = np.pad(composite_variance, int(smoothing_window/2), mode='edge')
+    # utility function to pad and smooth the data avoiding edge effects
+    conv_filter = np.ones(smoothing_window) / smoothing_window
+    window = int(smoothing_window / 2)
+    def pad_and_smooth(data):
+        data_padded = np.pad(data, (window,), mode='edge')
+        smoothed_data = np.convolve(data_padded, conv_filter, mode='valid')
+        return smoothed_data
 
-    # Apply convolution on padded arrays
-    min_values_smooth = np.convolve(min_values_padded, np.ones(smoothing_window)/smoothing_window, mode='valid')
-    max_values_smooth = np.convolve(max_values_padded, np.ones(smoothing_window)/smoothing_window, mode='valid')
-    avg_values_smooth = np.convolve(avg_values_padded, np.ones(smoothing_window)/smoothing_window, mode='valid')
-    composite_variance_smooth = np.convolve(composite_variance_padded, np.ones(smoothing_window)/smoothing_window, mode='valid')
+    # Stack the arrays and apply padding and smoothing in batch
+    data_arrays = np.stack([min_values, max_values, avg_values, composite_variance])
+    smoothed_arrays = np.array([pad_and_smooth(data) for data in data_arrays])
 
-    return min_values_smooth, max_values_smooth, avg_values_smooth, composite_variance_smooth
+    return smoothed_arrays
 
 
 # This function allow the computation of a symmetry score that reflect the spectrogram apparent symmetry between
 # measured axes on both the shape of the signal and the energy level consistency across both side of the signal
 def compute_symmetry_analysis(all_angles, spectrogram_data, measured_angles=[0, 90]):
-    total_angles = len(all_angles)
-    angles_per_degree = total_angles / 360
-    midpoint_angle = np.mean(measured_angles)
+    total_spectrogram_angles = len(all_angles)
+    half_spectrogram_angles = total_spectrogram_angles // 2
 
     # Extend the spectrogram by adding half to the beginning (in order to not get an out of bounds error later)
-    half_spectrogram_length = total_angles // 2
-    extended_spectrogram = np.concatenate((spectrogram_data[-half_spectrogram_length:],
-                                           spectrogram_data), axis=0)
+    extended_spectrogram = np.concatenate((spectrogram_data[-half_spectrogram_angles:], spectrogram_data), axis=0)
 
-    # Calculate the split index in center part of the extended spectrogram and get the segments bounds
-    split_index = int(midpoint_angle * angles_per_degree + half_spectrogram_length)
-    start_index = split_index - half_spectrogram_length // 2
-    end_index = split_index + half_spectrogram_length // 2
+    # Calculate the split index directly within the slicing
+    midpoint_angle = np.mean(measured_angles)
+    split_index = int(midpoint_angle * (total_spectrogram_angles / 360) + half_spectrogram_angles)
+    half_segment_length = half_spectrogram_angles // 2
 
-    # Slice out the two segments for comparison and flatten them for comparison
-    segment_1 = extended_spectrogram[start_index:split_index]
-    segment_2 = extended_spectrogram[split_index:end_index]
-    segment_1_flattened = segment_1.flatten()
-    segment_2_flattened = segment_2.flatten()
+    # Slice out the two segments of the spectrogram and flatten them for comparison
+    segment_1_flattened = extended_spectrogram[split_index - half_segment_length:split_index].flatten()
+    segment_2_flattened = extended_spectrogram[split_index:split_index + half_segment_length].flatten()
 
-    # Compute the correlation coefficient between the two halves of spectrogram
+    # Compute the correlation coefficient between the two segments of spectrogram
     correlation = np.corrcoef(segment_1_flattened, segment_2_flattened)[0, 1]
-    adjusted_correlation = np.power(correlation, 0.75)
-    percentage_correlation_biased = (100 * adjusted_correlation) + 10
-    
+    percentage_correlation_biased = (100 * np.power(correlation, 0.75)) + 10
+
     return np.clip(0, 100, percentage_correlation_biased)
 
 
@@ -215,35 +212,13 @@ def plot_angle_profile_polar(ax, angles, angles_powers, low_energy_zones, symmet
 
     # Polar plot doesn't follow the gridspec margin, so we adjust it manually here
     pos = ax.get_position()
-    new_pos = [pos.x0 - 0.005, pos.y0, pos.width * 0.98, pos.height * 0.98]
+    new_pos = [pos.x0 - 0.01, pos.y0 - 0.01, pos.width, pos.height]
     ax.set_position(new_pos)
 
     return
 
-def plot_angle_profile(ax, angles, angles_powers, low_energy_zones):
-    ax.set_title("Angle energy profile", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
-    ax.set_xlabel('Energy')
-    ax.set_ylabel('Angle (deg)')
-
-    ax.plot(angles_powers, angles, color=KLIPPAIN_COLORS['purple'], zorder=5)
-    xmax = angles_powers.max() * 1.1
-    ax.set_xlim([0, xmax])
-    ax.set_ylim([angles.min(), angles.max()])
-
-    for _, (start, end, _) in enumerate(low_energy_zones):
-        ax.axhline(angles[start], 0, angles_powers[start]/xmax, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
-        ax.axhline(angles[end], 0, angles_powers[end]/xmax, color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
-        ax.fill_betweenx(angles[start:end], 0, angles_powers[start:end], color='green', alpha=0.2)
-
-    ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-    ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-    ax.grid(which='major', color='grey')
-    ax.grid(which='minor', color='lightgrey')
-
-    return
-
-def plot_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance, num_peaks, peaks, low_energy_zones):
-    ax.set_title("Speed energy profile", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
+def plot_global_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance, num_peaks, peaks, low_energy_zones):
+    ax.set_title("Global speed energy profile", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_xlabel('Speed (mm/s)')
     ax.set_ylabel('Energy')
     ax2 = ax.twinx()
@@ -269,8 +244,8 @@ def plot_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_avg_ener
                         ha='left', fontsize=13, color=KLIPPAIN_COLORS['red_pink'], zorder=10)
 
     for idx, (start, end, _) in enumerate(low_energy_zones):
-        ax2.axvline(all_speeds[start], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
-        ax2.axvline(all_speeds[end], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5)
+        ax2.axvline(all_speeds[start], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5, zorder=8)
+        ax2.axvline(all_speeds[end], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5, zorder=8)
         ax2.fill_between(all_speeds[start:end], y2min, sp_composite_variance[start:end], color='green', alpha=0.2, label=f'Zone {idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
@@ -285,13 +260,44 @@ def plot_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_avg_ener
 
     return
 
+def plot_angular_speed_profiles(ax, speeds, angles, spectrogram_data):
+    ax.set_title("Major angles speed energy profiles", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
+    ax.set_xlabel('Speed (mm/s)')
+    ax.set_ylabel('Energy')
+
+    max_value = 0
+    for angle in [0, 45, 90, 135]:
+        profile_max = spectrogram_data[angle].max()
+        if profile_max > max_value:
+            max_value = profile_max
+        idx = np.searchsorted(angles, angle, side="left")
+        color = KLIPPAIN_COLORS[list(KLIPPAIN_COLORS.keys())[angle // 45]]
+        ax.plot(speeds, spectrogram_data[idx], label=f'{angle} deg', color=color, zorder=360-angle)
+    
+    ax.set_xlim([speeds.min(), speeds.max()])
+    ax.set_ylim([0, max_value * 1.1])
+    
+    ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+    ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+    ax.grid(which='major', color='grey')
+    ax.grid(which='minor', color='lightgrey')
+
+    fontP = matplotlib.font_manager.FontProperties()
+    fontP.set_size('small')
+    ax.legend(loc='upper right', prop=fontP)
+
+    return
+
 def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_profile, max_freq):
     ax.set_title("Motor frequency profile", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_ylabel('Energy')
     ax.set_xlabel('Frequency (Hz)')
 
+    ax2 = ax.twinx()
+    ax2.yaxis.set_visible(False)
+
     # Global weighted average motor profile
-    ax.plot(freqs, global_motor_profile, label="Combined profile", color=KLIPPAIN_COLORS['purple'], zorder=5)
+    ax.plot(freqs, global_motor_profile, label="Combined", color=KLIPPAIN_COLORS['purple'], zorder=5)
     max_value = global_motor_profile.max()
 
     # And then plot the motor profiles at each measured angles
@@ -303,6 +309,7 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
 
     ax.set_xlim([0, max_freq])
     ax.set_ylim([0, max_value * 1.1])
+    ax.ticklabel_format(axis='y', style='scientific', scilimits=(0,0))
 
     # Then add the motor resonance peak to the graph and print some infos about it
     motor_fr, motor_zeta, motor_res_idx, lowfreq_max = compute_mechanical_parameters(global_motor_profile, freqs, 30)
@@ -319,14 +326,11 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
                 textcoords="offset points", xytext=(15, 5),
                 ha='right', fontsize=14, color=KLIPPAIN_COLORS['red_pink'], weight='bold')
 
-    legend_texts = ["Resonant frequency (ω0): %.1fHz" % (motor_fr)]
+    ax2.plot([], [], ' ', label="Motor resonant frequency (ω0): %.1fHz" % (motor_fr))
     if motor_zeta is not None:
-        legend_texts.append("Damping ratio (ζ): %.3f" % (motor_zeta))
+        ax2.plot([], [], ' ', label="Motor damping ratio (ζ): %.3f" % (motor_zeta))
     else:
-        legend_texts.append("No damping ratio computed")
-    for i, text in enumerate(legend_texts):
-        ax.text(0.90 + i*0.05, 0.85, text, transform=ax.transAxes, color=KLIPPAIN_COLORS['red_pink'], fontsize=12,
-                 fontweight='bold', verticalalignment='top', rotation='vertical', zorder=10)
+        ax2.plot([], [], ' ', label="No damping ratio computed")
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
     ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
@@ -335,7 +339,8 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
 
     fontP = matplotlib.font_manager.FontProperties()
     fontP.set_size('small')
-    ax.legend(loc='upper right', prop=fontP)
+    ax.legend(loc='upper left', prop=fontP)
+    ax2.legend(loc='upper right', prop=fontP)
 
     return
 
@@ -458,6 +463,27 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
     
     good_speeds = identify_low_energy_zones(sp_composite_variance, SPEEDS_VALLEY_DETECTION_THRESHOLD)
     if good_speeds is not None:
+        deletion_range = int(SPEEDS_AROUND_PEAK_DELETION / (all_speeds[1] - all_speeds[0]))
+        peak_speed_indices = {pspeed: np.where(all_speeds == pspeed)[0][0] for pspeed in set(peaks_speeds)}
+
+        filtered_good_speeds = []
+        for start, end, energy in good_speeds:
+            # Check for peaks within the current good speed range
+            start_speed, end_speed = all_speeds[start], all_speeds[end]
+            intersecting_peaks_indices = [idx for speed, idx in peak_speed_indices.items() if start_speed <= speed <= end_speed]
+
+            # If no peaks intersect any good_speed range, add it as is, else iterate through intersecting peaks to split the range
+            if not intersecting_peaks_indices: filtered_good_speeds.append((start, end, energy))
+            else:
+                for peak_index in intersecting_peaks_indices:
+                    before_peak_end = max(start, peak_index - deletion_range)
+                    after_peak_start = min(end, peak_index + deletion_range)
+                    if start < before_peak_end:
+                        filtered_good_speeds.append((start, before_peak_end, energy))
+                    if after_peak_start < end:
+                        filtered_good_speeds.append((after_peak_start, end, energy))
+
+        good_speeds = filtered_good_speeds
         print_with_c_locale(f'Lowest vibrations speeds ({len(good_speeds)} ranges sorted from best to worse):')
         for idx, (start, end, energy) in enumerate(good_speeds):
             print_with_c_locale(f'{idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
@@ -472,7 +498,7 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
     # Create graph layout
     fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, gridspec_kw={
             'height_ratios':[1, 1],
-            'width_ratios':[4, 8, 4],
+            'width_ratios':[4, 8, 6],
             'bottom':0.050,
             'top':0.890,
             'left':0.040,
@@ -482,13 +508,13 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
             })
 
     # Transform ax3 and ax4 to polar plots
-    ax3.remove()
-    ax3 = fig.add_subplot(2, 3, 3, projection='polar')
+    ax1.remove()
+    ax1 = fig.add_subplot(2, 3, 1, projection='polar')
     ax4.remove()
     ax4 = fig.add_subplot(2, 3, 4, projection='polar')
 
     # Set the global .png figure size
-    fig.set_size_inches(19, 11.6)
+    fig.set_size_inches(20, 11.5)
 
     # Add title
     title_line1 = "MACHINE VIBRATIONS ANALYSIS TOOL"
@@ -505,14 +531,14 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
     fig.text(0.060, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     # Plot the graphs
-    plot_angle_profile_polar(ax3, all_angles, all_angles_energy, good_angles, symmetry_factor)
+    plot_angle_profile_polar(ax1, all_angles, all_angles_energy, good_angles, symmetry_factor)
     plot_vibration_spectrogram_polar(ax4, all_angles, all_speeds, spectrogram_data)
 
-    plot_motor_profiles(ax1, target_freqs, main_angles, motor_profiles, global_motor_profile, max_freq)
-    plot_angle_profile(ax6, all_angles, all_angles_energy, good_angles)
-    plot_speed_profile(ax2, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance, num_peaks, vibration_peaks, good_speeds)
-
+    plot_global_speed_profile(ax2, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance, num_peaks, vibration_peaks, good_speeds)
+    plot_angular_speed_profiles(ax3, all_speeds, all_angles, spectrogram_data)
     plot_vibration_spectrogram(ax5, all_angles, all_speeds, spectrogram_data, vibration_peaks)
+
+    plot_motor_profiles(ax6, target_freqs, main_angles, motor_profiles, global_motor_profile, max_freq)
 
     # Adding a small Klippain logo to the top left corner of the figure
     ax_logo = fig.add_axes([0.001, 0.924, 0.075, 0.075], anchor='NW')
