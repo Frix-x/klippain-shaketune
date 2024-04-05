@@ -260,21 +260,26 @@ def plot_global_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_a
 
     return
 
-def plot_angular_speed_profiles(ax, speeds, angles, spectrogram_data):
+def plot_angular_speed_profiles(ax, speeds, angles, spectrogram_data, kinematics="cartesian"):
     ax.set_title("Major angles speed energy profiles", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_xlabel('Speed (mm/s)')
     ax.set_ylabel('Energy')
 
-    max_value = 0
-    for angle in [0, 45, 90, 135]:
-        profile_max = spectrogram_data[angle].max()
-        if profile_max > max_value:
-            max_value = profile_max
+    # Define mappings for labels and colors to simplify plotting commands
+    angle_settings = {
+        0: ('X (0 deg)', 'purple', 10),
+        90: ('Y (90 deg)', 'dark_purple', 5),
+        45: ('A (45 deg)' if kinematics == "corexy" else '45 deg', 'orange', 10),
+        135: ('B (135 deg)' if kinematics == "corexy" else '135 deg', 'dark_orange', 5),
+    }
+
+    # Plot each angle using settings from the dictionary
+    for angle, (label, color, zorder) in angle_settings.items():
         idx = np.searchsorted(angles, angle, side="left")
-        color = KLIPPAIN_COLORS[list(KLIPPAIN_COLORS.keys())[angle // 45]]
-        ax.plot(speeds, spectrogram_data[idx], label=f'{angle} deg', color=color, zorder=360-angle)
-    
+        ax.plot(speeds, spectrogram_data[idx], label=label, color=KLIPPAIN_COLORS[color], zorder=zorder)
+
     ax.set_xlim([speeds.min(), speeds.max()])
+    max_value = max(spectrogram_data[angle].max() for angle in [0, 45, 90, 135])
     ax.set_ylim([0, max_value * 1.1])
     
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
@@ -524,7 +529,7 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
         dt = datetime.strptime(f"{filename_parts[1]} {filename_parts[2].split('-')[0]}", "%Y%m%d %H%M%S")
         title_line2 = dt.strftime('%x %X')
         if accel is not None:
-            title_line2 += ' at ' + str(accel) + ' mm/s²'
+            title_line2 += ' at ' + str(accel) + ' mm/s² -- ' + kinematics.upper() + ' kinematics'
     except:
         print_with_c_locale("Warning: CSV filenames appear to be different than expected (%s)" % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
@@ -535,7 +540,7 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
     plot_vibration_spectrogram_polar(ax4, all_angles, all_speeds, spectrogram_data)
 
     plot_global_speed_profile(ax2, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance, num_peaks, vibration_peaks, good_speeds)
-    plot_angular_speed_profiles(ax3, all_speeds, all_angles, spectrogram_data)
+    plot_angular_speed_profiles(ax3, all_speeds, all_angles, spectrogram_data, kinematics)
     plot_vibration_spectrogram(ax5, all_angles, all_speeds, spectrogram_data, vibration_peaks)
 
     plot_motor_profiles(ax6, target_freqs, main_angles, motor_profiles, global_motor_profile, max_freq)
@@ -573,7 +578,7 @@ def main():
     if options.output is None:
         opts.error("You must specify an output file.png to use the script (option -o)")
     if options.kinematics not in ["cartesian", "corexy"]:
-        opts.error("Only Cartesian and CoreXY kinematics are supported by this tool at the moment!")
+        opts.error("Only cartesian and corexy kinematics are supported by this tool at the moment!")
 
     fig = vibrations_profile(args, options.klipperdir, options.kinematics, options.accel, options.max_freq)
     fig.savefig(options.output, dpi=150)
