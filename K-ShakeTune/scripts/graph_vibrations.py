@@ -261,7 +261,7 @@ def plot_global_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_a
     return
 
 def plot_angular_speed_profiles(ax, speeds, angles, spectrogram_data, kinematics="cartesian"):
-    ax.set_title("Major angles speed energy profiles", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
+    ax.set_title("Angular speed energy profiles", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_xlabel('Speed (mm/s)')
     ax.set_ylabel('Energy')
 
@@ -305,12 +305,21 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
     ax.plot(freqs, global_motor_profile, label="Combined", color=KLIPPAIN_COLORS['purple'], zorder=5)
     max_value = global_motor_profile.max()
 
+    # Mapping of angles to axis names
+    angle_settings = {
+        0: "X",
+        90: "Y",
+        45: "A",
+        135: "B"
+    }
+
     # And then plot the motor profiles at each measured angles
     for angle in main_angles:
         profile_max = motor_profiles[angle].max()
         if profile_max > max_value:
             max_value = profile_max
-        ax.plot(freqs, motor_profiles[angle], linestyle='--', label=f'{angle} deg', zorder=2)
+        label = f"{angle_settings[angle]} ({angle} deg)" if angle in angle_settings else f"{angle} deg"
+        ax.plot(freqs, motor_profiles[angle], linestyle='--', label=label, zorder=2)
 
     ax.set_xlim([0, max_freq])
     ax.set_ylim([0, max_value * 1.1])
