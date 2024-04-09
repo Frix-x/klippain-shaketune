@@ -40,8 +40,7 @@ Ensure your machine is homed, then invoke one of the following macros as needed:
   - `AXES_MAP_CALIBRATION` to automatically find Klipper's `axes_map` parameter for your accelerometer orientation (be careful, this is experimental for now and known to give bad results).
   - `COMPARE_BELTS_RESPONSES` for a differential belt resonance graph, useful for checking relative belt tensions and belt path behaviors on a CoreXY printer.
   - `AXES_SHAPER_CALIBRATION` for standard input shaper graphs, used to mitigate ringing/ghosting by tuning Klipper's input shaper filters.
-  - `SPEED_VIBRATIONS_PROFILE` for vibration graphs as a function of toolhead speeds, used to optimize your slicer speed profiles and TMC driver parameters.
-  - `DIRECTIONAL_VIBRATIONS_PROFILE` for vibration graphs as a function of toolhead directional movements, used to find problematic angles where the printer could be exposed to more VFAs and optimize your slicer speed profiles and TMC driver parameters.
+  - `CREATE_VIBRATIONS_PROFILE` for vibrations graphs as a function of toolhead direction and speed, used to find problematic ranges where the printer could be exposed to more VFAs and optimize your slicer speed profiles and TMC driver parameters.
   - `EXCITATE_AXIS_AT_FREQ` to maintain a specific excitation frequency, useful to inspect and find out what is resonating.
 
 For further insights on the usage of these macros and the generated graphs, refer to the [K-Shake&Tune module documentation](./docs/README.md).
