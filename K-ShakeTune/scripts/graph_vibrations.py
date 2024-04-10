@@ -137,9 +137,15 @@ def compute_angle_powers(spectrogram_data):
 def compute_speed_powers(spectrogram_data, smoothing_window=15):
     min_values = np.amin(spectrogram_data, axis=0)
     max_values = np.amax(spectrogram_data, axis=0)
-    avg_values = np.mean(spectrogram_data, axis=0)
-    composite_variance = max_values * np.var(spectrogram_data, axis=0)
+    var_values = np.var(spectrogram_data, axis=0)
 
+    # rescale the variance to the same range as max_values to plot it on the same graph
+    var_values = var_values / var_values.max() * max_values.max()
+
+    # Create a vibration metric that is the product of the max values and the variance to quantify the best
+    # speeds that have at the same time a low global energy level that is also consistent at every angles
+    vibration_metric = max_values * var_values
+    
     # utility function to pad and smooth the data avoiding edge effects
     conv_filter = np.ones(smoothing_window) / smoothing_window
     window = int(smoothing_window / 2)
@@ -149,7 +155,7 @@ def compute_speed_powers(spectrogram_data, smoothing_window=15):
         return smoothed_data
 
     # Stack the arrays and apply padding and smoothing in batch
-    data_arrays = np.stack([min_values, max_values, avg_values, composite_variance])
+    data_arrays = np.stack([min_values, max_values, var_values, vibration_metric])
     smoothed_arrays = np.array([pad_and_smooth(data) for data in data_arrays])
 
     return smoothed_arrays
@@ -217,36 +223,36 @@ def plot_angle_profile_polar(ax, angles, angles_powers, low_energy_zones, symmet
 
     return
 
-def plot_global_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance, num_peaks, peaks, low_energy_zones):
+def plot_global_speed_profile(ax, all_speeds, sp_min_energy, sp_max_energy, sp_variance_energy, vibration_metric, num_peaks, peaks, low_energy_zones):
     ax.set_title("Global speed energy profile", fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_xlabel('Speed (mm/s)')
     ax.set_ylabel('Energy')
     ax2 = ax.twinx()
     ax2.yaxis.set_visible(False)
 
-    ax.plot(all_speeds, sp_avg_energy, label='Average energy', color=KLIPPAIN_COLORS['dark_orange'], zorder=5)
-    ax.plot(all_speeds, sp_min_energy, label='Minimum energy', color=KLIPPAIN_COLORS['dark_purple'], zorder=5)
-    ax.plot(all_speeds, sp_max_energy, label='Maximum energy', color=KLIPPAIN_COLORS['purple'], zorder=5)
-    ax2.plot(all_speeds, sp_composite_variance, label=f'Bad speed indicator ({num_peaks} peaks)', color=KLIPPAIN_COLORS['orange'], zorder=5)
+    ax.plot(all_speeds, sp_min_energy, label='Minimum', color=KLIPPAIN_COLORS['dark_purple'], zorder=5)
+    ax.plot(all_speeds, sp_max_energy, label='Maximum', color=KLIPPAIN_COLORS['purple'], zorder=5)
+    ax.plot(all_speeds, sp_variance_energy, label='Variance', color=KLIPPAIN_COLORS['orange'], zorder=5, linestyle='--')
+    ax2.plot(all_speeds, vibration_metric, label=f'Vibration metric ({num_peaks} bad peaks)', color=KLIPPAIN_COLORS['red_pink'], zorder=5)
 
     ax.set_xlim([all_speeds.min(), all_speeds.max()])
-    ax.set_ylim([0, sp_max_energy.max() * 1.1])
+    ax.set_ylim([0, sp_max_energy.max() * 1.15])
 
-    y2min = -(sp_composite_variance.max() * 0.025)
-    y2max = sp_composite_variance.max() * 1.1
+    y2min = -(vibration_metric.max() * 0.025)
+    y2max = vibration_metric.max() * 1.07
     ax2.set_ylim([y2min, y2max])
 
     if peaks is not None:
-        ax2.plot(all_speeds[peaks], sp_composite_variance[peaks], "x", color='black', markersize=8, zorder=10)
+        ax2.plot(all_speeds[peaks], vibration_metric[peaks], "x", color='black', markersize=8, zorder=10)
         for idx, peak in enumerate(peaks):
-            ax2.annotate(f"{idx+1}", (all_speeds[peak], sp_composite_variance[peak]),
+            ax2.annotate(f"{idx+1}", (all_speeds[peak], vibration_metric[peak]),
                         textcoords="offset points", xytext=(5, 5), fontweight='bold',
                         ha='left', fontsize=13, color=KLIPPAIN_COLORS['red_pink'], zorder=10)
 
     for idx, (start, end, _) in enumerate(low_energy_zones):
-        ax2.axvline(all_speeds[start], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5, zorder=8)
-        ax2.axvline(all_speeds[end], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5, zorder=8)
-        ax2.fill_between(all_speeds[start:end], y2min, sp_composite_variance[start:end], color='green', alpha=0.2, label=f'Zone {idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
+        # ax2.axvline(all_speeds[start], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5, zorder=8)
+        # ax2.axvline(all_speeds[end], color=KLIPPAIN_COLORS['red_pink'], linestyle='dotted', linewidth=1.5, zorder=8)
+        ax2.fill_between(all_speeds[start:end], y2min, vibration_metric[start:end], color='green', alpha=0.2, label=f'Zone {idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
     ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
@@ -458,7 +464,7 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
     # Precompute the variables used in plot functions
     all_angles, all_speeds, spectrogram_data = compute_dir_speed_spectrogram(measured_speeds, psds_sum, kinematics, main_angles)
     all_angles_energy = compute_angle_powers(spectrogram_data)
-    sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance = compute_speed_powers(spectrogram_data)
+    sp_min_energy, sp_max_energy, sp_variance_energy, vibration_metric = compute_speed_powers(spectrogram_data)
     motor_profiles, global_motor_profile = compute_motor_profiles(target_freqs, psds, all_angles_energy, main_angles)
 
     # symmetry_factor = compute_symmetry_analysis(all_angles, all_angles_energy)
@@ -468,14 +474,14 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
     # Analyze low variance ranges of vibration energy across all angles for each speed to identify clean speeds
     # and highlight them. Also find the peaks to identify speeds to avoid due to high resonances
     num_peaks, vibration_peaks, peaks_speeds = detect_peaks(
-        sp_composite_variance, all_speeds,
-        PEAKS_DETECTION_THRESHOLD * sp_composite_variance.max(),
+        vibration_metric, all_speeds,
+        PEAKS_DETECTION_THRESHOLD * vibration_metric.max(),
         PEAKS_RELATIVE_HEIGHT_THRESHOLD, 10, 10
         )
     formated_peaks_speeds = ["{:.1f}".format(pspeed) for pspeed in peaks_speeds]
     print_with_c_locale("Vibrations peaks detected: %d @ %s mm/s (avoid setting a speed near these values in your slicer print profile)" % (num_peaks, ", ".join(map(str, formated_peaks_speeds))))
     
-    good_speeds = identify_low_energy_zones(sp_composite_variance, SPEEDS_VALLEY_DETECTION_THRESHOLD)
+    good_speeds = identify_low_energy_zones(vibration_metric, SPEEDS_VALLEY_DETECTION_THRESHOLD)
     if good_speeds is not None:
         deletion_range = int(SPEEDS_AROUND_PEAK_DELETION / (all_speeds[1] - all_speeds[0]))
         peak_speed_indices = {pspeed: np.where(all_speeds == pspeed)[0][0] for pspeed in set(peaks_speeds)}
@@ -548,7 +554,7 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
     plot_angle_profile_polar(ax1, all_angles, all_angles_energy, good_angles, symmetry_factor)
     plot_vibration_spectrogram_polar(ax4, all_angles, all_speeds, spectrogram_data)
 
-    plot_global_speed_profile(ax2, all_speeds, sp_min_energy, sp_max_energy, sp_avg_energy, sp_composite_variance, num_peaks, vibration_peaks, good_speeds)
+    plot_global_speed_profile(ax2, all_speeds, sp_min_energy, sp_max_energy, sp_variance_energy, vibration_metric, num_peaks, vibration_peaks, good_speeds)
     plot_angular_speed_profiles(ax3, all_speeds, all_angles, spectrogram_data, kinematics)
     plot_vibration_spectrogram(ax5, all_angles, all_speeds, spectrogram_data, vibration_peaks)
 
