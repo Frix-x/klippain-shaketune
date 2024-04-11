@@ -11,7 +11,7 @@
 ################ !!! DO NOT EDIT BELOW THIS LINE !!! ################
 #####################################################################
 
-import optparse, matplotlib, sys, importlib, os
+import optparse, matplotlib, os
 from datetime import datetime
 from collections import namedtuple
 import numpy as np
@@ -22,7 +22,7 @@ from scipy.interpolate import griddata
 matplotlib.use('Agg')
 
 from locale_utils import set_locale, print_with_c_locale
-from common_func import compute_spectrogram, detect_peaks, get_git_version, parse_log, setup_klipper_import
+from common_func import compute_spectrogram, detect_peaks, get_git_version, parse_log, setup_klipper_import, compute_curve_similarity_factor
 
 
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" # For paired peaks names
@@ -48,28 +48,6 @@ KLIPPAIN_COLORS = {
 ######################################################################
 # Computation of the PSD graph
 ######################################################################
-
-# Calculate or estimate a "similarity" factor between two PSD curves and scale it to a percentage. This is
-# used here to quantify how close the two belts path behavior and responses are close together.
-def compute_curve_similarity_factor(signal1, signal2):
-    freqs1 = signal1.freqs
-    psd1 = signal1.psd
-    freqs2 = signal2.freqs
-    psd2 = signal2.psd
-    
-    # Interpolate PSDs to match the same frequency bins and do a cross-correlation
-    psd2_interp = np.interp(freqs1, freqs2, psd2)
-    cross_corr = np.correlate(psd1, psd2_interp, mode='full')
-    
-    # Find the peak of the cross-correlation and compute a similarity normalized by the energy of the signals
-    peak_value = np.max(cross_corr)
-    similarity = peak_value / (np.sqrt(np.sum(psd1**2) * np.sum(psd2_interp**2)))
-
-    # Apply sigmoid scaling to get better numbers and get a final percentage value
-    scaled_similarity = sigmoid_scale(-np.log(1 - similarity), CURVE_SIMILARITY_SIGMOID_K)
-    
-    return scaled_similarity
-
 
 # This function create pairs of peaks that are close in frequency on two curves (that are known
 # to be resonances points and must be similar on both belts on a CoreXY kinematic)
@@ -361,10 +339,6 @@ def plot_difference_spectrogram(ax, signal1, signal2, t, bins, combined_divergen
 # Custom tools 
 ######################################################################
 
-# Simple helper to compute a sigmoid scalling (from 0 to 100%)
-def sigmoid_scale(x, k=1):
-    return 1 / (1 + np.exp(-k * x)) * 100
-
 # Original Klipper function to get the PSD data of a raw accelerometer signal
 def compute_signal_data(data, max_freq):
     helper = shaper_calibrate.ShaperCalibrate(printer=None)
@@ -405,7 +379,7 @@ def belts_calibration(lognames, klipperdir="~/klipper", max_freq=200.):
     signal2 = signal2._replace(paired_peaks = paired_peaks, unpaired_peaks = unpaired_peaks2)
 
     # Compute the similarity (using cross-correlation of the PSD signals)
-    similarity_factor = compute_curve_similarity_factor(signal1, signal2)
+    similarity_factor = compute_curve_similarity_factor(signal1.freqs, signal1.psd, signal2.freqs, signal2.psd, CURVE_SIMILARITY_SIGMOID_K)
     print_with_c_locale(f"Belts estimated similarity: {similarity_factor:.1f}%")
     # Compute the MHI value from the differential spectrogram sum of gradient, salted with the similarity factor and the number of
     # unpaired peaks from the belts frequency profile. Be careful, this value is highly opinionated and is pretty experimental!
@@ -425,7 +399,7 @@ def belts_calibration(lognames, klipperdir="~/klipper", max_freq=200.):
     fig.set_size_inches(8.3, 11.6)
 
     # Add title
-    title_line1 = "RELATIVE BELT CALIBRATION TOOL"
+    title_line1 = "RELATIVE BELTS CALIBRATION TOOL"
     fig.text(0.12, 0.965, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold')
     try:
         filename = lognames[0].split('/')[-1]

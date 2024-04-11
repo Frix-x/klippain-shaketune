@@ -25,7 +25,7 @@ KLIPPER_FOLDER = os.path.expanduser('~/klipper')
 
 from graph_belts import belts_calibration
 from graph_shaper import shaper_calibration
-from graph_speed_vibrations import speed_vibrations_profile
+from graph_vibrations import vibrations_profile
 from analyze_axesmap import axesmap_calibration
 
 RESULTS_SUBFOLDERS = ['belts', 'inputshaper', 'vibrations']
@@ -132,7 +132,7 @@ def create_shaper_graph(keep_csv, max_smoothing, scv):
     return axis
 
 
-def create_vibrations_graph(axis_name, accel, chip_name, keep_csv):
+def create_vibrations_graph(accel, kinematics, chip_name, keep_csv):
     current_date = datetime.now().strftime('%Y%m%d_%H%M%S')
     lognames = []
 
@@ -162,15 +162,15 @@ def create_vibrations_graph(axis_name, accel, chip_name, keep_csv):
     time.sleep(5)
 
     # Generate the vibration graph and its name
-    fig = speed_vibrations_profile(lognames, KLIPPER_FOLDER, axis_name, accel)
-    png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], f'vibrations_{current_date}_{axis_name}.png')
+    fig = vibrations_profile(lognames, KLIPPER_FOLDER, kinematics, accel)
+    png_filename = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], f'vibrations_{current_date}.png')
     fig.savefig(png_filename, dpi=150)
     
     # Archive all the csv files in a tarball in case the user want to keep them
     if keep_csv:
-        with tarfile.open(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], f'vibrations_{current_date}_{axis_name}.tar.gz'), 'w:gz') as tar:
+        with tarfile.open(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], f'vibrations_{current_date}.tar.gz'), 'w:gz') as tar:
             for csv_file in lognames:
-                tar.add(csv_file, recursive=False)
+                tar.add(csv_file, arcname=os.path.basename(csv_file), recursive=False)
 
     # Remove the remaining CSV files not needed anymore (tarball is safe if it was created)
     for csv_file in lognames:
@@ -221,7 +221,7 @@ def clean_files(keep_results):
     # Find old files in each directory
     old_belts_files = get_old_files(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[0]), '.png', keep1)
     old_inputshaper_files = get_old_files(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[1]), '.png', keep2)
-    old_vibrations_files = get_old_files(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2]), '.png', keep1)
+    old_speed_vibr_files = get_old_files(os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2]), '.png', keep1)
 
     # Remove the old belt files
     for old_file in old_belts_files:
@@ -240,7 +240,7 @@ def clean_files(keep_results):
         os.remove(old_file)
 
     # Remove the old vibrations files
-    for old_file in old_vibrations_files:
+    for old_file in old_speed_vibr_files:
         os.remove(old_file)
         tar_file = os.path.join(RESULTS_FOLDER, RESULTS_SUBFOLDERS[2], os.path.splitext(os.path.basename(old_file))[0] + ".tar.gz")
         if os.path.exists(tar_file):
@@ -267,6 +267,8 @@ def main():
                     help="square corner velocity used to compute max accel for axis shapers graphs")
     opts.add_option("--max_smoothing", type="float", dest="max_smoothing", default=None,
                     help="maximum shaper smoothing to allow")
+    opts.add_option("-m", "--kinematics", type="string", dest="kinematics",
+                    default="cartesian", help="machine kinematics configuration used for the vibrations graphs")
     options, args = opts.parse_args()
     
     if options.type is None:
@@ -275,6 +277,9 @@ def main():
         opts.error("Type of output graph need to be in the list of 'belts', 'shaper', 'vibrations', 'axesmap' or 'clean'")
     else:
         graph_mode = options.type
+    
+    if graph_mode.lower() == "vibrations" and options.kinematics not in ["cartesian", "corexy"]:
+        opts.error("Only Cartesian and CoreXY kinematics are supported by this tool at the moment!")
 
     # Check if results folders are there or create them before doing anything else
     for result_subfolder in RESULTS_SUBFOLDERS:
@@ -289,14 +294,17 @@ def main():
         axis = create_shaper_graph(keep_csv=options.keep_csv, max_smoothing=options.max_smoothing, scv=options.scv)
         print(f"{axis} input shaper graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[1]}")
     elif graph_mode.lower() == 'vibrations':
-        create_vibrations_graph(axis_name=options.axis_name, accel=options.accel_used, chip_name=options.chip_name, keep_csv=options.keep_csv)
-        print(f"{options.axis_name} vibration graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[2]}")
+        create_vibrations_graph(accel=options.accel_used, kinematics=options.kinematics, chip_name=options.chip_name, keep_csv=options.keep_csv)
+        print(f"Vibrations graph created. You will find the results in {RESULTS_FOLDER}/{RESULTS_SUBFOLDERS[2]}")
     elif graph_mode.lower() == 'axesmap':
         print(f"WARNING: AXES_MAP_CALIBRATION is currently very experimental and may produce incorrect results... Please validate the output!")
         find_axesmap(accel=options.accel_used, chip_name=options.chip_name)
     elif graph_mode.lower() == 'clean':
         print(f"Cleaning output folder to keep only the last {options.keep_results} results...")
         clean_files(keep_results=options.keep_results)
+
+    if options.keep_csv is False and graph_mode.lower() != 'clean':
+        print(f"Deleting raw CSV files... If you want to keep them, use the --keep_csv option!")
 
 
 if __name__ == '__main__':
