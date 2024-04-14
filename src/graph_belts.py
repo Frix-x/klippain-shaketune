@@ -24,7 +24,6 @@ from common_func import (
     compute_curve_similarity_factor,
     compute_spectrogram,
     detect_peaks,
-    get_git_version,
     parse_log,
     setup_klipper_import,
 )
@@ -453,7 +452,7 @@ def compute_signal_data(data, max_freq):
 ######################################################################
 
 
-def belts_calibration(lognames, klipperdir='~/klipper', max_freq=200.0):
+def belts_calibration(lognames, klipperdir='~/klipper', max_freq=200.0, st_version=None):
     set_locale()
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
@@ -530,7 +529,6 @@ def belts_calibration(lognames, klipperdir='~/klipper', max_freq=200.0):
     ax_logo.axis('off')
 
     # Adding Shake&Tune version in the top right corner
-    st_version = get_git_version()
     if st_version is not None:
         fig.text(0.995, 0.985, st_version, ha='right', va='bottom', fontsize=8, color=KLIPPAIN_COLORS['purple'])
 

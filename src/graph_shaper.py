@@ -24,7 +24,6 @@ from common_func import (
     compute_mechanical_parameters,
     compute_spectrogram,
     detect_peaks,
-    get_git_version,
     parse_log,
     setup_klipper_import,
 )
@@ -295,7 +294,7 @@ def plot_spectrogram(ax, t, bins, pdata, peaks, max_freq):
 ######################################################################
 
 
-def shaper_calibration(lognames, klipperdir='~/klipper', max_smoothing=None, scv=5.0, max_freq=200.0):
+def shaper_calibration(lognames, klipperdir='~/klipper', max_smoothing=None, scv=5.0, max_freq=200.0, st_version=None):
     set_locale()
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
@@ -387,7 +386,6 @@ def shaper_calibration(lognames, klipperdir='~/klipper', max_smoothing=None, scv
     ax_logo.axis('off')
 
     # Adding Shake&Tune version in the top right corner
-    st_version = get_git_version()
     if st_version is not None:
         fig.text(0.995, 0.985, st_version, ha='right', va='bottom', fontsize=8, color=KLIPPAIN_COLORS['purple'])
 
