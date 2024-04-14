@@ -709,7 +709,7 @@ def vibrations_profile(
     ax_logo.axis('off')
 
     # Adding Shake&Tune version in the top right corner
-    if st_version is not None:
+    if st_version != 'unknown':
         fig.text(0.995, 0.985, st_version, ha='right', va='bottom', fontsize=8, color=KLIPPAIN_COLORS['purple'])
 
     return fig

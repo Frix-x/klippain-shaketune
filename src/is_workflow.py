@@ -20,9 +20,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from git import GitCommandError, Repo
-
 from analyze_axesmap import axesmap_calibration
+from git import GitCommandError, Repo
 from graph_belts import belts_calibration
 from graph_shaper import shaper_calibration
 from graph_vibrations import vibrations_profile
@@ -52,7 +51,7 @@ class Config:
                 version = repo.head.commit.hexsha[:7]  # If no tag is found, use the simplified commit SHA instead
             return version
         except Exception:
-            return None
+            return 'unknown'
 
     @staticmethod
     def parse_arguments():
@@ -61,7 +60,7 @@ class Config:
             '-t',
             '--type',
             dest='type',
-            choices=['belts', 'shaper', 'vibrations', 'axesmap', 'clean'],
+            choices=['belts', 'shaper', 'vibrations', 'axesmap'],
             required=True,
             help='Type of output graph to produce',
         )
@@ -155,42 +154,6 @@ class FileManager:
             folder = os.path.join(Config.RESULTS_BASE_FOLDER, subfolder)
             os.makedirs(folder, exist_ok=True)
 
-    @staticmethod
-    def clean_old_files(type, keep_results=3, extension='.png'):
-        folder = Config.get_results_folder(type)
-        files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(extension)]
-        files.sort(key=os.path.getmtime, reverse=True)
-
-        if 'belts' in folder:
-            if len(files) <= keep_results + 1:
-                return
-            else:  # delete the older files
-                for old_file in files[keep_results + 1 :]:
-                    file_date = '_'.join(os.path.splitext(os.path.basename(old_file))[0].split('_')[1:3])
-                    for suffix in ['A', 'B']:
-                        csv_file = os.path.join(folder, f'belt_{file_date}_{suffix}.csv')
-                        if os.path.exists(csv_file):
-                            os.remove(csv_file)
-                    os.remove(old_file)
-        elif 'shaper' in folder:
-            if len(files) <= 2 * keep_results + 1:
-                return
-            else:  # delete the older files
-                for old_file in files[2 * keep_results + 1 :]:
-                    csv_file = os.path.join(folder, os.path.splitext(os.path.basename(old_file))[0] + '.csv')
-                    if os.path.exists(csv_file):
-                        os.remove(csv_file)
-                    os.remove(old_file)
-        elif 'vibrations' in folder:
-            if len(files) <= keep_results + 1:
-                return
-            else:  # delete the older files
-                for old_file in files[keep_results + 1 :]:
-                    os.remove(old_file)
-                    tar_file = os.path.join(folder, os.path.splitext(os.path.basename(old_file))[0] + '.tar.gz')
-                    if os.path.exists(tar_file):
-                        os.remove(tar_file)
-
 
 class GraphCreator(abc.ABC):
     def __init__(self, keep_csv, dpi):
@@ -250,6 +213,10 @@ class GraphCreator(abc.ABC):
     def create_graph(self):
         pass
 
+    @abc.abstractmethod
+    def clean_old_files(self, keep_results):
+        pass
+
 
 class BeltsGraphCreator(GraphCreator):
     def __init__(self, keep_csv=False, dpi=150):
@@ -265,6 +232,22 @@ class BeltsGraphCreator(GraphCreator):
         )
         fig = belts_calibration(lognames, Config.KLIPPER_FOLDER, self._version)
         self._save_figure_and_cleanup(fig, lognames)
+
+    def clean_old_files(self, keep_results=3):
+        folder = self._folder
+        files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.png')]
+        files.sort(key=os.path.getmtime, reverse=True)
+
+        if len(files) <= keep_results + 1:
+            return
+        else:
+            for old_file in files[keep_results + 1 :]:
+                file_date = '_'.join(os.path.splitext(os.path.basename(old_file))[0].split('_')[1:3])
+                for suffix in ['A', 'B']:
+                    csv_file = os.path.join(folder, f'belt_{file_date}_{suffix}.csv')
+                    if os.path.exists(csv_file):
+                        os.remove(csv_file)
+                os.remove(old_file)
 
 
 class ShaperGraphCreator(GraphCreator):
@@ -287,6 +270,20 @@ class ShaperGraphCreator(GraphCreator):
         )
         self._save_figure_and_cleanup(fig, lognames, lognames[0].split('_')[-1].split('.')[0])
 
+    def clean_old_files(self, keep_results=3):
+        folder = self._folder
+        files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.png')]
+        files.sort(key=os.path.getmtime, reverse=True)
+
+        if len(files) <= 2 * keep_results + 1:
+            return
+        else:  # delete the older files
+            for old_file in files[2 * keep_results + 1 :]:
+                csv_file = os.path.join(folder, os.path.splitext(os.path.basename(old_file))[0] + '.csv')
+                if os.path.exists(csv_file):
+                    os.remove(csv_file)
+                os.remove(old_file)
+
 
 class VibrationsGraphCreator(GraphCreator):
     def __init__(self, kinematics, accel, chip_name, keep_csv=False, dpi=150):
@@ -298,6 +295,11 @@ class VibrationsGraphCreator(GraphCreator):
 
         self._setup_folder('vibrations')
 
+    def _archive_files(self, lognames):
+        with tarfile.open(os.path.join(self._folder, f'{self._type}_{self._graph_date}.tar.gz'), 'w:gz') as tar:
+            for csv_file in lognames:
+                tar.add(csv_file, arcname=os.path.basename(csv_file), recursive=False)
+
     def create_graph(self):
         lognames = self._move_and_prepare_files(
             glob_pattern=f'/tmp/{self._chip_name}-*.csv',
@@ -307,10 +309,19 @@ class VibrationsGraphCreator(GraphCreator):
         fig = vibrations_profile(lognames, Config.KLIPPER_FOLDER, self._kinematics, self._accel, self._version)
         self._save_figure_and_cleanup(fig, lognames)
 
-    def _archive_files(self, lognames):
-        with tarfile.open(os.path.join(self._folder, f'{self._type}_{self._graph_date}.tar.gz'), 'w:gz') as tar:
-            for csv_file in lognames:
-                tar.add(csv_file, arcname=os.path.basename(csv_file), recursive=False)
+    def clean_old_files(self, keep_results=3):
+        folder = self._folder
+        files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.png')]
+        files.sort(key=os.path.getmtime, reverse=True)
+
+        if len(files) <= keep_results + 1:
+            return
+        else:  # delete the older files
+            for old_file in files[keep_results + 1 :]:
+                os.remove(old_file)
+                tar_file = os.path.join(folder, os.path.splitext(os.path.basename(old_file))[0] + '.tar.gz')
+                if os.path.exists(tar_file):
+                    os.remove(tar_file)
 
 
 class AxesMapFinder:
@@ -355,17 +366,12 @@ def main():
         )
     elif options.type == 'axesmap':
         graph_creator = AxesMapFinder(options.accel_used, options.chip_name)
-    elif options.type == 'clean':
-        print_with_c_locale(f'Cleaning output folder to keep only the last {options.keep_results} results...')
-        FileManager.clean_old_files(options.type, options.keep_results)
-        return
 
     if graph_creator:
         graph_creator.create_graph()
         print_with_c_locale(f'{options.type} graphs created successfully!')
-
-    if options.keep_csv is False and options.type != 'clean':
-        print_with_c_locale('Deleting raw CSV files... If you want to keep them, use the --keep_csv option!')
+        graph_creator.clean_old_files(options.keep_results)
+        print_with_c_locale(f'Cleaned output folder to keep only the last {options.keep_results} results!')
 
 
 if __name__ == '__main__':
