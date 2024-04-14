@@ -119,7 +119,7 @@ class Config:
             help='Number of results to keep in the result folder after each run of the script',
         )
         parser.add_argument('--dpi', type=int, default=150, dest='dpi', help='DPI of the output PNG files')
-        parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + Config.get_git_version())
+        parser.add_argument('-v', '--version', action='version', version=f'Shake&Tune {Config.get_git_version()}')
 
         return parser.parse_args()
 
@@ -200,6 +200,52 @@ class GraphCreator(abc.ABC):
         self._graph_date = datetime.now().strftime('%Y%m%d_%H%M%S')
         self._version = Config.get_git_version()
 
+        self._type = None
+        self._folder = None
+
+    def _setup_folder(self, graph_type):
+        self._type = graph_type
+        self._folder = Config.get_results_folder(graph_type)
+
+    def _move_and_prepare_files(self, glob_pattern, min_files_required, custom_name_func=None):
+        globbed_files = glob.glob(glob_pattern)
+        if not globbed_files:
+            raise FileNotFoundError(f'no CSV files found in the /tmp folder to create the {self._type} graphs!')
+        if len(globbed_files) < min_files_required:
+            raise FileNotFoundError(f'{min_files_required} CSV files are needed to create the {self._type} graphs!')
+
+        if min_files_required is None:
+            min_files_required = len(globbed_files)
+
+        lognames = []
+        for filename in sorted(globbed_files, key=os.path.getmtime, reverse=True)[:min_files_required]:
+            FileManager.wait_file_ready(filename)
+            custom_name = custom_name_func(filename) if custom_name_func else os.path.basename(filename)
+            new_file = os.path.join(self._folder, f'{self._type}_{self._graph_date}_{custom_name}.csv')
+            shutil.move(filename, new_file)
+            os.sync()
+            FileManager.wait_file_ready(new_file)
+            lognames.append(new_file)
+        return lognames
+
+    def _save_figure_and_cleanup(self, fig, lognames, axis_label=None):
+        axis_suffix = f'_{axis_label}' if axis_label else ''
+        png_filename = os.path.join(self._folder, f'{self._type}_{self._graph_date}{axis_suffix}.png')
+        fig.savefig(png_filename, dpi=self._dpi)
+
+        if self._keep_csv:
+            self._archive_files(lognames)
+        else:
+            self._remove_files(lognames)
+
+    def _archive_files(self, _):
+        return
+
+    def _remove_files(self, lognames):
+        for csv in lognames:
+            if os.path.exists(csv):
+                os.remove(csv)
+
     @abc.abstractmethod
     def create_graph(self):
         pass
@@ -209,40 +255,16 @@ class BeltsGraphCreator(GraphCreator):
     def __init__(self, keep_csv=False, dpi=150):
         super().__init__(keep_csv, dpi)
 
-        self._type = 'belts'
-        self._folder = Config.get_results_folder(self._type)
+        self._setup_folder('belts')
 
     def create_graph(self):
-        globbed_files = glob.glob('/tmp/raw_data_axis*.csv')
-        if not globbed_files:
-            raise FileNotFoundError('no CSV files found in the /tmp folder to create the belt comparison graphs!')
-        if len(globbed_files) < 2:
-            raise FileNotFoundError('two CSV files are needed to create the belt comparison graphs!')
-
-        lognames = []
-        for filename in sorted(globbed_files, key=os.path.getmtime, reverse=True)[:2]:
-            # Wait for the file handler to be released by Klipper
-            FileManager.wait_file_ready(filename)
-
-            # Cleanup of the filename and moving it in the result folder
-            belt = os.path.basename(filename).split('_')[3].split('.')[0].upper()
-            new_file = os.path.join(self._folder, f'{self._type}_{self._graph_date}_{belt}.csv')
-            shutil.move(filename, new_file)
-            lognames.append(new_file)
-
-            # Check if the file is ready to be read
-            os.sync()
-            FileManager.wait_file_ready(new_file)
-
+        lognames = self._move_and_prepare_files(
+            glob_pattern='/tmp/raw_data_axis*.csv',
+            min_files_required=2,
+            custom_name_func=lambda f: os.path.basename(f).split('_')[3].split('.')[0].upper(),
+        )
         fig = belts_calibration(lognames, Config.KLIPPER_FOLDER, self._version)
-        png_filename = os.path.join(self._folder, f'{self._type}_{self._graph_date}.png')
-        fig.savefig(png_filename, dpi=self._dpi)
-
-        # Remove the CSV files if the user don't want to keep them
-        if not self._keep_csv:
-            for csv in lognames:
-                if os.path.exists(csv):
-                    os.remove(csv)
+        self._save_figure_and_cleanup(fig, lognames)
 
 
 class ShaperGraphCreator(GraphCreator):
@@ -252,43 +274,18 @@ class ShaperGraphCreator(GraphCreator):
         self._max_smoothing = max_smoothing
         self._scv = scv
 
-        self._type = 'shaper'
-        self._folder = Config.get_results_folder(self._type)
+        self._setup_folder('shaper')
 
     def create_graph(self):
-        globbed_files = glob.glob('/tmp/raw_data*.csv')
-        if not globbed_files:
-            raise FileNotFoundError('no CSV files found in the /tmp folder to create the input shaper graphs!')
-
-        # Find the CSV files with the latest timestamp and wait for it to be released by Klipper
-        filename = sorted(globbed_files, key=os.path.getmtime, reverse=True)[0]
-        FileManager.wait_file_ready(filename)
-
-        # Cleanup of the filename and moving it in the result folder
-        axis = os.path.basename(filename).split('_')[3].split('.')[0].upper()
-        new_file = os.path.join(self._folder, f'{self._type}_{self._graph_date}_{axis}.csv')
-        shutil.move(filename, new_file)
-
-        # Check if the file is ready to be read
-        os.sync()
-        FileManager.wait_file_ready(new_file)
-
-        fig = shaper_calibration(
-            [new_file],
-            Config.KLIPPER_FOLDER,
-            max_smoothing=self._max_smoothing,
-            scv=self._scv,
-            st_version=self._version,
+        lognames = self._move_and_prepare_files(
+            glob_pattern='/tmp/raw_data*.csv',
+            min_files_required=1,
+            custom_name_func=lambda f: os.path.basename(f).split('_')[3].split('.')[0].upper(),
         )
-        png_filename = os.path.join(self._folder, f'{self._type}_{self._graph_date}_{axis}.png')
-        fig.savefig(png_filename, dpi=self._dpi)
-
-        # Remove the CSV files if the user don't want to keep them
-        if not self._keep_csv:
-            if os.path.exists(new_file):
-                os.remove(new_file)
-
-        return axis
+        fig = shaper_calibration(
+            lognames, Config.KLIPPER_FOLDER, max_smoothing=self._max_smoothing, scv=self._scv, st_version=self._version
+        )
+        self._save_figure_and_cleanup(fig, lognames, lognames[0].split('_')[-1].split('.')[0])
 
 
 class VibrationsGraphCreator(GraphCreator):
@@ -299,45 +296,21 @@ class VibrationsGraphCreator(GraphCreator):
         self._accel = accel
         self._chip_name = chip_name
 
-        self._type = 'vibrations'
-        self._folder = Config.get_results_folder(self._type)
+        self._setup_folder('vibrations')
 
     def create_graph(self):
-        globbed_files = glob.glob(f'/tmp/{self._chip_name}-*.csv')
-        if not globbed_files:
-            raise FileNotFoundError('no CSV files found in the /tmp folder to create the vibrations graphs!')
-        if len(globbed_files) < 3:
-            raise FileNotFoundError('at least 3 CSV files are needed to create the vibrations graphs!')
-
-        lognames = []
-        for filename in globbed_files:
-            # Wait for the file handler to be released by Klipper
-            FileManager.wait_file_ready(filename)
-
-            # Cleanup of the filename and moving it in the result folder
-            cleanfilename = os.path.basename(filename).replace(self._chip_name, f'{self._type}_{self._graph_date}')
-            new_file = os.path.join(self._folder, cleanfilename)
-            shutil.move(filename, new_file)
-            lognames.append(new_file)
-
-        # Sync filesystem to avoid problems as there is a lot of file copied
-        os.sync()
-        time.sleep(5)
-
+        lognames = self._move_and_prepare_files(
+            glob_pattern=f'/tmp/{self._chip_name}-*.csv',
+            min_files_required=None,
+            custom_name_func=lambda f: os.path.basename(f).replace(self._chip_name, self._type),
+        )
         fig = vibrations_profile(lognames, Config.KLIPPER_FOLDER, self._kinematics, self._accel, self._version)
-        png_filename = os.path.join(self._folder, f'{self._type}_{self._graph_date}.png')
-        fig.savefig(png_filename, dpi=self._dpi)
+        self._save_figure_and_cleanup(fig, lognames)
 
-        # Archive all the csv files in a tarball in case the user want to keep them
-        if self._keep_csv:
-            with tarfile.open(os.path.join(self._folder, f'{self._type}_{self._graph_date}.tar.gz'), 'w:gz') as tar:
-                for csv_file in lognames:
-                    tar.add(csv_file, arcname=os.path.basename(csv_file), recursive=False)
-
-        # Remove the remaining CSV files not needed anymore (tarball is safe if it was created)
-        for csv in lognames:
-            if os.path.exists(csv):
-                os.remove(csv)
+    def _archive_files(self, lognames):
+        with tarfile.open(os.path.join(self._folder, f'{self._type}_{self._graph_date}.tar.gz'), 'w:gz') as tar:
+            for csv_file in lognames:
+                tar.add(csv_file, arcname=os.path.basename(csv_file), recursive=False)
 
 
 class AxesMapFinder:
@@ -366,10 +339,10 @@ class AxesMapFinder:
 
 
 def main():
-    print_with_c_locale(f'Shake&Tune version: {Config.get_git_version()}')
-
     options = Config.parse_arguments()
     FileManager.ensure_folders_exist()
+
+    print_with_c_locale(f'Shake&Tune version: {Config.get_git_version()}')
 
     graph_creator = None
     if options.type == 'belts':
