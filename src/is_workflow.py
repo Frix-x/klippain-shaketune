@@ -50,7 +50,8 @@ class Config:
             except GitCommandError:
                 version = repo.head.commit.hexsha[:7]  # If no tag is found, use the simplified commit SHA instead
             return version
-        except Exception:
+        except Exception as e:
+            print_with_c_locale(f'Warning: unable to retrieve Shake&Tune version number: {e}')
             return 'unknown'
 
     @staticmethod
