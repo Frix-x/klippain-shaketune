@@ -14,14 +14,14 @@ import argparse
 import glob
 import os
 import shutil
-import sys
 import tarfile
 import time
 from datetime import datetime
 from pathlib import Path
 
-from analyze_axesmap import axesmap_calibration
 from git import GitCommandError, Repo
+
+from analyze_axesmap import axesmap_calibration
 from graph_belts import belts_calibration
 from graph_shaper import shaper_calibration
 from graph_vibrations import vibrations_profile
@@ -140,9 +140,8 @@ class FileManager:
                         except PermissionError:  # Unable to check for this particular process due to permissions
                             pass
             if loop_count > 60:
-                # If Klipper is taking too long to release the file (60 * 1s = 1min), exit the script
-                print_with_c_locale(f'Error: Klipper is taking too long to release {filepath}!')
-                sys.exit(1)
+                # If Klipper is taking too long to release the file (60 * 1s = 1min), raise an error
+                raise TimeoutError(f'Klipper is taking too long to release {filepath}!')
             else:
                 loop_count += 1
                 time.sleep(1)
@@ -368,7 +367,18 @@ def main():
         graph_creator = AxesMapFinder(options.accel_used, options.chip_name)
 
     if graph_creator:
-        graph_creator.create_graph()
+        try:
+            graph_creator.create_graph()
+        except FileNotFoundError as e:
+            print_with_c_locale(f'FileNotFound error: {e}')
+            return
+        except TimeoutError as e:
+            print_with_c_locale(f'Timeout error: {e}')
+            return
+        except Exception as e:
+            print_with_c_locale(f'Error while generating the graphs: {e}')
+            return
+
         print_with_c_locale(f'{options.type} graphs created successfully!')
         graph_creator.clean_old_files(options.keep_results)
         print_with_c_locale(f'Cleaned output folder to keep only the last {options.keep_results} results!')
