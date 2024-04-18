@@ -16,6 +16,7 @@ import os
 import shutil
 import tarfile
 import time
+import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -186,7 +187,6 @@ class GraphCreator(abc.ABC):
             custom_name = custom_name_func(filename) if custom_name_func else os.path.basename(filename)
             new_file = os.path.join(self._folder, f'{self._type}_{self._graph_date}_{custom_name}.csv')
             shutil.move(filename, new_file)
-            os.sync()
             FileManager.wait_file_ready(new_file)
             lognames.append(new_file)
         return lognames
@@ -230,7 +230,7 @@ class BeltsGraphCreator(GraphCreator):
             min_files_required=2,
             custom_name_func=lambda f: os.path.basename(f).split('_')[3].split('.')[0].upper(),
         )
-        fig = belts_calibration(lognames, Config.KLIPPER_FOLDER, self._version)
+        fig = belts_calibration(lognames, Config.KLIPPER_FOLDER, st_version=self._version)
         self._save_figure_and_cleanup(fig, lognames)
 
     def clean_old_files(self, keep_results=3):
@@ -306,7 +306,9 @@ class VibrationsGraphCreator(GraphCreator):
             min_files_required=None,
             custom_name_func=lambda f: os.path.basename(f).replace(self._chip_name, self._type),
         )
-        fig = vibrations_profile(lognames, Config.KLIPPER_FOLDER, self._kinematics, self._accel, self._version)
+        fig = vibrations_profile(
+            lognames, Config.KLIPPER_FOLDER, kinematics=self._kinematics, accel=self._accel, st_version=self._version
+        )
         self._save_figure_and_cleanup(fig, lognames)
 
     def clean_old_files(self, keep_results=3):
@@ -378,6 +380,7 @@ def main():
             return
         except Exception as e:
             print_with_c_locale(f'Error while generating the graphs: {e}')
+            traceback.print_exc()
             return
 
         print_with_c_locale(f'{options.type} graphs created successfully!')
