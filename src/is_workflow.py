@@ -238,10 +238,10 @@ class BeltsGraphCreator(GraphCreator):
         files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.png')]
         files.sort(key=os.path.getmtime, reverse=True)
 
-        if len(files) <= keep_results + 1:
+        if len(files) <= keep_results:
             return
         else:
-            for old_file in files[keep_results + 1 :]:
+            for old_file in files[keep_results:]:
                 file_date = '_'.join(os.path.splitext(os.path.basename(old_file))[0].split('_')[1:3])
                 for suffix in ['A', 'B']:
                     csv_file = os.path.join(folder, f'belt_{file_date}_{suffix}.csv')
@@ -275,10 +275,10 @@ class ShaperGraphCreator(GraphCreator):
         files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.png')]
         files.sort(key=os.path.getmtime, reverse=True)
 
-        if len(files) <= 2 * keep_results + 1:
+        if len(files) <= 2 * keep_results:
             return
         else:  # delete the older files
-            for old_file in files[2 * keep_results + 1 :]:
+            for old_file in files[2 * keep_results :]:
                 csv_file = os.path.join(folder, os.path.splitext(os.path.basename(old_file))[0] + '.csv')
                 if os.path.exists(csv_file):
                     os.remove(csv_file)
@@ -316,10 +316,10 @@ class VibrationsGraphCreator(GraphCreator):
         files = [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.png')]
         files.sort(key=os.path.getmtime, reverse=True)
 
-        if len(files) <= keep_results + 1:
+        if len(files) <= keep_results:
             return
         else:  # delete the older files
-            for old_file in files[keep_results + 1 :]:
+            for old_file in files[keep_results:]:
                 os.remove(old_file)
                 tar_file = os.path.join(folder, os.path.splitext(os.path.basename(old_file))[0] + '.tar.gz')
                 if os.path.exists(tar_file):
