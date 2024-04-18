@@ -173,13 +173,14 @@ class GraphCreator(abc.ABC):
 
     def _move_and_prepare_files(self, glob_pattern, min_files_required, custom_name_func=None):
         globbed_files = glob.glob(glob_pattern)
+
+        # If min_files_required is not set, use the number of globbed files as the minimum
+        min_files_required = min_files_required or len(globbed_files)
+
         if not globbed_files:
             raise FileNotFoundError(f'no CSV files found in the /tmp folder to create the {self._type} graphs!')
         if len(globbed_files) < min_files_required:
             raise FileNotFoundError(f'{min_files_required} CSV files are needed to create the {self._type} graphs!')
-
-        if min_files_required is None:
-            min_files_required = len(globbed_files)
 
         lognames = []
         for filename in sorted(globbed_files, key=os.path.getmtime, reverse=True)[:min_files_required]:
