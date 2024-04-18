@@ -355,7 +355,7 @@ def plot_difference_spectrogram(ax, signal1, signal2, t, bins, combined_divergen
         KLIPPAIN_COLORS['dark_purple'],
     ]
     cm = matplotlib.colors.LinearSegmentedColormap.from_list(
-        'klippain_divergent', list(zip([0, 0.25, 0.5, 0.75, 1], colors, strict=True))
+        'klippain_divergent', list(zip([0, 0.25, 0.5, 0.75, 1], colors))
     )
     norm = matplotlib.colors.TwoSlopeNorm(vmin=np.min(combined_divergent), vcenter=0, vmax=np.max(combined_divergent))
     ax.imshow(

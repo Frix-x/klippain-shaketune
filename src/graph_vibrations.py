@@ -123,7 +123,7 @@ def compute_dir_speed_spectrogram(measured_speeds, data, kinematics='cartesian',
     sqrt_2_inv = 1 / math.sqrt(2)
 
     # Compute the spectrum vibrations for each angle and speed combination
-    for target_angle_idx, (cos_val, sin_val) in enumerate(zip(cos_vals, sin_vals, strict=True)):
+    for target_angle_idx, (cos_val, sin_val) in enumerate(zip(cos_vals, sin_vals)):
         for target_speed_idx, target_speed in enumerate(spectrum_speeds):
             if kinematics == 'cartesian':
                 speed_1 = np.abs(target_speed * cos_val)
