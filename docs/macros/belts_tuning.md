@@ -15,7 +15,7 @@ Then, call the `COMPARE_BELTS_RESPONSES` macro and look for the graphs in the re
 |FREQ_END|133|Maximum excitation frequency|
 |HZ_PER_SEC|1|Number of Hz per seconds for the test|
 |KEEP_N_RESULTS|3|Total number of results to keep in the result folder after running the test. The older results are automatically cleaned up|
-|KEEP_CSV|True|Weither or not to keep the CSV data files alonside the PNG graphs|
+|KEEP_CSV|0|Weither or not to keep the CSV data files alonside the PNG graphs|
 
 
 ## Graphs description
