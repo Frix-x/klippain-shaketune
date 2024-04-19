@@ -10,7 +10,7 @@ import optparse
 import numpy as np
 from scipy.signal import butter, filtfilt
 
-from locale_utils import print_with_c_locale
+from helpers.locale_utils import print_with_c_locale
 
 NUM_POINTS = 500
 
