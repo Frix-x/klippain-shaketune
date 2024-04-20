@@ -20,12 +20,12 @@ from typing import Callable, Optional
 from git import GitCommandError, Repo
 from matplotlib.figure import Figure
 
-import helpers.filemanager as fm
-from graph_creators.analyze_axesmap import axesmap_calibration
-from graph_creators.graph_belts import belts_calibration
-from graph_creators.graph_shaper import shaper_calibration
-from graph_creators.graph_vibrations import vibrations_profile
-from helpers.locale_utils import print_with_c_locale
+import src.helpers.filemanager as fm
+from src.graph_creators.analyze_axesmap import axesmap_calibration
+from src.graph_creators.graph_belts import belts_calibration
+from src.graph_creators.graph_shaper import shaper_calibration
+from src.graph_creators.graph_vibrations import vibrations_profile
+from src.helpers.locale_utils import print_with_c_locale
 
 
 class Config:
@@ -358,7 +358,9 @@ class AxesMapFinder:
 
 def main():
     options = Config.parse_arguments()
-    fm.ensure_folders_exist()
+    fm.ensure_folders_exist(
+        folders=[Config.RESULTS_BASE_FOLDER / subfolder for subfolder in Config.RESULTS_SUBFOLDERS.values()]
+    )
 
     print_with_c_locale(f'Shake&Tune version: {Config.get_git_version()}')
 

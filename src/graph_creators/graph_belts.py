@@ -20,14 +20,14 @@ from scipy.interpolate import griddata
 
 matplotlib.use('Agg')
 
-from helpers.common_func import (
+from ..helpers.common_func import (
     compute_curve_similarity_factor,
     compute_spectrogram,
     detect_peaks,
     parse_log,
     setup_klipper_import,
 )
-from helpers.locale_utils import print_with_c_locale, set_locale
+from ..helpers.locale_utils import print_with_c_locale, set_locale
 
 ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'  # For paired peaks names
 

@@ -6,8 +6,6 @@
 import time
 from pathlib import Path
 
-from is_workflow import Config
-
 
 def wait_file_ready(filepath: Path) -> None:
     file_busy = True
@@ -37,7 +35,6 @@ def wait_file_ready(filepath: Path) -> None:
         time.sleep(1)
 
 
-def ensure_folders_exist() -> None:
-    for subfolder in Config.RESULTS_SUBFOLDERS.values():
-        folder = Config.RESULTS_BASE_FOLDER / subfolder
-        Path(folder).mkdir(parents=True, exist_ok=True)
+def ensure_folders_exist(folders: list[Path]) -> None:
+    for folder in folders:
+        folder.mkdir(parents=True, exist_ok=True)

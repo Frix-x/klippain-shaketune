@@ -20,14 +20,14 @@ import numpy as np
 
 matplotlib.use('Agg')
 
-from helpers.common_func import (
+from ..helpers.common_func import (
     compute_mechanical_parameters,
     compute_spectrogram,
     detect_peaks,
     parse_log,
     setup_klipper_import,
 )
-from helpers.locale_utils import print_with_c_locale, set_locale
+from ..helpers.locale_utils import print_with_c_locale, set_locale
 
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_EFFECT_THRESHOLD = 0.12
