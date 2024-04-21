@@ -161,6 +161,50 @@ def compute_speed_powers(spectrogram_data, smoothing_window=15):
     return smoothed_arrays
 
 
+# Function that filter and split the good_speed ranges. The goal is to remove some zones around
+# additional detected small peaks in order to suppress them if there is a peak, even if it's low,
+# that's probably due to a crossing in the motor resonance pattern that still need to be removed
+def filter_and_split_ranges(all_speeds, good_speeds, peak_speed_indices, deletion_range):
+    # Process each range to filter out and split based on peak indices
+    filtered_good_speeds = []
+    for start, end, energy in good_speeds:
+        start_speed, end_speed = all_speeds[start], all_speeds[end]
+        # Identify peaks that intersect with the current speed range
+        intersecting_peaks_indices = [
+            idx for speed, idx in peak_speed_indices.items() if start_speed <= speed <= end_speed
+        ]
+
+        if not intersecting_peaks_indices:
+            filtered_good_speeds.append((start, end, energy))
+        else:
+            intersecting_peaks_indices.sort()
+            current_start = start
+
+            for peak_index in intersecting_peaks_indices:
+                before_peak_end = max(current_start, peak_index - deletion_range)
+                if current_start < before_peak_end:
+                    filtered_good_speeds.append((current_start, before_peak_end, energy))
+                current_start = peak_index + deletion_range + 1
+
+            if current_start < end:
+                filtered_good_speeds.append((current_start, end, energy))
+
+    # Sorting by start point once and then merge overlapping ranges
+    sorted_ranges = sorted(filtered_good_speeds, key=lambda x: x[0])
+    merged_ranges = [sorted_ranges[0]]
+
+    for current in sorted_ranges[1:]:
+        last_merged_start, last_merged_end, last_merged_energy = merged_ranges[-1]
+        if current[0] <= last_merged_end:
+            new_end = max(last_merged_end, current[1])
+            new_energy = min(last_merged_energy, current[2])
+            merged_ranges[-1] = (last_merged_start, new_end, new_energy)
+        else:
+            merged_ranges.append(current)
+
+    return merged_ranges
+
+
 # This function allow the computation of a symmetry score that reflect the spectrogram apparent symmetry between
 # measured axes on both the shape of the signal and the energy level consistency across both side of the signal
 def compute_symmetry_analysis(all_angles, spectrogram_data, measured_angles=[0, 90]):
@@ -486,26 +530,12 @@ def vibrations_profile(lognames, klipperdir="~/klipper", kinematics="cartesian",
         deletion_range = int(SPEEDS_AROUND_PEAK_DELETION / (all_speeds[1] - all_speeds[0]))
         peak_speed_indices = {pspeed: np.where(all_speeds == pspeed)[0][0] for pspeed in set(peaks_speeds)}
 
-        filtered_good_speeds = []
-        for start, end, energy in good_speeds:
-            # Check for peaks within the current good speed range
-            start_speed, end_speed = all_speeds[start], all_speeds[end]
-            intersecting_peaks_indices = [idx for speed, idx in peak_speed_indices.items() if start_speed <= speed <= end_speed]
+        # Filter and split ranges based on peak indices, avoiding overlaps
+        good_speeds = filter_and_split_ranges(all_speeds, good_speeds, peak_speed_indices, deletion_range)
 
-            # If no peaks intersect any good_speed range, add it as is, else iterate through intersecting peaks to split the range
-            if not intersecting_peaks_indices: filtered_good_speeds.append((start, end, energy))
-            else:
-                for peak_index in intersecting_peaks_indices:
-                    before_peak_end = max(start, peak_index - deletion_range)
-                    after_peak_start = min(end, peak_index + deletion_range)
-                    if start < before_peak_end:
-                        filtered_good_speeds.append((start, before_peak_end, energy))
-                    if after_peak_start < end:
-                        filtered_good_speeds.append((after_peak_start, end, energy))
-
-        good_speeds = filtered_good_speeds
+        # Add some logging about the good speeds found
         print_with_c_locale(f'Lowest vibrations speeds ({len(good_speeds)} ranges sorted from best to worse):')
-        for idx, (start, end, energy) in enumerate(good_speeds):
+        for idx, (start, end, _) in enumerate(good_speeds):
             print_with_c_locale(f'{idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
 
     # Angle low energy valleys identification (good angles ranges) and print them to the console
