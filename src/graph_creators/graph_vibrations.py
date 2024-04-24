@@ -701,7 +701,7 @@ def vibrations_profile(
     )
     try:
         filename_parts = (lognames[0].split('/')[-1]).split('_')
-        dt = datetime.strptime(f'{filename_parts[1]} {filename_parts[2].split('-')[0]}', '%Y%m%d %H%M%S')
+        dt = datetime.strptime(f"{filename_parts[1]} {filename_parts[2].split('-')[0]}", '%Y%m%d %H%M%S')
         title_line2 = dt.strftime('%x %X')
         if accel is not None:
             title_line2 += ' at ' + str(accel) + ' mm/s² -- ' + kinematics.upper() + ' kinematics'
