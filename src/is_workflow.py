@@ -25,11 +25,13 @@ from src.graph_creators.analyze_axesmap import axesmap_calibration
 from src.graph_creators.graph_belts import belts_calibration
 from src.graph_creators.graph_shaper import shaper_calibration
 from src.graph_creators.graph_vibrations import vibrations_profile
+from src.helpers import MotorLogParser
 from src.helpers.locale_utils import print_with_c_locale
 
 
 class Config:
     KLIPPER_FOLDER = Path.home() / 'klipper'
+    KLIPPER_LOG_FOLDER = Path.home() / 'printer_data/logs'
     RESULTS_BASE_FOLDER = Path.home() / 'printer_data/config/K-ShakeTune_results'
     RESULTS_SUBFOLDERS = {'belts': 'belts', 'shaper': 'inputshaper', 'vibrations': 'vibrations'}
 
@@ -101,6 +103,13 @@ class Config:
             default='cartesian',
             choices=['cartesian', 'corexy'],
             help='Machine kinematics configuration used for the vibrations profile creation',
+        )
+        parser.add_argument(
+            '--metadata',
+            type=str,
+            default=None,
+            dest='metadata',
+            help='Motor configuration metadata printed on the vibrations profiles',
         )
         parser.add_argument(
             '-c',
@@ -279,13 +288,17 @@ class VibrationsGraphCreator(GraphCreator):
         self._kinematics = None
         self._accel = None
         self._chip_name = None
+        self._motors = None
 
         self._setup_folder('vibrations')
 
-    def configure(self, kinematics: str, accel: float, chip_name: str) -> None:
+    def configure(self, kinematics: str, accel: float, chip_name: str, metadata: str) -> None:
         self._kinematics = kinematics
         self._accel = accel
         self._chip_name = chip_name
+
+        parser = MotorLogParser(Config.KLIPPER_LOG_FOLDER / 'klippy.log', metadata)
+        self._motors = parser.get_motors()
 
     def _archive_files(self, lognames: list[Path]) -> None:
         tar_path = self._folder / f'{self._type}_{self._graph_date}.tar.gz'
@@ -308,6 +321,7 @@ class VibrationsGraphCreator(GraphCreator):
             kinematics=self._kinematics,
             accel=self._accel,
             st_version=self._version,
+            motors=self._motors,
         )
         self._save_figure_and_cleanup(fig, lognames)
 
@@ -369,7 +383,7 @@ def main():
         'shaper': (ShaperGraphCreator, lambda gc: gc.configure(options.scv, options.max_smoothing)),
         'vibrations': (
             VibrationsGraphCreator,
-            lambda gc: gc.configure(options.kinematics, options.accel_used, options.chip_name),
+            lambda gc: gc.configure(options.kinematics, options.accel_used, options.chip_name, options.metadata),
         ),
         'axesmap': (AxesMapFinder, None),
     }

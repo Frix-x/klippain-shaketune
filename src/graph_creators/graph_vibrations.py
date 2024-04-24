@@ -577,7 +577,7 @@ def extract_angle_and_speed(logname):
 
 
 def vibrations_profile(
-    lognames, klipperdir='~/klipper', kinematics='cartesian', accel=None, max_freq=1000.0, st_version=None
+    lognames, klipperdir='~/klipper', kinematics='cartesian', accel=None, max_freq=1000.0, st_version=None, motors=None
 ):
     set_locale()
     global shaper_calibrate
@@ -701,7 +701,7 @@ def vibrations_profile(
     )
     try:
         filename_parts = (lognames[0].split('/')[-1]).split('_')
-        dt = datetime.strptime(f"{filename_parts[1]} {filename_parts[2].split('-')[0]}", '%Y%m%d %H%M%S')
+        dt = datetime.strptime(f'{filename_parts[1]} {filename_parts[2].split('-')[0]}', '%Y%m%d %H%M%S')
         title_line2 = dt.strftime('%x %X')
         if accel is not None:
             title_line2 += ' at ' + str(accel) + ' mm/s² -- ' + kinematics.upper() + ' kinematics'
@@ -709,6 +709,32 @@ def vibrations_profile(
         print_with_c_locale('Warning: CSV filenames appear to be different than expected (%s)' % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
     fig.text(0.060, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
+
+    # Add the motors infos to the top of the graph
+    if motors is not None and len(motors) >= 2:
+        print(motors[0])
+        print(motors[1])
+
+        # TODO: add dynamic motor block creation based on the real TMC registers
+        #       and organize things better on the graph to be clean and clear
+        motor_block1_X = f'| X TMC: {motors[0].get_property('tmc_x_name').upper()}'
+        motor_block2_X = f'| Run/Hold currents: {motors[0].get_property('x_run_current')}/{motors[0].get_property('x_hold_current')} A'
+        motor_block3_X = '| toff=3 hstrt=2 hend=3 tbl=1 vhighfs=1 mres=32 intpol=1 dedge=1'
+
+        motor_block1_Y = f'| Y TMC: {motors[1].get_property('tmc_y_name').upper()}'
+        motor_block2_Y = f'| Run/Hold currents: {motors[1].get_property('y_run_current')}/{motors[0].get_property('y_hold_current')} A'
+        motor_block3_Y = '| toff=3 hstrt=2 hend=3 tbl=1 vhighfs=1 mres=32 intpol=1 dedge=1'
+
+        if motors[0].get_property('autotune_enabled'):
+            autotune_block1 = '| TMC Autotune enabled'
+            autotune_block2 = f'| X motor: {motors[0].get_property('x_motor')} @{motors[0].get_property('x_voltage')}V'
+            autotune_block3 = f'| Y motor: {motors[1].get_property('y_motor')} @{motors[1].get_property('y_voltage')}V'
+        else:
+            autotune_block1 = '| TMC Autotune not detected'
+            autotune_block2 = ''
+            autotune_block3 = ''
+
+        # fig.text(0.060, 0.935, motors_line, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'])
 
     # Plot the graphs
     plot_angle_profile_polar(ax1, all_angles, all_angles_energy, good_angles, symmetry_factor)
