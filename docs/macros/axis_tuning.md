@@ -18,7 +18,7 @@ Then, call the `AXES_SHAPER_CALIBRATION` macro and look for the graphs in the re
 |SCV|printer square corner velocity|Square corner velocity you want to use to calculate shaper recommendations. Using higher SCV values usually results in more smoothing and lower maximum accelerations|
 |MAX_SMOOTHING|None|Max smoothing allowed when calculating shaper recommendations|
 |KEEP_N_RESULTS|3|Total number of results to keep in the result folder after running the test. The older results are automatically cleaned up|
-|KEEP_CSV|True|Weither or not to keep the CSV data file alonside the PNG graphs|
+|KEEP_CSV|0|Weither or not to keep the CSV data file alonside the PNG graphs|
 
 
 ## Graphs description
