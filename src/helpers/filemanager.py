@@ -3,33 +3,31 @@
 # Common file management functions for the Shake&Tune package
 # Written by Frix_x#0161 #
 
+import os
 import time
 from pathlib import Path
 
 
-def wait_file_ready(filepath: Path) -> None:
+def wait_file_ready(filepath: Path, timeout: int = 60) -> None:
     file_busy = True
     loop_count = 0
-    proc_path = Path('/proc')
-    while file_busy:
-        if loop_count > 60:
-            # If Klipper is taking too long to release the file (60 * 1s = 1min), raise an error
-            raise TimeoutError(f'Klipper is taking too long to release {filepath}!')
 
-        for proc in proc_path.iterdir():
-            if proc.name.isdigit():
-                fd_path = proc / 'fd'
-                if fd_path.exists():
-                    for fd in fd_path.iterdir():
-                        try:
-                            # Using resolve to ensure symbolic links are followed
-                            if fd.resolve(strict=False) == filepath:
-                                pass  # File is still being used by Klipper
-                        except FileNotFoundError:  # Klipper has already released the CSV file
-                            file_busy = False
-                            break
-                        except PermissionError:  # Unable to check for this particular process due to permissions
-                            pass
+    while file_busy:
+        if loop_count >= timeout:
+            raise TimeoutError(f'Klipper is taking too long to release the CSV file ({filepath})!')
+
+        # Try to open the file in write-only mode to check if it is in use
+        # If we successfully open and close the file, it is not in use
+        try:
+            fd = os.open(filepath, os.O_WRONLY)
+            os.close(fd)
+            file_busy = False
+        except OSError:
+            # If OSError is caught, it indicates the file is still being used
+            pass
+        except Exception:
+            # If another exception is raised, it's not a problem, we just loop again
+            pass
 
         loop_count += 1
         time.sleep(1)
