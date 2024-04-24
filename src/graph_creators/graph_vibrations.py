@@ -305,7 +305,7 @@ def plot_global_speed_profile(
     y2max = vibration_metric.max() * 1.07
     ax2.set_ylim([y2min, y2max])
 
-    if peaks is not None:
+    if peaks is not None and len(peaks) > 0:
         ax2.plot(all_speeds[peaks], vibration_metric[peaks], 'x', color='black', markersize=8, zorder=10)
         for idx, peak in enumerate(peaks):
             ax2.annotate(
@@ -499,7 +499,7 @@ def plot_vibration_spectrogram(ax, angles, speeds, spectrogram_data, peaks):
     )
 
     # Add peaks lines in the spectrogram to get hint from peaks found in the first graph
-    if peaks is not None:
+    if peaks is not None and len(peaks) > 0:
         for idx, peak in enumerate(peaks):
             ax.axvline(speeds[peak], color='cyan', linewidth=0.75)
             ax.annotate(
