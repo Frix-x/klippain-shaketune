@@ -142,8 +142,8 @@ class GraphCreator(abc.ABC):
     def _move_and_prepare_files(
         self,
         glob_pattern: str,
-        min_files_required: Optional[int],
-        custom_name_func: Optional[Callable[[Path], str]],
+        min_files_required: Optional[int] = None,
+        custom_name_func: Optional[Callable[[Path], str]] = None,
     ) -> list[Path]:
         tmp_path = Path('/tmp')
         globbed_files = list(tmp_path.glob(glob_pattern))
@@ -166,7 +166,7 @@ class GraphCreator(abc.ABC):
             lognames.append(new_file)
         return lognames
 
-    def _save_figure_and_cleanup(self, fig: Figure, lognames: list[Path], axis_label: Optional[str]) -> None:
+    def _save_figure_and_cleanup(self, fig: Figure, lognames: list[Path], axis_label: Optional[str] = None) -> None:
         axis_suffix = f'_{axis_label}' if axis_label else ''
         png_filename = self._folder / f'{self._type}_{self._graph_date}{axis_suffix}.png'
         fig.savefig(png_filename, dpi=self._dpi)
