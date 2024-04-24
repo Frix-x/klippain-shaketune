@@ -25,8 +25,8 @@ from src.graph_creators.analyze_axesmap import axesmap_calibration
 from src.graph_creators.graph_belts import belts_calibration
 from src.graph_creators.graph_shaper import shaper_calibration
 from src.graph_creators.graph_vibrations import vibrations_profile
-from src.helpers import MotorLogParser
 from src.helpers.locale_utils import print_with_c_locale
+from src.helpers.motorlogparser import MotorLogParser
 
 
 class Config:
