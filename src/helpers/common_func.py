@@ -120,7 +120,11 @@ def compute_mechanical_parameters(psd, freqs, min_freq=None):
     bw1 = math.pow(bandwidth / fr, 2)
     bw2 = math.pow(bandwidth / fr, 4)
 
-    zeta = math.sqrt(0.5 - math.sqrt(1 / (4 + 4 * bw1 - bw2)))
+    try:
+        zeta = math.sqrt(0.5 - math.sqrt(1 / (4 + 4 * bw1 - bw2)))
+    except ValueError:
+        # If a math problem arise such as a negative sqrt term, we also return None instead for damping ratio
+        return fr, None, max_power_index, max_under_min_freq
 
     return fr, zeta, max_power_index, max_under_min_freq
 
