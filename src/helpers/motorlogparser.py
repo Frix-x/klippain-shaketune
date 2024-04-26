@@ -5,7 +5,7 @@
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Union
 
 
 class Motor:
@@ -43,17 +43,50 @@ class Motor:
     def set_property(self, property: str, value: Any) -> None:
         self._properties[property] = value
 
-    def get_registers_keys(self) -> Set[str]:
-        return set(self._registers.keys())
-
     def get_property(self, property: str) -> Optional[Any]:
         return self._properties.get(property)
 
-    def get_properties_keys(self) -> Set[str]:
-        return set(self._properties.keys())
-
     def __str__(self):
         return f'Stepper: {self._name}\nKlipper config: {self._properties}\nTMC Registers: {self._registers}'
+
+    # Return the other motor properties and registers that are different from the current motor
+    def compare_to(self, other: 'Motor') -> Optional[Dict[str, Dict[str, Any]]]:
+        differences = {'properties': {}, 'registers': {}}
+
+        # Compare properties
+        all_keys = self._properties.keys() | other._properties.keys()
+        for key in all_keys:
+            val1 = self._properties.get(key)
+            val2 = other._properties.get(key)
+            if val1 != val2:
+                differences['properties'][key] = val2
+
+        # Compare registers
+        all_keys = self._registers.keys() | other._registers.keys()
+        for key in all_keys:
+            reg1 = self._registers.get(key, {})
+            reg2 = other._registers.get(key, {})
+            if reg1 != reg2:
+                reg_diffs = {}
+                sub_keys = reg1.keys() | reg2.keys()
+                for sub_key in sub_keys:
+                    reg_val1 = reg1.get(sub_key)
+                    reg_val2 = reg2.get(sub_key)
+                    if reg_val1 != reg_val2:
+                        reg_diffs[sub_key] = reg_val2
+                if reg_diffs:
+                    differences['registers'][key] = reg_diffs
+
+        # Clean up: remove empty sections if there are no differences
+        if not differences['properties']:
+            del differences['properties']
+        if not differences['registers']:
+            del differences['registers']
+
+        if not differences:
+            return None
+
+        return differences
 
 
 class MotorLogParser:
@@ -136,45 +169,6 @@ class MotorLogParser:
     # Get all the motor list at once
     def get_motors(self) -> List[Motor]:
         return self._motors
-
-    # Compare two motors object and return the differences in their configuration
-    def compare_motors(self, motor1: Motor, motor2: Motor) -> Optional[Dict[str, Dict[str, Dict[str, Any]]]]:
-        differences = {'properties': {}, 'registers': {}}
-
-        # Compare properties
-        all_property_keys = motor1.get_properties_keys().union(motor2.get_properties_keys())
-        for key in all_property_keys:
-            val1 = motor1.get_property(key)
-            val2 = motor2.get_property(key)
-            if val1 != val2:
-                differences['properties'][key] = {'Motor 1': val1, 'Motor 2': val2}
-
-        # Compare registers
-        all_register_keys = motor1.get_registers_keys().union(motor2.get_registers_keys())
-        for key in all_register_keys:
-            reg1 = motor1.get_register(key)
-            reg2 = motor2.get_register(key)
-            if reg1 != reg2:
-                reg_diffs = {}
-                all_reg_keys = set(reg1.keys()).union(reg2.keys()) if reg1 and reg2 else set()
-                for reg_key in all_reg_keys:
-                    reg_val1 = reg1.get(reg_key) if reg1 else None
-                    reg_val2 = reg2.get(reg_key) if reg2 else None
-                    if reg_val1 != reg_val2:
-                        reg_diffs[reg_key] = {'Motor 1': reg_val1, 'Motor 2': reg_val2}
-                if reg_diffs:
-                    differences['registers'][key] = reg_diffs
-
-        # Clean up: remove empty sections if there are no differences
-        if not differences['properties']:
-            del differences['properties']
-        if not differences['registers']:
-            del differences['registers']
-
-        if not differences:
-            return None
-
-        return differences
 
 
 # # Usage example:
