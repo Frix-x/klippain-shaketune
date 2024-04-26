@@ -5,26 +5,52 @@
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 
 class Motor:
     def __init__(self, name: str):
         self._name: str = name
-        self._registers: Dict[str, Any] = {}
+        self._registers: Dict[str, Dict[str, Any]] = {}
         self._properties: Dict[str, Any] = {}
 
     def set_register(self, register: str, value: Any) -> None:
-        self._registers[register] = value
+        # Special parsing for CHOPCONF to extract meaningful values
+        if register == 'CHOPCONF':
+            if 'intpol=' not in value:
+                value += ' intpol=0'
+            mres_match = re.search(r'mres=\d+\((\d+)usteps\)', value)
+            if mres_match:
+                value = re.sub(r'mres=\d+\(\d+usteps\)', f'mres={mres_match.group(1)}', value)
+
+        cleaned_values = re.sub(r'\b\w+:\s+\S+\s+', '', value)
+
+        # Parse and set the TMC register sub-values as a dictionary
+        self._registers[register] = self._parse_register_values(cleaned_values)
+
+    def _parse_register_values(self, register_string: str) -> Dict[str, Any]:
+        parsed = {}
+        parts = register_string.split()
+        for part in parts:
+            if '=' in part:
+                k, v = part.split('=', 1)
+                parsed[k] = v
+        return parsed
+
+    def get_register(self, register: str) -> Optional[Dict[str, Any]]:
+        return self._registers.get(register)
 
     def set_property(self, property: str, value: Any) -> None:
         self._properties[property] = value
 
-    def get_register(self, register: str) -> Optional[Any]:
-        return self._registers.get(register)
+    def get_registers_keys(self) -> Set[str]:
+        return set(self._registers.keys())
 
     def get_property(self, property: str) -> Optional[Any]:
         return self._properties.get(property)
+
+    def get_properties_keys(self) -> Set[str]:
+        return set(self._properties.keys())
 
     def __str__(self):
         return f'Stepper: {self._name}\nKlipper config: {self._properties}\nTMC Registers: {self._registers}'
@@ -96,12 +122,7 @@ class MotorLogParser:
                 match = re.search(pattern, content)
                 if match:
                     values = match.group(1).strip()
-                    if key == 'CHOPCONF':
-                        mres_match = re.search(r'mres=\d+\((\d+)usteps\)', values)
-                        if mres_match:
-                            values = re.sub(r'mres=\d+\(\d+usteps\)', f'mres={mres_match.group(1)}', values)
-                    cleaned_values = re.sub(r'\b\w+:\s+\S+\s+', '', values)
-                    motor.set_register(key, cleaned_values)
+                    motor.set_register(key, values)
 
             self._motors.append(motor)
 
@@ -115,6 +136,45 @@ class MotorLogParser:
     # Get all the motor list at once
     def get_motors(self) -> List[Motor]:
         return self._motors
+
+    # Compare two motors object and return the differences in their configuration
+    def compare_motors(self, motor1: Motor, motor2: Motor) -> Optional[Dict[str, Dict[str, Dict[str, Any]]]]:
+        differences = {'properties': {}, 'registers': {}}
+
+        # Compare properties
+        all_property_keys = motor1.get_properties_keys().union(motor2.get_properties_keys())
+        for key in all_property_keys:
+            val1 = motor1.get_property(key)
+            val2 = motor2.get_property(key)
+            if val1 != val2:
+                differences['properties'][key] = {'Motor 1': val1, 'Motor 2': val2}
+
+        # Compare registers
+        all_register_keys = motor1.get_registers_keys().union(motor2.get_registers_keys())
+        for key in all_register_keys:
+            reg1 = motor1.get_register(key)
+            reg2 = motor2.get_register(key)
+            if reg1 != reg2:
+                reg_diffs = {}
+                all_reg_keys = set(reg1.keys()).union(reg2.keys()) if reg1 and reg2 else set()
+                for reg_key in all_reg_keys:
+                    reg_val1 = reg1.get(reg_key) if reg1 else None
+                    reg_val2 = reg2.get(reg_key) if reg2 else None
+                    if reg_val1 != reg_val2:
+                        reg_diffs[reg_key] = {'Motor 1': reg_val1, 'Motor 2': reg_val2}
+                if reg_diffs:
+                    differences['registers'][key] = reg_diffs
+
+        # Clean up: remove empty sections if there are no differences
+        if not differences['properties']:
+            del differences['properties']
+        if not differences['registers']:
+            del differences['registers']
+
+        if not differences:
+            return None
+
+        return differences
 
 
 # # Usage example:
