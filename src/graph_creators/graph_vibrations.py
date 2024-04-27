@@ -560,6 +560,57 @@ def plot_vibration_spectrogram(ax, angles, speeds, spectrogram_data, peaks):
     return
 
 
+def plot_motor_config_txt(fig, motors, differences):
+    motor_details = [(motors[0], 'X motor'), (motors[1], 'Y motor')]
+
+    distance = 0.12
+    if motors[0].get_property('autotune_enabled'):
+        distance = 0.24
+        config_blocks = [
+            f"| {lbl}: {mot.get_property('motor').upper()} on {mot.get_property('tmc').upper()} @ {mot.get_property('voltage')}V {mot.get_property('run_current')}A"
+            for mot, lbl in motor_details
+        ]
+        config_blocks.append('| TMC Autotune enabled')
+    else:
+        config_blocks = [
+            f"| {lbl}: {mot.get_property('tmc').upper()} @ {mot.get_property('run_current')}A"
+            for mot, lbl in motor_details
+        ]
+        config_blocks.append('| TMC Autotune not detected')
+
+    for idx, block in enumerate(config_blocks):
+        fig.text(
+            0.40, 0.990 - 0.015 * idx, block, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple']
+        )
+
+    tmc_registers = motors[0].get_registers()
+    idx = -1
+    for idx, (register, settings) in enumerate(tmc_registers.items()):
+        settings_str = ' '.join(f'{k}={v}' for k, v in settings.items())
+        tmc_block = f'| {register.upper()}: {settings_str}'
+        fig.text(
+            0.40 + distance,
+            0.990 - 0.015 * idx,
+            tmc_block,
+            ha='left',
+            va='top',
+            fontsize=10,
+            color=KLIPPAIN_COLORS['dark_purple'],
+        )
+
+    if differences is not None:
+        differences_text = f'| Y motor diff: {differences}'
+        fig.text(
+            0.40 + distance,
+            0.990 - 0.015 * (idx + 1),
+            differences_text,
+            ha='left',
+            va='top',
+            fontsize=10,
+            color=KLIPPAIN_COLORS['dark_purple'],
+        )
+
+
 ######################################################################
 # Startup and main routines
 ######################################################################
@@ -577,7 +628,7 @@ def extract_angle_and_speed(logname):
 
 
 def vibrations_profile(
-    lognames, klipperdir='~/klipper', kinematics='cartesian', accel=None, max_freq=1000.0, st_version=None
+    lognames, klipperdir='~/klipper', kinematics='cartesian', accel=None, max_freq=1000.0, st_version=None, motors=None
 ):
     set_locale()
     global shaper_calibrate
@@ -709,6 +760,13 @@ def vibrations_profile(
         print_with_c_locale('Warning: CSV filenames appear to be different than expected (%s)' % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
     fig.text(0.060, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
+
+    # Add the motors infos to the top of the graph
+    if motors is not None and len(motors) == 2:
+        differences = motors[0].compare_to(motors[1])
+        plot_motor_config_txt(fig, motors, differences)
+        if differences is not None and kinematics == 'corexy':
+            print_with_c_locale(f'Warning: motors have different TMC configurations!\n{differences}')
 
     # Plot the graphs
     plot_angle_profile_polar(ax1, all_angles, all_angles_energy, good_angles, symmetry_factor)
