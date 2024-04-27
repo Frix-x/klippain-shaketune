@@ -17,16 +17,36 @@ class Motor:
     def set_register(self, register: str, value: Any) -> None:
         # Special parsing for CHOPCONF to extract meaningful values
         if register == 'CHOPCONF':
+            # Add intpol=0 if missing from the register dump
             if 'intpol=' not in value:
                 value += ' intpol=0'
+            # Simplify the microstep resolution format
             mres_match = re.search(r'mres=\d+\((\d+)usteps\)', value)
             if mres_match:
                 value = re.sub(r'mres=\d+\(\d+usteps\)', f'mres={mres_match.group(1)}', value)
 
+        # Special parsing for CHOPCONF to avoid pwm_ before each values
+        if register == 'PWMCONF':
+            parts = value.split()
+            new_parts = []
+            for part in parts:
+                key, val = part.split('=', 1)
+                if key.startswith('pwm_'):
+                    key = key[4:]
+                new_parts.append(f'{key}={val}')
+            value = ' '.join(new_parts)
+
+        # General cleaning to remove extraneous labels and colons and parse the whole into Motor _registers
         cleaned_values = re.sub(r'\b\w+:\s+\S+\s+', '', value)
 
-        # Parse and set the TMC register sub-values as a dictionary
-        self._registers[register] = self._parse_register_values(cleaned_values)
+        # Then fill the registers while merging all the thresholds into the same THRS virtual register
+        if register in ['TPWMTHRS', 'TCOOLTHRS']:
+            existing_thrs = self._registers.get('THRS', {})
+            new_values = self._parse_register_values(cleaned_values)
+            merged_values = {**existing_thrs, **new_values}
+            self._registers['THRS'] = merged_values
+        else:
+            self._registers[register] = self._parse_register_values(cleaned_values)
 
     def _parse_register_values(self, register_string: str) -> Dict[str, Any]:
         parsed = {}
@@ -39,6 +59,9 @@ class Motor:
 
     def get_register(self, register: str) -> Optional[Dict[str, Any]]:
         return self._registers.get(register)
+
+    def get_registers(self) -> Dict[str, Dict[str, Any]]:
+        return self._registers
 
     def set_property(self, property: str, value: Any) -> None:
         self._properties[property] = value

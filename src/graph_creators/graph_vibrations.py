@@ -560,6 +560,57 @@ def plot_vibration_spectrogram(ax, angles, speeds, spectrogram_data, peaks):
     return
 
 
+def plot_motor_config_txt(fig, motors, differences):
+    motor_details = [(motors[0], 'X motor'), (motors[1], 'Y motor')]
+
+    distance = 0.12
+    if motors[0].get_property('autotune_enabled'):
+        distance = 0.24
+        config_blocks = [
+            f"| {lbl}: {mot.get_property('motor').upper()} on {mot.get_property('tmc').upper()} @ {mot.get_property('voltage')}V {mot.get_property('run_current')}A"
+            for mot, lbl in motor_details
+        ]
+        config_blocks.append('| TMC Autotune enabled')
+    else:
+        config_blocks = [
+            f"| {lbl}: {mot.get_property('tmc').upper()} @ {mot.get_property('run_current')}A"
+            for mot, lbl in motor_details
+        ]
+        config_blocks.append('| TMC Autotune not detected')
+
+    for idx, block in enumerate(config_blocks):
+        fig.text(
+            0.40, 0.990 - 0.015 * idx, block, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple']
+        )
+
+    tmc_registers = motors[0].get_registers()
+    idx = -1
+    for idx, (register, settings) in enumerate(tmc_registers.items()):
+        settings_str = ' '.join(f'{k}={v}' for k, v in settings.items())
+        tmc_block = f'| {register.upper()}: {settings_str}'
+        fig.text(
+            0.40 + distance,
+            0.990 - 0.015 * idx,
+            tmc_block,
+            ha='left',
+            va='top',
+            fontsize=10,
+            color=KLIPPAIN_COLORS['dark_purple'],
+        )
+
+    if differences is not None:
+        differences_text = f'| Y motor diff: {differences}'
+        fig.text(
+            0.40 + distance,
+            0.990 - 0.015 * (idx + 1),
+            differences_text,
+            ha='left',
+            va='top',
+            fontsize=10,
+            color=KLIPPAIN_COLORS['dark_purple'],
+        )
+
+
 ######################################################################
 # Startup and main routines
 ######################################################################
@@ -713,38 +764,9 @@ def vibrations_profile(
     # Add the motors infos to the top of the graph
     if motors is not None and len(motors) == 2:
         differences = motors[0].compare_to(motors[1])
+        plot_motor_config_txt(fig, motors, differences)
         if differences is not None and kinematics == 'corexy':
             print_with_c_locale(f'Warning: motors have different TMC configurations!\n{differences}')
-
-        if motors[0].get_property('autotune_enabled'):
-            config_block1 = f"| X motor: {motors[0].get_property('motor').upper()} on \
-                                {motors[0].get_property('tmc').upper()} @ \
-                                {motors[0].get_property('voltage')}V/{motors[0].get_property('run_current')}A"
-            config_block2 = f"| Y motor: {motors[1].get_property('motor').upper()} on \
-                                {motors[0].get_property('tmc').upper()} @ \
-                                {motors[1].get_property('voltage')}V/{motors[1].get_property('run_current')}A"
-            config_block3 = '| TMC Autotune enabled'
-        else:
-            config_block1 = f"| X TMC: {motors[0].get_property('tmc').upper()} @ \
-                                {motors[0].get_property('run_current')}A"
-            config_block2 = f"| Y TMC: {motors[0].get_property('tmc').upper()} @ \
-                                {motors[1].get_property('run_current')}A"
-            config_block3 = '| TMC Autotune not detected'
-
-        fig.text(0.58, 0.960, config_block1, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
-        fig.text(0.58, 0.946, config_block2, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
-        fig.text(0.58, 0.932, config_block3, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
-
-        # TODO: add dynamic motor block creation based on the real TMC registers
-        tmc_block1 = '| CHOPCONF: toff=3 hstrt=2 hend=3 tbl=1 vhighfs=1 mres=32 intpol=1 dedge=1'
-        tmc_block2 = '| PWMCONF: pwm_ofs=21 pwm_grad=12 pwm_freq=2 pwm_autoscale=1 pwm_autograd=1 pwm_reg=15 pwm_lim=4'
-        tmc_block3 = '| COOLCONF: semin=8 seup=3 semax=4 sgt=2'
-        tmc_block4 = '| THRESHOLDS: tpwmthrs=1048575 tcoolthrs=305'
-
-        fig.text(0.75, 0.967, tmc_block1, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
-        fig.text(0.75, 0.953, tmc_block2, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
-        fig.text(0.75, 0.939, tmc_block3, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
-        fig.text(0.75, 0.925, tmc_block4, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
 
     # Plot the graphs
     plot_angle_profile_polar(ax1, all_angles, all_angles_energy, good_angles, symmetry_factor)
