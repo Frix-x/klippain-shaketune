@@ -26,7 +26,7 @@ Call the `CREATE_VIBRATIONS_PROFILE` macro with the speed range you want to meas
 
 ## Graphs description
 
-The `CREATE_VIBRATIONS_PROFILE` macro results are constituted of a set of 6 plots. Following are some details about them.
+The `CREATE_VIBRATIONS_PROFILE` macro results are constituted of a set of 6 plots. At the top of the figure you can also see all the detected motor, current and TMC driver parameters. These notes are just for reference in case you want to tinker with them and don't forget what you changed between each run of the macro.
 
 ![](../images/vibrations_example.png)
 
