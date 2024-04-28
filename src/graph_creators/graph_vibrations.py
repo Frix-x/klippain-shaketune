@@ -622,8 +622,12 @@ def extract_angle_and_speed(logname):
         if match:
             angle = match.group(1)
             speed = match.group(2)
+        else:
+            raise ValueError(f'File {logname} does not match expected format. Clean your /tmp folder and start again!')
     except AttributeError as err:
-        raise ValueError(f'File {logname} does not match expected format.') from err
+        raise ValueError(
+            f'File {logname} does not match expected format. Clean your /tmp folder and start again!'
+        ) from err
     return float(angle), float(speed)
 
 
