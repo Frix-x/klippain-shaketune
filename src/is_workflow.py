@@ -11,6 +11,7 @@
 
 import abc
 import argparse
+import shutil
 import tarfile
 import traceback
 from datetime import datetime
@@ -170,7 +171,8 @@ class GraphCreator(abc.ABC):
             fm.wait_file_ready(filename)
             custom_name = custom_name_func(filename) if custom_name_func else filename.name
             new_file = self._folder / f'{self._type}_{self._graph_date}_{custom_name}.csv'
-            filename.rename(new_file)
+            # shutil.move() is needed to move the file across filesystems (mainly for BTT CB1 Pi default OS image)
+            shutil.move(filename, new_file)
             fm.wait_file_ready(new_file)
             lognames.append(new_file)
         return lognames
