@@ -1,0 +1,29 @@
+[project]
+name = "Shake&Tune"
+description = "Klipper streamlined input shaper workflow and calibration tools"
+readme = "README.md"
+requires-python = ">= 3.9"
+authors = [
+  {name = "Félix Boisselier", email = "felix@fboisselier.fr"}
+]
+keywords = ["klipper", "input shaper", "calibration", "3d printer"]
+license = {file = "LICENSE"}
+
+[project.urls]
+Repository = "https://github.com/Frix-x/klippain-shaketune"
+Documentation = "https://github.com/Frix-x/klippain-shaketune/tree/main/docs"
+Issues = "https://github.com/Frix-x/klippain-shaketune/issues"
+Changelog = "https://github.com/Frix-x/klippain-shaketune/releases"
+
+[tool.ruff]
+line-length = 120 # We all have modern screens now and I believe this should be brought in line with current technology
+indent-width = 4
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B"]
+unfixable = ["B"]
+
+[tool.ruff.format]
+quote-style = "single"
+skip-magic-trailing-comma = false

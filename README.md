@@ -13,9 +13,9 @@ It operates in two steps:
 
 Check out the **[detailed documentation of the Shake&Tune module here](./docs/README.md)**. You can also look at the documentation for each type of graph by directly clicking on them below to better understand your results and tune your machine!
 
-| [Belts graph](./docs/macros/belts_tuning.md) | [Axis input shaper graphs](./docs/macros/axis_tuning.md) | [Vibrations graph](./docs/macros/vibrations_tuning.md) |
+| [Belts graph](./docs/macros/belts_tuning.md) | [Axis input shaper graphs](./docs/macros/axis_tuning.md) | [Vibrations graph](./docs/macros/vibrations_profile.md) |
 |:----------------:|:------------:|:---------------------:|
-| [<img src="./docs/images/belts_example.png">](./docs/macros/belts_tuning.md) | [<img src="./docs/images/axis_example.png">](./docs/macros/axis_tuning.md) | [<img src="./docs/images/vibrations_example.png">](./docs/macros/vibrations_tuning.md) |
+| [<img src="./docs/images/belts_example.png">](./docs/macros/belts_tuning.md) | [<img src="./docs/images/axis_example.png">](./docs/macros/axis_tuning.md) | [<img src="./docs/images/vibrations_example.png">](./docs/macros/vibrations_profile.md) |
 
   > **Note**:
   >
@@ -34,17 +34,13 @@ Follow these steps to install the Shake&Tune module in your printer:
      [include K-ShakeTune/*.cfg]
      ```
 
-  > **Note**:
-  >
-  > Due to some breaking changes in the resonance testing code on the Klipper side, Shake&Tune has been modified to take advantage of this, and thus S&T v2.6+ will only support a Klipper version from Feb 17th 2024. If you are using an older version of Klipper, you must use S&T <=2.5.x
-
 ## Usage
 
 Ensure your machine is homed, then invoke one of the following macros as needed:
-  - `AXES_MAP_CALIBRATION` to automatically find Klipper's `axes_map` parameter for your accelerometer orientation (be careful, this is experimental for now).
-  - `BELTS_SHAPER_CALIBRATION` for belt resonance graphs, useful for verifying belt tension and differential belt paths behavior.
-  - `AXES_SHAPER_CALIBRATION` for input shaper graphs to mitigate ringing/ghosting by tuning Klipper's input shaper system.
-  - `VIBRATIONS_CALIBRATION` for machine and motors vibration graphs, used to optimize your slicer speed profiles and TMC drivers parameters.
-  - `EXCITATE_AXIS_AT_FREQ` to sustain a specific excitation frequency, useful to let you inspect and find out what is resonating.
+  - `AXES_MAP_CALIBRATION` to automatically find Klipper's `axes_map` parameter for your accelerometer orientation (be careful, this is experimental for now and known to give bad results).
+  - `COMPARE_BELTS_RESPONSES` for a differential belt resonance graph, useful for checking relative belt tensions and belt path behaviors on a CoreXY printer.
+  - `AXES_SHAPER_CALIBRATION` for standard input shaper graphs, used to mitigate ringing/ghosting by tuning Klipper's input shaper filters.
+  - `CREATE_VIBRATIONS_PROFILE` for vibrations graphs as a function of toolhead direction and speed, used to find problematic ranges where the printer could be exposed to more VFAs and optimize your slicer speed profiles and TMC driver parameters.
+  - `EXCITATE_AXIS_AT_FREQ` to maintain a specific excitation frequency, useful to inspect and find out what is resonating.
 
 For further insights on the usage of these macros and the generated graphs, refer to the [K-Shake&Tune module documentation](./docs/README.md).

@@ -18,7 +18,7 @@ Then, call the `AXES_SHAPER_CALIBRATION` macro and look for the graphs in the re
 |SCV|printer square corner velocity|Square corner velocity you want to use to calculate shaper recommendations. Using higher SCV values usually results in more smoothing and lower maximum accelerations|
 |MAX_SMOOTHING|None|Max smoothing allowed when calculating shaper recommendations|
 |KEEP_N_RESULTS|3|Total number of results to keep in the result folder after running the test. The older results are automatically cleaned up|
-|KEEP_CSV|True|Weither or not to keep the CSV data file alonside the PNG graphs|
+|KEEP_CSV|0|Weither or not to keep the CSV data file alonside the PNG graphs|
 
 
 ## Graphs description
@@ -105,7 +105,7 @@ Here's how to troubleshoot the issue:
 
 Such graph patterns can arise from various factors, and there isn't a one-size-fits-all solution. To address them:
   1. A wobbly table can be the cause. So first thing to do is to try with the printer directly on the floor.
-  1. Ensure optimal belt tension using the [`BELTS_SHAPER_CALIBRATION` macro](./belts_tuning.md).
+  1. Ensure optimal belt tension using the [`COMPARE_BELTS_RESPONSES` macro](./belts_tuning.md).
   1. If problems persist, it might be due to an improperly squared gantry. For correction, refer to [Nero3D's de-racking video](https://youtu.be/cOn6u9kXvy0?si=ZCSdWU6br3Y9rGsy).
   1. If it's still there... you will need to find out what is resonating to fix it. You can use the `EXCITATE_AXIS_AT_FREQ` macro to help you find it.
 
