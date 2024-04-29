@@ -299,8 +299,8 @@ def shaper_calibration(lognames, klipperdir='~/klipper', max_smoothing=None, scv
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
-    # Parse data
-    datas = [parse_log(fn) for fn in lognames]
+    # Parse data from the log files while ignoring CSV in the wrong format
+    datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
     if len(datas) > 1:
         print_with_c_locale('Warning: incorrect number of .csv files detected. Only the first one will be used!')
 

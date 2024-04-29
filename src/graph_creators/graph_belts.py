@@ -457,8 +457,8 @@ def belts_calibration(lognames, klipperdir='~/klipper', max_freq=200.0, st_versi
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
-    # Parse data
-    datas = [parse_log(fn) for fn in lognames]
+    # Parse data from the log files while ignoring CSV in the wrong format
+    datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
     if len(datas) > 2:
         raise ValueError('Incorrect number of .csv files used (this function needs exactly two files to compare them)!')
 

@@ -651,6 +651,8 @@ def vibrations_profile(
 
     for logname in lognames:
         data = parse_log(logname)
+        if data is None:
+            continue  # File is not in the expected format, skip it
         angle, speed = extract_angle_and_speed(logname)
         freq_response = calc_freq_response(data)
         first_freqs = freq_response.freq_bins
