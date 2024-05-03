@@ -207,7 +207,12 @@ class BeltsGraphCreator(GraphCreator):
     def __init__(self, keep_csv: bool = False, dpi: int = 150):
         super().__init__(keep_csv, dpi)
 
+        self._kinematics = None
+
         self._setup_folder('belts')
+
+    def configure(self, kinematics: str) -> None:
+        self._kinematics = kinematics
 
     def create_graph(self) -> None:
         lognames = self._move_and_prepare_files(
@@ -217,6 +222,7 @@ class BeltsGraphCreator(GraphCreator):
         )
         fig = belts_calibration(
             lognames=[str(path) for path in lognames],
+            kinematics=self._kinematics,
             klipperdir=str(Config.KLIPPER_FOLDER),
             st_version=self._version,
         )
@@ -381,7 +387,7 @@ def main():
     print_with_c_locale(f'Shake&Tune version: {Config.get_git_version()}')
 
     graph_creators = {
-        'belts': (BeltsGraphCreator, None),
+        'belts': (BeltsGraphCreator, lambda gc: gc.configure(options.kinematics)),
         'shaper': (ShaperGraphCreator, lambda gc: gc.configure(options.scv, options.max_smoothing)),
         'vibrations': (
             VibrationsGraphCreator,

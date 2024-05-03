@@ -424,7 +424,7 @@ def compute_signal_data(data, max_freq):
 ######################################################################
 
 
-def belts_calibration(lognames, klipperdir='~/klipper', max_freq=200.0, st_version=None):
+def belts_calibration(lognames, kinematics, klipperdir='~/klipper', max_freq=200.0, st_version=None):
     set_locale()
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
@@ -493,6 +493,8 @@ def belts_calibration(lognames, klipperdir='~/klipper', max_freq=200.0, st_versi
         filename = lognames[0].split('/')[-1]
         dt = datetime.strptime(f"{filename.split('_')[1]} {filename.split('_')[2]}", '%Y%m%d %H%M%S')
         title_line2 = dt.strftime('%x %X')
+        if kinematics is not None:
+            title_line2 += ' -- ' + kinematics.upper() + ' kinematics'
     except Exception:
         print_with_c_locale(
             'Warning: CSV filenames look to be different than expected (%s , %s)' % (lognames[0], lognames[1])
@@ -530,13 +532,20 @@ def main():
     opts.add_option(
         '-k', '--klipper_dir', type='string', dest='klipperdir', default='~/klipper', help='main klipper directory'
     )
+    opts.add_option(
+        '-m',
+        '--kinematics',
+        type='string',
+        dest='kinematics',
+        help='machine kinematics configuration',
+    )
     options, args = opts.parse_args()
     if len(args) < 1:
         opts.error('Incorrect number of arguments')
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
 
-    fig = belts_calibration(args, options.klipperdir, options.max_freq)
+    fig = belts_calibration(args, options.kinematics, options.klipperdir, options.max_freq)
     fig.savefig(options.output, dpi=150)
 
 
