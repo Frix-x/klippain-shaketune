@@ -4,7 +4,16 @@
 # Written by Frix_x#0161 #
 
 
+import io
 import locale
+from typing import Callable, Optional
+
+KLIPPER_CONSOLE_OUTPUT_FUNC: Optional[Callable[[str], None]] = None
+
+
+def set_shaketune_output_func(func: Callable[[str], None]):
+    global KLIPPER_CONSOLE_OUTPUT_FUNC
+    KLIPPER_CONSOLE_OUTPUT_FUNC = func
 
 
 # Set the best locale for time and date formating (generation of the titles)
@@ -27,7 +36,12 @@ def print_with_c_locale(*args, **kwargs):
             'Warning: Failed to set a basic locale. Special characters may not display correctly in Klipper console:', e
         )
     finally:
-        print(*args, **kwargs)  # Proceed with printing regardless of locale setting success
+        if not KLIPPER_CONSOLE_OUTPUT_FUNC:
+            print(*args, **kwargs)  # Proceed with printing regardless of locale setting success
+        else:
+            with io.StringIO() as mem_output:
+                print(*args, file=mem_output, **kwargs)
+                KLIPPER_CONSOLE_OUTPUT_FUNC(mem_output.getvalue())
         try:
             locale.setlocale(locale.LC_ALL, original_locale)
         except locale.Error as e:

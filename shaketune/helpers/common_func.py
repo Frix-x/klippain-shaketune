@@ -10,7 +10,6 @@ from importlib import import_module
 from pathlib import Path
 
 import numpy as np
-from git import GitCommandError, Repo
 from scipy.signal import spectrogram
 
 
@@ -69,6 +68,7 @@ def get_git_version():
     try:
         # Get the absolute path of the script, resolving any symlinks
         # Then get 2 times to parent dir to be at the git root folder
+        from git import GitCommandError, Repo
         script_path = Path(__file__).resolve()
         repo_path = script_path.parents[1]
         repo = Repo(repo_path)

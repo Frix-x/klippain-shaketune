@@ -5,7 +5,6 @@ MOONRAKER_CONFIG="${HOME}/printer_data/config/moonraker.conf"
 KLIPPER_PATH="${HOME}/klipper"
 
 K_SHAKETUNE_PATH="${HOME}/klippain_shaketune"
-K_SHAKETUNE_VENV_PATH="${HOME}/klippain_shaketune-env"
 
 set -eu
 export LC_ALL=C
@@ -39,7 +38,7 @@ function is_package_installed {
 }
 
 function install_package_requirements {
-    packages=("python3-venv" "libopenblas-dev" "libatlas-base-dev")
+    packages=("libopenblas-dev" "libatlas-base-dev")
     packages_to_install=""
 
     for package in "${packages[@]}"; do
@@ -75,22 +74,6 @@ function check_download {
     fi
 }
 
-function setup_venv {
-    if [ ! -d "${K_SHAKETUNE_VENV_PATH}" ]; then
-        echo "[SETUP] Creating Python virtual environment..."
-        python3 -m venv "${K_SHAKETUNE_VENV_PATH}"
-    else
-        echo "[SETUP] Virtual environment already exists. Continuing..."
-    fi
-
-    source "${K_SHAKETUNE_VENV_PATH}/bin/activate"
-    echo "[SETUP] Installing/Updating K-Shake&Tune dependencies..."
-    pip install --upgrade pip
-    pip install -r "${K_SHAKETUNE_PATH}/requirements.txt"
-    deactivate
-    printf "\n"
-}
-
 function link_extension {
     echo "[INSTALL] Linking scripts to your config directory..."
 
@@ -98,16 +81,17 @@ function link_extension {
         echo "[INSTALL] Klippain full installation found! Linking module to the script folder of Klippain"
         ln -frsn ${K_SHAKETUNE_PATH}/K-ShakeTune ${USER_CONFIG_PATH}/scripts/K-ShakeTune
     else
+        echo "[INSTALL] Klippain not found! Linking module to the config folder of Klipper"
         ln -frsn ${K_SHAKETUNE_PATH}/K-ShakeTune ${USER_CONFIG_PATH}/K-ShakeTune
     fi
 }
 
-function link_gcodeshellcommandpy {
-    if [ ! -f "${KLIPPER_PATH}/klippy/extras/gcode_shell_command.py" ]; then
-        echo "[INSTALL] Downloading gcode_shell_command.py Klipper extension needed for this module"
-        wget -P ${KLIPPER_PATH}/klippy/extras https://raw.githubusercontent.com/Frix-x/klippain/main/scripts/gcode_shell_command.py
+function link_module {
+    if [ ! -d "${KLIPPER_PATH}/klippy/extras/shaketune" ]; then
+        echo "[INSTALL] Linking Shake&Tune module to Klipper extras"
+        ln -frsn ${K_SHAKETUNE_PATH}/shaketune ${KLIPPER_PATH}/klippy/extras/shaketune
     else
-        printf "[INSTALL] gcode_shell_command.py Klipper extension is already installed. Continuing...\n\n"
+        printf "[INSTALL] Klippain Shake&Tune Klipper module is already installed. Continuing...\n\n"
     fi
 }
 
@@ -138,9 +122,8 @@ printf "=============================================\n\n"
 # Run steps
 preflight_checks
 check_download
-setup_venv
 link_extension
+link_module
 add_updater
-link_gcodeshellcommandpy
 restart_klipper
 restart_moonraker

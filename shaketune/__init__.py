@@ -5,29 +5,30 @@
 ############################################
 # Written by Frix_x#0161 #
 
-#   This script is designed to be used with gcode_shell_commands directly from Klipper
+#   This script is designed to be run from inside Klipper Console
 #   Use the provided Shake&Tune macros instead!
 
 
 import abc
 import argparse
+import os
 import shutil
 import tarfile
+import threading
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
-from git import GitCommandError, Repo
 from matplotlib.figure import Figure
 
-import src.helpers.filemanager as fm
-from src.graph_creators.analyze_axesmap import axesmap_calibration
-from src.graph_creators.graph_belts import belts_calibration
-from src.graph_creators.graph_shaper import shaper_calibration
-from src.graph_creators.graph_vibrations import vibrations_profile
-from src.helpers.locale_utils import print_with_c_locale
-from src.helpers.motorlogparser import MotorLogParser
+from .graph_creators.analyze_axesmap import axesmap_calibration
+from .graph_creators.graph_belts import belts_calibration
+from .graph_creators.graph_shaper import shaper_calibration
+from .graph_creators.graph_vibrations import vibrations_profile
+from .helpers import filemanager as fm
+from .helpers.locale_utils import print_with_c_locale, set_shaketune_output_func
+from .helpers.motorlogparser import MotorLogParser
 
 
 class Config:
@@ -43,6 +44,8 @@ class Config:
     @staticmethod
     def get_git_version() -> str:
         try:
+            from git import GitCommandError, Repo
+
             # Get the absolute path of the script, resolving any symlinks
             # Then get 1 times to parent dir to be at the git root folder
             script_path = Path(__file__).resolve()
@@ -58,7 +61,7 @@ class Config:
             return 'unknown'
 
     @staticmethod
-    def parse_arguments() -> argparse.Namespace:
+    def parse_arguments(params: Optional[List] = None) -> argparse.Namespace:
         parser = argparse.ArgumentParser(description='Shake&Tune graphs generation script')
         parser.add_argument(
             '-t',
@@ -131,7 +134,7 @@ class Config:
         parser.add_argument('--dpi', type=int, default=150, dest='dpi', help='DPI of the output PNG files')
         parser.add_argument('-v', '--version', action='version', version=f'Shake&Tune {Config.get_git_version()}')
 
-        return parser.parse_args()
+        return parser.parse_args(params)
 
 
 class GraphCreator(abc.ABC):
@@ -341,15 +344,20 @@ class VibrationsGraphCreator(GraphCreator):
             tar_file.unlink(missing_ok=True)
 
 
-class AxesMapFinder:
-    def __init__(self, accel: float, chip_name: str):
-        self._accel = accel
-        self._chip_name = chip_name
+class AxesMapFinder(GraphCreator):
+    def __init__(self, keep_csv: bool = False, dpi: int = 150):
+        super().__init__(keep_csv, dpi)
 
         self._graph_date = datetime.now().strftime('%Y%m%d_%H%M%S')
-
         self._type = 'axesmap'
         self._folder = Config.RESULTS_BASE_FOLDER
+
+        self._accel = None
+        self._chip_name = None
+
+    def configure(self, accel: int, chip_name: str) -> None:
+        self._accel = accel
+        self._chip_name = chip_name
 
     def find_axesmap(self) -> None:
         tmp_folder = Path('/tmp')
@@ -371,9 +379,16 @@ class AxesMapFinder:
         with result_filename.open('w') as f:
             f.write(results)
 
+        print_with_c_locale(f'Detected axes_map: {results}')
 
-def main():
-    options = Config.parse_arguments()
+    def create_graph(self) -> None:
+        self.find_axesmap()
+
+    def clean_old_files(self, keep_results: int) -> None:
+        pass
+
+
+def create_graph(options: argparse.Namespace) -> None:
     fm.ensure_folders_exist(
         folders=[Config.RESULTS_BASE_FOLDER / subfolder for subfolder in Config.RESULTS_SUBFOLDERS.values()]
     )
@@ -387,7 +402,7 @@ def main():
             VibrationsGraphCreator,
             lambda gc: gc.configure(options.kinematics, options.accel_used, options.chip_name, options.metadata),
         ),
-        'axesmap': (AxesMapFinder, None),
+        'axesmap': (AxesMapFinder, lambda gc: gc.configure(options.accel_used, options.chip_name)),
     }
 
     creator_info = graph_creators.get(options.type)
@@ -422,5 +437,36 @@ def main():
     print_with_c_locale(f'Cleaned output folder to keep only the last {options.keep_results} results!')
 
 
-if __name__ == '__main__':
-    main()
+class ShakeTune:
+    def __init__(self, config) -> None:
+        self._printer = config.get_printer()
+        self._gcode = self._printer.lookup_object('gcode')
+        self.timeout = config.getfloat('timeout', 2.0, above=0.0)
+
+        self._gcode.register_command(
+            'SHAKETUNE_POSTPROCESS',
+            self.cmd_SHAKETUNE_POSTPROCESS,
+            desc='PostProcess ShakeTune data for graph creation',
+        )
+
+    def shaketune_thread(self, options):
+        set_shaketune_output_func(self._gcode.respond_info)
+        os.nice(20)
+        create_graph(options)
+
+    def cmd_SHAKETUNE_POSTPROCESS(self, gcmd) -> None:
+        options = Config.parse_arguments(gcmd.get('PARAMS').split())
+        t = threading.Thread(target=self.shaketune_thread, args=(options,))
+        t.start()
+
+        reactor = self._printer.get_reactor()
+        event_time = reactor.monotonic()
+        end_time = event_time + self.timeout
+        while event_time < end_time:
+            event_time = reactor.pause(event_time + 0.05)
+            if not t.is_alive():
+                break
+
+
+def load_config(config) -> ShakeTune:
+    return ShakeTune(config)
