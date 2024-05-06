@@ -27,7 +27,9 @@ A standard tuning workflow might look something like this:
   }
 }%%
 
-flowchart LR
+flowchart TB
+    subgraph Tuning Workflow
+    direction LR
     start([Start]) --> tensionBelts[Tension your\nbelts as best\n as possible]
     checkmotion --> tensionBelts
     tensionBelts --> SnT_Belts[Run Shake&Tune\nbelts comparison tool]
@@ -52,12 +54,14 @@ flowchart LR
     printGood --> |NO -> Ghosting, ringing, resonance| SnT_IS
     unicorn --> |NO| done
     unicorn --> |YES| SnT_Belts
+    end
 
-    classDef default fill:#70088C,stroke:#150140,stroke-width:4px,color:#ffffff;
+    classDef standard fill:#70088C,stroke:#150140,stroke-width:4px,color:#ffffff;
     classDef questions fill:#FF8D32,stroke:#F24130,stroke-width:4px,color:#ffffff;
-    classDef startstop fill:#F2055C,stroke:#150140,stroke-width:3px;
+    classDef startstop fill:#F2055C,stroke:#150140,stroke-width:3px,color:#ffffff;
     class start,done startstop;
     class goodbelts,goodIS,goodvibs,printGood,unicorn questions;
+    class tensionBelts,checkmotion,SnT_Belts,SnT_IS,SnT_Vibrations,pressureAdvance,extrusionMultiplier,testPrint,checkTMC standard;
 ```
 
 You can access the documentation for each graph type by clicking on it in the table below.
