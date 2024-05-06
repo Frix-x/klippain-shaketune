@@ -2,11 +2,51 @@
 
 ![](./banner_long.png)
 
+
+When perfecting 3D prints and tuning your printer, there is all that resonance testing stuff that Shake&Tune will try to help you with. But keep in mind that it's part of a complete process, and Shake&Tune alone won't magically make your printer print at lightning speed. Also, when using the tools, **it's important to get back to the original need: good prints**.
+
+While there are some ideal goals described in this documentation, you need to understand that it's not always possible to achieve the ideal resonance graphs due to a variety of factors unique to each printer, such as precision of the assembly, quality and brand of components, components wear, etc. Even a different accelerometer can give different results. But that's not a problem; the primary goal is to produce clean and satisfactory prints. If your test prints look good and meet your standards, even if the response curves aren't perfect, you're on the right track. **Trust your printer and your print results more than chasing ideal graphs!** If it's satisfactory, there's no need for further adjustments.
+
+
 ## Resonance testing
 
-First, check out the **[input shaping and tuning generalities](./is_tuning_generalities.md)** documentation to understand how it all works and what to look for when taking these measurements.
+First, check out the **[input shaping and tuning generalities](./is_tuning_generalities.md)** documentation to understand how it all works and what to look for when taking these measurements. A standard tuning workflow might look something like this:
 
-Then look at the documentation for each type of graph by clicking on them below tu run the tests and better understand your results to tune your machine!
+```mermaid
+flowchart LR
+    start([Start]) --> tensionBelts[Tension your\nbelts as best\n as possible]
+    checkmotion --> tensionBelts
+    tensionBelts --> SnT_Belts[Run Shake&Tune\nbelts comparison tool]
+    SnT_Belts --> goodbelts{Check the documentation\nDoes belts comparison profiles\nlook decent?}
+    goodbelts --> |YES| SnT_IS[Run Shake&Tune\naxis input shaper tool]
+    goodbelts --> |NO| checkmotion[Fix your mechanical assembly\nand your motion system]
+    SnT_IS --> goodIS{Check the documentation\nDoes axis profiles and\n input shapers look decent?}
+    goodIS --> |YES| SnT_Vibrations[Run Shake&Tune\nvibration profile tool]
+    goodIS--> |NO| checkmotion
+    SnT_Vibrations --> goodvibs{Check the documentation\nAre the graphs OK?\nSet the speeds in\nyour slicer profile}
+    goodvibs --> |YES| pressureAdvance[Tune your\npressure advance]
+    goodvibs --> |NO| checkTMC[Dig into TMC drivers\ntuning if you want to]
+    goodvibs --> |NO| checkmotion
+    checkTMC --> SnT_Vibrations
+    pressureAdvance --> extrusionMultiplier[Tune your\nextrusion multiplier]
+    extrusionMultiplier --> testPrint[Do a test print]
+    testPrint --> printGood{Is the print good?}
+    printGood --> |YES| unicorn{want to chase unicorns}
+    printGood --> |NO -> Underextrusion / Overextrusion| extrusionMultiplier
+    printGood --> |NO -> Corner humps and no ghosting| pressureAdvance
+    printGood --> |NO -> Visible VFAs| SnT_Vibrations
+    printGood --> |NO -> Ghosting, ringing, resonance| SnT_IS
+    unicorn --> |NO| done
+    unicorn --> |YES| SnT_Belts
+
+    classDef default fill:#70088C,stroke:#150140,stroke-width:4px,color:#ffffff;
+    classDef questions fill:#FF8D32,stroke:#F24130,stroke-width:4px,color:#ffffff;
+    classDef startstop fill:#F2055C,stroke:#150140,stroke-width:3px;
+    class start,done startstop;
+    class goodbelts,goodIS,goodvibs,printGood,unicorn questions;
+```
+
+You can access the documentation for each type of graph by clicking on them below.
 
 | [Belt response comparison](./macros/belts_tuning.md) | [Axis input shaper graphs](./macros/axis_tuning.md) | [Vibrations profile](./macros/vibrations_profile.md) |
 |:----------------:|:------------:|:---------------------:|

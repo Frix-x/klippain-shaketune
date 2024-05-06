@@ -1,11 +1,11 @@
 # Belt relative difference measurements
 
-The `COMPARE_BELTS_RESPONSES` macro is dedicated for CoreXY machines where it can help you to diagnose belt path problems by measuring and plotting the differences between their behavior. It will also help you tension your belts at the same tension.
+The `COMPARE_BELTS_RESPONSES` macro is dedicated for CoreXY machines where it can help you to diagnose belt path problems by measuring and plotting the differences between their behavior. It will also help you tension your belts at the same tension. Using it on Cartesian printers doesn't really make sense, as it's normal to have different responses in that case.
 
 
 ## Usage
 
-**Before starting, ensure that the belts are properly tensioned**. For example, you can follow the [Voron belt tensioning documentation](https://docs.vorondesign.com/tuning/secondary_printer_tuning.html#belt-tension). This is crucial: you need a good starting point to then iterate from it!
+**Before starting, ensure that the belts are properly pre-tensioned**. For example, you can follow the [Voron belt tensioning documentation](https://docs.vorondesign.com/tuning/secondary_printer_tuning.html#belt-tension). This is crucial: you need a good starting point to then iterate from it!
 
 Then, call the `COMPARE_BELTS_RESPONSES` macro and look for the graphs in the results folder. Here are the parameters available:
 
@@ -32,6 +32,10 @@ Aside from the actual belt tension, the resonant frequency/amplitude of the curv
   - the *belt path length*, which is why they must have the **exact same number of teeth** so that one belt path is not longer than the other when tightened at the same tension. This specific point is very important: a single tooth difference is enough to prevent you from having a good superposition of the curves. Moreover, it is even one of the main causes of problems found in Discord resonance testing channels.
 
 **If these three parameters are met, there is no way that the curves could be different** or you can be sure that there is an underlying problem in at least one of the belt paths. Also, if the belt graphs have low amplitude curves (no distinct peaks) and a lot of noise, you will probably also have poor input shaper graphs. So before you continue, ensure that you have good belt graphs or fix your belt paths. Start by checking the belt tension, bearings, gantry screws, alignment of the belts on the idlers, and so on.
+
+  > **Note**:
+  >
+  > If you are using this tool to check or adjust the tension after installing new belts, you will need to measure again after a few hours of printing, as the tension can change slightly as the belts stretch and settle to their final tension. Usually 24 hours should be sufficient.
 
 
 ## Advanced explanation on why 1 or 2 peaks
