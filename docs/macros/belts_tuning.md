@@ -5,7 +5,7 @@ The `COMPARE_BELTS_RESPONSES` macro is dedicated for CoreXY machines where it ca
 
 ## Usage
 
-**Before starting, ensure that the belts are properly tensioned**. For example, you can follow the [Voron belt tensioning documentation](https://docs.vorondesign.com/tuning/secondary_printer_tuning.html#belt-tension). This is crucial: you need a good starting point to then iterate from it!
+**Before starting, ensure that the belts are properly tensioned**. For example, you can follow the [Voron belt tensioning documentation](https://docs.vorondesign.com/tuning/secondary_printer_tuning.html#belt-tension). You need a good starting point before starting to iterate from it!
 
 Then, call the `COMPARE_BELTS_RESPONSES` macro and look for the graphs in the results folder. Here are the parameters available:
 
@@ -20,9 +20,9 @@ Then, call the `COMPARE_BELTS_RESPONSES` macro and look for the graphs in the re
 
 ## Graphs description
 
-![](../images/belt_graphs/belt_graph_explanation.png)
+![](../images/belts_example.png)
 
-## Analysis of the results
+### Belts frequency profiles
 
 On these graphs, **you want both curves to look similar and overlap to form a single curve**: try to make them fit as closely as possible in frequency **and** in amplitude. Usually a belt graph is composed of one or two main peaks (more than 2 peaks can hint about mechanical problems). It's acceptable to have "noise" around the main peaks, but it should be present on both curves with a comparable amplitude. Keep in mind that when you tighten a belt, its peaks should move diagonally toward the upper right corner, changing significantly in amplitude and slightly in frequency. Additionally, the magnitude order of the main peaks *should typically* range from ~500k to ~2M on most machines.
 
@@ -31,7 +31,20 @@ Aside from the actual belt tension, the resonant frequency/amplitude of the curv
   - the *belt "elasticity"*, which changes over time as the belt wears. Ensure that you use the **same belt brand and type** for both A and B belts and that they were **installed at the same time**: you want similar belts with a similar level of wear!
   - the *belt path length*, which is why they must have the **exact same number of teeth** so that one belt path is not longer than the other when tightened at the same tension. This specific point is very important: a single tooth difference is enough to prevent you from having a good superposition of the curves. Moreover, it is even one of the main causes of problems found in Discord resonance testing channels.
 
-**If these three parameters are met, there is no way that the curves could be different** or you can be sure that there is an underlying problem in at least one of the belt paths. Also, if the belt graphs have low amplitude curves (no distinct peaks) and a lot of noise, you will probably also have poor input shaper graphs. So before you continue, ensure that you have good belt graphs or fix your belt paths. Start by checking the belt tension, bearings, gantry screws, alignment of the belts on the idlers, and so on.
+**If these three parameters are met, there is no way that the curves could be different** or you can be sure that there is an underlying problem in at least one of the belt paths. Also, if the belt graphs have low amplitude curves and/or a lot of noise, you will probably also have poor input shaper graphs. So before you continue, ensure that you have good belt graphs by fixing your mechanical issues first.
+
+### Cross-belts comparison plot
+
+The Cross-Belts plot is an innovative cool way to compare the frequency profiles of the belts at every frequency point. In this plot, each point marks the amplitude response of each belt at different frequencies, connected point by point to trace the frequency spectrum. Ideally, these points should align on the diagonal center line, indicating that both belts have matching energy response values at each frequency. 
+
+The good zone, wider at the bottom (low-amplitude regions where the deviation doesn't matter much) and narrower at the top right (high-energy region where the main peaks lie), represents acceptable deviations. So **you want all points to be close to the ideal center line and as many as possible within the green zone**, as this means that the bands are well tuned and behave similarly.
+
+Paired peaks of exactly the same frequency will be on the same point (labeled A1/A2, ...) and the distance from the center line will show the difference in energy. For paired peaks that also have a frequency delta between them, they are displayed as two points (labeled A1 and A2, ...) and the additional distance between them along the plotted line represents their frequency delta.
+
+### Estimated similarity and mechanical issues indicator
+
+  1. **The estimated similarity** measure provides a quantitative view of how closely the frequency profiles of the two belts match across their entire range. A similarity value close to 100% means that the belts are well matched, indicating equal tension and uniform mechanical behavior.
+  2. **The mechanical health indicator** provides another assessment of the printer's operating condition based on the estimated similarity and influenced by the number of paired and unpaired peaks. A noisy signal generally lowers the value of this indicator, indicating potential problems. However, this measure can sometimes be misleading, so it's important not to rely on it alone and to consider it in conjunction with the other information displayed.
 
 
 ## Advanced explanation on why 1 or 2 peaks

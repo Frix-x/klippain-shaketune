@@ -24,7 +24,7 @@ from ..helpers.locale_utils import print_with_c_locale, set_locale
 
 ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'  # For paired peaks names
 
-PEAKS_DETECTION_THRESHOLD = 0.075  # Threshold to detect peaks in the PSD signal (7.5% of max)
+PEAKS_DETECTION_THRESHOLD = 0.1  # Threshold to detect peaks in the PSD signal (10% of max)
 DC_MAX_PEAKS = 2  # Maximum ideal number of peaks
 DC_MAX_UNPAIRED_PEAKS_ALLOWED = 0  # No unpaired peaks are tolerated
 
