@@ -7,12 +7,26 @@ When perfecting 3D prints and tuning your printer, there is all that resonance t
 
 While there are some ideal goals described in this documentation, you need to understand that it's not always possible to achieve the ideal resonance graphs due to a variety of factors unique to each printer, such as precision of the assembly, quality and brand of components, components wear, etc. Even a different accelerometer can give different results. But that's not a problem; the primary goal is to produce clean and satisfactory prints. If your test prints look good and meet your standards, even if the response curves aren't perfect, you're on the right track. **Trust your printer and your print results more than chasing ideal graphs!** If it's satisfactory, there's no need for further adjustments.
 
+First, you might want to check out the **[input shaping and tuning generalities](./is_tuning_generalities.md)** documentation to understand how it all works and what to look for when taking these measurements.
+
 
 ## Resonance testing
 
-First, check out the **[input shaping and tuning generalities](./is_tuning_generalities.md)** documentation to understand how it all works and what to look for when taking these measurements. A standard tuning workflow might look something like this:
+A standard tuning workflow might look something like this:
 
 ```mermaid
+%%{
+  init: {
+    'theme': 'base',
+    'themeVariables': {
+      'lineColor': '#232323',
+      'primaryTextColor': '#F2055C',
+      'secondaryColor': '#D3D3D3',
+      'tertiaryColor': '#FFFFFF'
+    }
+  }
+}%%
+
 flowchart LR
     start([Start]) --> tensionBelts[Tension your\nbelts as best\n as possible]
     checkmotion --> tensionBelts
@@ -46,7 +60,7 @@ flowchart LR
     class goodbelts,goodIS,goodvibs,printGood,unicorn questions;
 ```
 
-You can access the documentation for each type of graph by clicking on them below.
+You can access the documentation for each graph type by clicking on it in the table below.
 
 | [Belt response comparison](./macros/belts_tuning.md) | [Axis input shaper graphs](./macros/axis_tuning.md) | [Vibrations profile](./macros/vibrations_profile.md) |
 |:----------------:|:------------:|:---------------------:|
