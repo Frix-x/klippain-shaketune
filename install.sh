@@ -3,6 +3,7 @@
 USER_CONFIG_PATH="${HOME}/printer_data/config"
 MOONRAKER_CONFIG="${HOME}/printer_data/config/moonraker.conf"
 KLIPPER_PATH="${HOME}/klipper"
+KLIPPER_VENV_PATH="${HOME}/klippy-env"
 
 K_SHAKETUNE_PATH="${HOME}/klippain_shaketune"
 
@@ -74,6 +75,20 @@ function check_download {
     fi
 }
 
+function setup_venv {
+    if [ ! -d "${KLIPPER_VENV_PATH}" ]; then
+        echo "[ERROR] Klipper's Python virtual environment not found!"
+        exit -1
+    fi
+
+    source "${KLIPPER_VENV_PATH}/bin/activate"
+    echo "[SETUP] Installing/Updating K-Shake&Tune dependencies..."
+    pip install --upgrade pip
+    pip install -r "${K_SHAKETUNE_PATH}/requirements.txt"
+    deactivate
+    printf "\n"
+}
+
 function link_extension {
     echo "[INSTALL] Linking scripts to your config directory..."
 
@@ -122,6 +137,7 @@ printf "=============================================\n\n"
 # Run steps
 preflight_checks
 check_download
+setup_venv
 link_extension
 link_module
 add_updater
