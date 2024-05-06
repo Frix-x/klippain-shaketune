@@ -24,7 +24,7 @@ from ..helpers.locale_utils import print_with_c_locale, set_locale
 
 ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'  # For paired peaks names
 
-PEAKS_DETECTION_THRESHOLD = 0.20  # Threshold to detect peaks in the PSD signal
+PEAKS_DETECTION_THRESHOLD = 0.075  # Threshold to detect peaks in the PSD signal (7.5% of max)
 DC_MAX_PEAKS = 2  # Maximum ideal number of peaks
 DC_MAX_UNPAIRED_PEAKS_ALLOWED = 0  # No unpaired peaks are tolerated
 
@@ -148,7 +148,7 @@ def plot_compare_frequency(ax, signal1, signal2, signal1_belt, signal2_belt, max
 
     # Trace the "relax region" (also used as a threshold to filter and detect the peaks)
     psd_lowest_max = min(signal1.psd.max(), signal2.psd.max())
-    peaks_warning_threshold = PEAKS_DETECTION_THRESHOLD * psd_lowest_max
+    peaks_warning_threshold = 0.20 * psd_lowest_max
     ax.axhline(y=peaks_warning_threshold, color='black', linestyle='--', linewidth=0.5)
     ax.fill_between(signal1.freqs, 0, peaks_warning_threshold, color='green', alpha=0.15, label='Relax Region')
 
@@ -296,7 +296,7 @@ def plot_versus_belts(ax, common_freqs, signal1, signal2, interp_psd1, interp_ps
     )
 
     ax.plot(interp_psd1, interp_psd2, color='dimgrey', marker='o', markersize=1.5)
-    # ax.fill_betweenx(interp_psd2, interp_psd1, color='grey', alpha=0.2)
+    ax.fill_betweenx(interp_psd2, interp_psd1, color=KLIPPAIN_COLORS['red_pink'], alpha=0.1)
 
     paired_peak_count = 0
     unpaired_peak_count = 0
@@ -502,10 +502,13 @@ def belts_calibration(lognames, kinematics, klipperdir='~/klipper', max_freq=200
         title_line2 = lognames[0].split('/')[-1] + ' / ' + lognames[1].split('/')[-1]
     fig.text(0.060, 0.939, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
-    title_line3 = f'| Estimated similarity: {similarity_factor:.1f}%'
-    title_line4 = f'| {mhi} (experimental)'
-    fig.text(0.55, 0.980, title_line3, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
-    fig.text(0.55, 0.945, title_line4, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
+    # We add the estimated similarity and the MHI value to the title only if the kinematics is CoreXY
+    # as it make no sense to compute these values for other kinematics that doesn't have paired belts
+    if kinematics == 'corexy':
+        title_line3 = f'| Estimated similarity: {similarity_factor:.1f}%'
+        title_line4 = f'| {mhi} (experimental)'
+        fig.text(0.55, 0.980, title_line3, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
+        fig.text(0.55, 0.945, title_line4, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
 
     # Plot the graphs
     plot_compare_frequency(ax1, signal1, signal2, signal1_belt, signal2_belt, max_freq)
