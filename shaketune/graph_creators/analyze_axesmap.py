@@ -10,7 +10,7 @@ import optparse
 import numpy as np
 from scipy.signal import butter, filtfilt
 
-from ..helpers.locale_utils import print_with_c_locale
+from ..helpers.console_output import ConsoleOutput
 
 NUM_POINTS = 500
 
@@ -143,7 +143,7 @@ def main():
         opts.error('Invalid acceleration value. It should be a numeric value.')
 
     results = axesmap_calibration(args, accel_value)
-    print_with_c_locale(results)
+    ConsoleOutput.print(results)
 
     if options.output is not None:
         with open(options.output, 'w') as f:

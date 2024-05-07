@@ -27,8 +27,8 @@ from .graph_creators.graph_belts import belts_calibration
 from .graph_creators.graph_shaper import shaper_calibration
 from .graph_creators.graph_vibrations import vibrations_profile
 from .helpers import filemanager as fm
-from .helpers.locale_utils import print_with_c_locale, set_shaketune_output_func
 from .helpers.motorlogparser import MotorLogParser
+from .helpers.console_output import ConsoleOutput
 
 
 class Config:
@@ -57,7 +57,7 @@ class Config:
                 version = repo.head.commit.hexsha[:7]  # If no tag is found, use the simplified commit SHA instead
             return version
         except Exception as e:
-            print_with_c_locale(f'Warning: unable to retrieve Shake&Tune version number: {e}')
+            ConsoleOutput.print(f'Warning: unable to retrieve Shake&Tune version number: {e}')
             return 'unknown'
 
     @staticmethod
@@ -379,7 +379,7 @@ class AxesMapFinder(GraphCreator):
         with result_filename.open('w') as f:
             f.write(results)
 
-        print_with_c_locale(f'Detected axes_map: {results}')
+        ConsoleOutput.print(f'Detected axes_map: {results}')
 
     def create_graph(self) -> None:
         self.find_axesmap()
@@ -393,7 +393,7 @@ def create_graph(options: argparse.Namespace) -> None:
         folders=[Config.RESULTS_BASE_FOLDER / subfolder for subfolder in Config.RESULTS_SUBFOLDERS.values()]
     )
 
-    print_with_c_locale(f'Shake&Tune version: {Config.get_git_version()}')
+    ConsoleOutput.print(f'Shake&Tune version: {Config.get_git_version()}')
 
     graph_creators = {
         'belts': (BeltsGraphCreator, None),
@@ -407,7 +407,7 @@ def create_graph(options: argparse.Namespace) -> None:
 
     creator_info = graph_creators.get(options.type)
     if not creator_info:
-        print_with_c_locale('Error: invalid graph type specified!')
+        ConsoleOutput.print('Error: invalid graph type specified!')
         return
 
     # Instantiate the graph creator
@@ -422,19 +422,18 @@ def create_graph(options: argparse.Namespace) -> None:
     try:
         graph_creator.create_graph()
     except FileNotFoundError as e:
-        print_with_c_locale(f'FileNotFound error: {e}')
+        ConsoleOutput.print(f'FileNotFound error: {e}')
         return
     except TimeoutError as e:
-        print_with_c_locale(f'Timeout error: {e}')
+        ConsoleOutput.print(f'Timeout error: {e}')
         return
     except Exception as e:
-        print_with_c_locale(f'Error while generating the graphs: {e}')
-        traceback.print_exc()
+        ConsoleOutput.print(f'Error while generating the graphs: {e}\n{traceback.print_exc()}')
         return
 
-    print_with_c_locale(f'{options.type} graphs created successfully!')
+    ConsoleOutput.print(f'{options.type} graphs created successfully!')
     graph_creator.clean_old_files(options.keep_results)
-    print_with_c_locale(f'Cleaned output folder to keep only the last {options.keep_results} results!')
+    ConsoleOutput.print(f'Cleaned output folder to keep only the last {options.keep_results} results!')
 
 
 class ShakeTune:
@@ -443,15 +442,19 @@ class ShakeTune:
         self._gcode = self._printer.lookup_object('gcode')
         self.timeout = config.getfloat('timeout', 2.0, above=0.0)
 
+        ConsoleOutput.register_output_callback(self._gcode.respond_info)
+
         self._gcode.register_command(
             'SHAKETUNE_POSTPROCESS',
             self.cmd_SHAKETUNE_POSTPROCESS,
-            desc='PostProcess ShakeTune data for graph creation',
+            desc='Post process data for ShakeTune graph creation',
         )
 
     def shaketune_thread(self, options):
-        set_shaketune_output_func(self._gcode.respond_info)
-        os.nice(20)
+        try:
+            os.nice(20)
+        except Exception:
+            ConsoleOutput.print('Failed reducing ShakeTune thread priority, continuing.')
         create_graph(options)
 
     def cmd_SHAKETUNE_POSTPROCESS(self, gcmd) -> None:
