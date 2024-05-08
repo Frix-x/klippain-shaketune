@@ -103,12 +103,6 @@ def compute_mhi(similarity_factor, signal1, signal2):
     ]
     psd_highest_max = max(signal1.psd.max(), signal2.psd.max())
 
-    # Iterate over the combined list of unpaired peaks
-    for peak, signal in combined_unpaired_peaks:
-        print(
-            f'Unpaired peak in belt {"1" if signal is signal1 else "2"} at {signal.freqs[peak]:.1f} Hz ({signal.psd[peak]:.1f})'
-        )
-
     # Start with the similarity factor directly scaled to a percentage
     mhi = similarity_factor
 
@@ -121,7 +115,6 @@ def compute_mhi(similarity_factor, signal1, signal2):
     if num_unpaired_peaks > DC_MAX_UNPAIRED_PEAKS_ALLOWED:
         for peak, signal in combined_unpaired_peaks:
             unpaired_peak_penalty += (signal.psd[peak] / psd_highest_max) * 30
-            print(f'penality for peak {peak}: {(signal.psd[peak] / psd_highest_max) * 30}')
         mhi -= unpaired_peak_penalty
 
     # Ensure the result lies between 0 and 100 by clipping the computed value
