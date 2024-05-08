@@ -94,29 +94,40 @@ def pair_peaks(peaks1, freqs1, psd1, peaks2, freqs2, psd2):
 ######################################################################
 
 
-def compute_mhi(similarity_coefficient, total_num_peaks, num_unpaired_peaks):
-    # Start with the similarity coefficient directly scaled to a percentage
-    base_percentage = similarity_coefficient
+def compute_mhi(similarity_factor, signal1, signal2):
+    num_unpaired_peaks = len(signal1.unpaired_peaks) + len(signal2.unpaired_peaks)
+    num_paired_peaks = len(signal1.paired_peaks)
+    # Combine unpaired peaks from both signals, tagging each peak with its respective signal
+    combined_unpaired_peaks = [(peak, signal1) for peak in signal1.unpaired_peaks] + [
+        (peak, signal2) for peak in signal2.unpaired_peaks
+    ]
+    psd_highest_max = max(signal1.psd.max(), signal2.psd.max())
+
+    # Iterate over the combined list of unpaired peaks
+    for peak, signal in combined_unpaired_peaks:
+        print(
+            f'Unpaired peak in belt {"1" if signal is signal1 else "2"} at {signal.freqs[peak]:.1f} Hz ({signal.psd[peak]:.1f})'
+        )
+
+    # Start with the similarity factor directly scaled to a percentage
+    mhi = similarity_factor
 
     # Bonus for ideal number of total peaks (1 or 2)
-    if total_num_peaks <= DC_MAX_PEAKS:
-        peak_bonus = 1.1  # Boost by 10% if the number of peaks is ideal
-    else:
-        peak_bonus = DC_MAX_PEAKS / total_num_peaks  # Reduce MHI if more than ideal number of peaks
+    if num_paired_peaks >= DC_MAX_PEAKS:
+        mhi *= DC_MAX_PEAKS / num_paired_peaks  # Reduce MHI if more than ideal number of peaks
 
-    adjusted_percentage = base_percentage * peak_bonus
-
-    # Heavy penalty for unpaired peaks
+    # Penalty from unpaired peaks weighted by their amplitude relative to the maximum PSD amplitude
+    unpaired_peak_penalty = 0
     if num_unpaired_peaks > DC_MAX_UNPAIRED_PEAKS_ALLOWED:
-        unpaired_peak_penalty = num_unpaired_peaks * 5  # Applying a strong penalty factor for each unpaired peak
-        final_percentage = adjusted_percentage - unpaired_peak_penalty
-    else:
-        final_percentage = adjusted_percentage
+        for peak, signal in combined_unpaired_peaks:
+            unpaired_peak_penalty += (signal.psd[peak] / psd_highest_max) * 30
+            print(f'penality for peak {peak}: {(signal.psd[peak] / psd_highest_max) * 30}')
+        mhi -= unpaired_peak_penalty
 
     # Ensure the result lies between 0 and 100 by clipping the computed value
-    final_percentage = np.clip(final_percentage, 0, 100)
+    mhi = np.clip(mhi, 0, 100)
 
-    return mhi_lut(final_percentage)
+    return mhi_lut(mhi)
 
 
 # LUT to transform the MHI into a textual value easy to understand for the users of the script
@@ -145,12 +156,6 @@ def plot_compare_frequency(ax, signal1, signal2, signal1_belt, signal2_belt, max
     # Plot the two belts PSD signals
     ax.plot(signal1.freqs, signal1.psd, label='Belt ' + signal1_belt, color=KLIPPAIN_COLORS['purple'])
     ax.plot(signal2.freqs, signal2.psd, label='Belt ' + signal2_belt, color=KLIPPAIN_COLORS['orange'])
-
-    # Trace the "relax region" (also used as a threshold to filter and detect the peaks)
-    psd_lowest_max = min(signal1.psd.max(), signal2.psd.max())
-    peaks_warning_threshold = 0.20 * psd_lowest_max
-    ax.axhline(y=peaks_warning_threshold, color='black', linestyle='--', linewidth=0.5)
-    ax.fill_between(signal1.freqs, 0, peaks_warning_threshold, color='green', alpha=0.15, label='Relax Region')
 
     # Trace and annotate the peaks on the graph
     paired_peak_count = 0
@@ -464,9 +469,8 @@ def belts_calibration(lognames, kinematics, klipperdir='~/klipper', max_freq=200
     similarity_factor = (1 - (ss_res / ss_tot)) * 100
     print_with_c_locale(f'Belts estimated similarity: {similarity_factor:.1f}%')
 
-    num_unpaired_peaks = len(unpaired_peaks1) + len(unpaired_peaks2)
-    num_peaks = len(paired_peaks) + num_unpaired_peaks
-    mhi = compute_mhi(similarity_factor, num_peaks, num_unpaired_peaks)
+    # mhi = compute_mhi(similarity_factor, num_peaks, num_unpaired_peaks)
+    mhi = compute_mhi(similarity_factor, signal1, signal2)
     print_with_c_locale(f'[experimental] Mechanical health: {mhi}')
 
     fig, ((ax1, ax3)) = plt.subplots(
