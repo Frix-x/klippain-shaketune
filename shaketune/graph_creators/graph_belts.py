@@ -27,7 +27,7 @@ from ..helpers.common_func import (
     parse_log,
     setup_klipper_import,
 )
-from ..helpers.locale_utils import print_with_c_locale, set_locale
+from ..helpers.console_output import ConsoleOutput
 
 ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'  # For paired peaks names
 
@@ -200,7 +200,7 @@ def plot_compare_frequency(ax, lognames, signal1, signal2, similarity_factor, ma
         signal1_belt += ' (axis 1, 1)'
         signal2_belt += ' (axis 1,-1)'
     else:
-        print_with_c_locale(
+        ConsoleOutput.print(
             "Warning: belts doesn't seem to have the correct name A and B (extracted from the filename.csv)"
         )
 
@@ -453,7 +453,6 @@ def compute_signal_data(data, max_freq):
 
 
 def belts_calibration(lognames, klipperdir='~/klipper', max_freq=200.0, st_version=None):
-    set_locale()
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
@@ -479,13 +478,13 @@ def belts_calibration(lognames, klipperdir='~/klipper', max_freq=200.0, st_versi
     similarity_factor = compute_curve_similarity_factor(
         signal1.freqs, signal1.psd, signal2.freqs, signal2.psd, CURVE_SIMILARITY_SIGMOID_K
     )
-    print_with_c_locale(f'Belts estimated similarity: {similarity_factor:.1f}%')
+    ConsoleOutput.print(f'Belts estimated similarity: {similarity_factor:.1f}%')
     # Compute the MHI value from the differential spectrogram sum of gradient, salted with the similarity factor and the number of
     # unpaired peaks from the belts frequency profile. Be careful, this value is highly opinionated and is pretty experimental!
     mhi, textual_mhi = compute_mhi(
         combined_sum, similarity_factor, len(signal1.unpaired_peaks) + len(signal2.unpaired_peaks)
     )
-    print_with_c_locale(f'[experimental] Mechanical Health Indicator: {textual_mhi.lower()} ({mhi:.1f}%)')
+    ConsoleOutput.print(f'[experimental] Mechanical Health Indicator: {textual_mhi.lower()} ({mhi:.1f}%)')
 
     # Create graph layout
     fig, (ax1, ax2) = plt.subplots(
@@ -513,9 +512,7 @@ def belts_calibration(lognames, klipperdir='~/klipper', max_freq=200.0, st_versi
         dt = datetime.strptime(f"{filename.split('_')[1]} {filename.split('_')[2]}", '%Y%m%d %H%M%S')
         title_line2 = dt.strftime('%x %X')
     except Exception:
-        print_with_c_locale(
-            'Warning: CSV filenames look to be different than expected (%s , %s)' % (lognames[0], lognames[1])
-        )
+        ConsoleOutput.print(f'Warning: CSV filenames look to be different than expected: {lognames}')
         title_line2 = lognames[0].split('/')[-1] + ' / ' + lognames[1].split('/')[-1]
     fig.text(0.12, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 

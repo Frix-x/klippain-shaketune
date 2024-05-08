@@ -28,7 +28,7 @@ from ..helpers.common_func import (
     parse_log,
     setup_klipper_import,
 )
-from ..helpers.locale_utils import print_with_c_locale, set_locale
+from ..helpers.console_output import ConsoleOutput
 
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_RELATIVE_HEIGHT_THRESHOLD = 0.04
@@ -453,19 +453,19 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
     # Then add the motor resonance peak to the graph and print some infos about it
     motor_fr, motor_zeta, motor_res_idx, lowfreq_max = compute_mechanical_parameters(global_motor_profile, freqs, 30)
     if lowfreq_max:
-        print_with_c_locale(
+        ConsoleOutput.print(
             '[WARNING] There are a lot of low frequency vibrations that can alter the readings. This is probably due to the test being performed at too high an acceleration!'
         )
-        print_with_c_locale(
+        ConsoleOutput.print(
             'Try lowering the ACCEL value and/or increasing the SIZE value before restarting the macro to ensure that only constant speeds are being recorded and that the dynamic behavior of the machine is not affecting the measurements'
         )
     if motor_zeta is not None:
-        print_with_c_locale(
+        ConsoleOutput.print(
             'Motors have a main resonant frequency at %.1fHz with an estimated damping ratio of %.3f'
             % (motor_fr, motor_zeta)
         )
     else:
-        print_with_c_locale(
+        ConsoleOutput.print(
             'Motors have a main resonant frequency at %.1fHz but it was impossible to estimate a damping ratio.'
             % (motor_fr)
         )
@@ -634,7 +634,6 @@ def extract_angle_and_speed(logname):
 def vibrations_profile(
     lognames, klipperdir='~/klipper', kinematics='cartesian', accel=None, max_freq=1000.0, st_version=None, motors=None
 ):
-    set_locale()
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
@@ -686,7 +685,7 @@ def vibrations_profile(
 
     # symmetry_factor = compute_symmetry_analysis(all_angles, all_angles_energy)
     symmetry_factor = compute_symmetry_analysis(all_angles, spectrogram_data, main_angles)
-    print_with_c_locale(f'Machine estimated vibration symmetry: {symmetry_factor:.1f}%')
+    ConsoleOutput.print(f'Machine estimated vibration symmetry: {symmetry_factor:.1f}%')
 
     # Analyze low variance ranges of vibration energy across all angles for each speed to identify clean speeds
     # and highlight them. Also find the peaks to identify speeds to avoid due to high resonances
@@ -699,7 +698,7 @@ def vibrations_profile(
         10,
     )
     formated_peaks_speeds = ['{:.1f}'.format(pspeed) for pspeed in peaks_speeds]
-    print_with_c_locale(
+    ConsoleOutput.print(
         'Vibrations peaks detected: %d @ %s mm/s (avoid setting a speed near these values in your slicer print profile)'
         % (num_peaks, ', '.join(map(str, formated_peaks_speeds)))
     )
@@ -713,16 +712,16 @@ def vibrations_profile(
         good_speeds = filter_and_split_ranges(all_speeds, good_speeds, peak_speed_indices, deletion_range)
 
         # Add some logging about the good speeds found
-        print_with_c_locale(f'Lowest vibrations speeds ({len(good_speeds)} ranges sorted from best to worse):')
+        ConsoleOutput.print(f'Lowest vibrations speeds ({len(good_speeds)} ranges sorted from best to worse):')
         for idx, (start, end, _) in enumerate(good_speeds):
-            print_with_c_locale(f'{idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
+            ConsoleOutput.print(f'{idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
 
     # Angle low energy valleys identification (good angles ranges) and print them to the console
     good_angles = identify_low_energy_zones(all_angles_energy, ANGLES_VALLEY_DETECTION_THRESHOLD)
     if good_angles is not None:
-        print_with_c_locale(f'Lowest vibrations angles ({len(good_angles)} ranges sorted from best to worse):')
+        ConsoleOutput.print(f'Lowest vibrations angles ({len(good_angles)} ranges sorted from best to worse):')
         for idx, (start, end, energy) in enumerate(good_angles):
-            print_with_c_locale(
+            ConsoleOutput.print(
                 f'{idx+1}: {all_angles[start]:.1f}° to {all_angles[end]:.1f}° (mean vibrations energy: {energy:.2f}% of max)'
             )
 
@@ -763,7 +762,7 @@ def vibrations_profile(
         if accel is not None:
             title_line2 += ' at ' + str(accel) + ' mm/s² -- ' + kinematics.upper() + ' kinematics'
     except Exception:
-        print_with_c_locale('Warning: CSV filenames appear to be different than expected (%s)' % (lognames[0]))
+        ConsoleOutput.print('Warning: CSV filenames appear to be different than expected (%s)' % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
     fig.text(0.060, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
@@ -772,7 +771,7 @@ def vibrations_profile(
         differences = motors[0].compare_to(motors[1])
         plot_motor_config_txt(fig, motors, differences)
         if differences is not None and kinematics == 'corexy':
-            print_with_c_locale(f'Warning: motors have different TMC configurations!\n{differences}')
+            ConsoleOutput.print(f'Warning: motors have different TMC configurations!\n{differences}')
 
     # Plot the graphs
     plot_angle_profile_polar(ax1, all_angles, all_angles_energy, good_angles, symmetry_factor)

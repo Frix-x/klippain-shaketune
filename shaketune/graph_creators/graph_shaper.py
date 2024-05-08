@@ -27,7 +27,7 @@ from ..helpers.common_func import (
     parse_log,
     setup_klipper_import,
 )
-from ..helpers.locale_utils import print_with_c_locale, set_locale
+from ..helpers.console_output import ConsoleOutput
 
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_EFFECT_THRESHOLD = 0.12
@@ -72,19 +72,19 @@ def calibrate_shaper(datas, max_smoothing, scv, max_freq):
             max_smoothing=max_smoothing,
             test_damping_ratios=None,
             max_freq=max_freq,
-            logger=print_with_c_locale,
+            logger=ConsoleOutput.print,
         )
     except TypeError:
-        print_with_c_locale(
+        ConsoleOutput.print(
             '[WARNING] You seem to be using an older version of Klipper that is not compatible with all the latest Shake&Tune features!'
         )
-        print_with_c_locale(
+        ConsoleOutput.print(
             'Shake&Tune now runs in compatibility mode: be aware that the results may be slightly off, since the real damping ratio cannot be used to create the filter recommendations'
         )
         compat = True
-        shaper, all_shapers = helper.find_best_shaper(calibration_data, max_smoothing, print_with_c_locale)
+        shaper, all_shapers = helper.find_best_shaper(calibration_data, max_smoothing, ConsoleOutput.print)
 
-    print_with_c_locale(
+    ConsoleOutput.print(
         '\n-> Recommended shaper is %s @ %.1f Hz (when using a square corner velocity of %.1f and a damping ratio of %.3f)'
         % (shaper.name.upper(), shaper.freq, scv, zeta)
     )
@@ -295,14 +295,13 @@ def plot_spectrogram(ax, t, bins, pdata, peaks, max_freq):
 
 
 def shaper_calibration(lognames, klipperdir='~/klipper', max_smoothing=None, scv=5.0, max_freq=200.0, st_version=None):
-    set_locale()
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
     # Parse data from the log files while ignoring CSV in the wrong format
     datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
     if len(datas) > 1:
-        print_with_c_locale('Warning: incorrect number of .csv files detected. Only the first one will be used!')
+        ConsoleOutput.print('Warning: incorrect number of .csv files detected. Only the first one will be used!')
 
     # Compute shapers, PSD outputs and spectrogram
     performance_shaper, shapers, calibration_data, fr, zeta, compat = calibrate_shaper(
@@ -329,7 +328,7 @@ def shaper_calibration(lognames, klipperdir='~/klipper', max_smoothing=None, scv
     # Print the peaks info in the console
     peak_freqs_formated = ['{:.1f}'.format(f) for f in peaks_freqs]
     num_peaks_above_effect_threshold = np.sum(calibration_data.psd_sum[peaks] > peaks_threshold[1])
-    print_with_c_locale(
+    ConsoleOutput.print(
         '\nPeaks detected on the graph: %d @ %s Hz (%d above effect threshold)'
         % (num_peaks, ', '.join(map(str, peak_freqs_formated)), num_peaks_above_effect_threshold)
     )
@@ -366,7 +365,7 @@ def shaper_calibration(lognames, klipperdir='~/klipper', max_smoothing=None, scv
             title_line3 = '| Square corner velocity: ' + str(scv) + 'mm/s'
             title_line4 = '| Max allowed smoothing: ' + str(max_smoothing)
     except Exception:
-        print_with_c_locale('Warning: CSV filename look to be different than expected (%s)' % (lognames[0]))
+        ConsoleOutput.print('Warning: CSV filename look to be different than expected (%s)' % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
         title_line3 = ''
         title_line4 = ''
