@@ -140,11 +140,12 @@ def mhi_lut(mhi):
         (15, 30, 'Likely a mechanical issue'),
         (0, 15, 'Mechanical issue detected'),
     ]
+    mhi = np.clip(mhi, 1, 100)
     for lower, upper, message in ranges:
         if lower < mhi <= upper:
             return message
 
-    return 'Error computing MHI value'
+    return 'Unknown mechanical health'  # Should never happen
 
 
 ######################################################################
