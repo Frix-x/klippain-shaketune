@@ -5,6 +5,7 @@ MOONRAKER_CONFIG="${HOME}/printer_data/config/moonraker.conf"
 KLIPPER_PATH="${HOME}/klipper"
 KLIPPER_VENV_PATH="${HOME}/klippy-env"
 
+OLD_K_SHAKETUNE_VENV="${HOME}/klippain_shaketune-env"
 K_SHAKETUNE_PATH="${HOME}/klippain_shaketune"
 
 set -eu
@@ -81,6 +82,11 @@ function setup_venv {
         exit -1
     fi
 
+    if [ -d "${OLD_K_SHAKETUNE_VENV}" ]; then
+        echo "[INFO] Old K-Shake&Tune virtual environement found, cleaning it!"
+        rm -rf "${OLD_K_SHAKETUNE_VENV}"
+    fi
+
     source "${KLIPPER_VENV_PATH}/bin/activate"
     echo "[SETUP] Installing/Updating K-Shake&Tune dependencies..."
     pip install --upgrade pip
@@ -90,14 +96,18 @@ function setup_venv {
 }
 
 function link_extension {
-    echo "[INSTALL] Linking scripts to your config directory..."
+    # Reusing the old linking extension function to cleanup and remove the macros for older S&T versions
 
     if [ -d "${HOME}/klippain_config" ] && [ -f "${USER_CONFIG_PATH}/.VERSION" ]; then
-        echo "[INSTALL] Klippain full installation found! Linking module to the script folder of Klippain"
-        ln -frsn ${K_SHAKETUNE_PATH}/K-ShakeTune ${USER_CONFIG_PATH}/scripts/K-ShakeTune
+        if [ -d "${USER_CONFIG_PATH}/scripts/K-ShakeTune" ]; then
+            echo "[INFO] Old K-Shake&Tune macro folder found, cleaning it!"
+            rm -d "${USER_CONFIG_PATH}/scripts/K-ShakeTune"
+        fi
     else
-        echo "[INSTALL] Klippain not found! Linking module to the config folder of Klipper"
-        ln -frsn ${K_SHAKETUNE_PATH}/K-ShakeTune ${USER_CONFIG_PATH}/K-ShakeTune
+        if [ -d "${USER_CONFIG_PATH}/K-ShakeTune" ]; then
+            echo "[INFO] Old K-Shake&Tune macro folder found, cleaning it!"
+            rm -d "${USER_CONFIG_PATH}/K-ShakeTune"
+        fi
     fi
 }
 
