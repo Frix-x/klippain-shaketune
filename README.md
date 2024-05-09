@@ -29,7 +29,9 @@ Follow these steps to install the Shake&Tune module in your printer:
   1. Then, append the following to your `printer.cfg` file and restart Klipper (if prefered, you can include only the needed macros: using `*.cfg` is a convenient way to include them all at once):
      ```
      [shaketune]
-     [include K-ShakeTune/*.cfg]
+     # result_folder: ~/printer_data/config/K-ShakeTune_results
+     # number_of_results_to_keep: 3
+     # keep_raw_csv: False
      ```
 
 ## Usage
