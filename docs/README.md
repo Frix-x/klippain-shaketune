@@ -1,4 +1,4 @@
-# Klippain Shake&Tune module documentation
+# Klipper Shake&Tune plugin documentation
 
 ![](./banner_long.png)
 
@@ -89,7 +89,7 @@ Here are the parameters available when calling this macro:
 |SPEED|80|speed of the toolhead in mm/s for the movements|
 |ACCEL|1500 (or max printer accel)|accel in mm/s^2 used for all the moves|
 |TRAVEL_SPEED|120|speed in mm/s used for all the travels moves|
-|ACCEL_CHIP|"adxl345"|accelerometer chip name in the config|
+|ACCEL_CHIP|None|accelerometer to use for the test. If unset, it will automatically select the proper accelerometer based on what is configured in your `[resonance_tester]` config section|
 
 The machine will move slightly in +X, +Y, and +Z, and output in the console: `Detected axes_map: -z,y,x`.
 
@@ -108,8 +108,11 @@ Here are the parameters available when calling this macro:
 | parameters | default value | description |
 |-----------:|---------------|-------------|
 |FREQUENCY|25|excitation frequency (in Hz) that you want to maintain. Usually, it's the frequency of a peak on one of the graphs|
-|TIME|10|time in second to maintain this excitation|
+|DURATION|10|duration in second to maintain this excitation|
+|ACCEL_PER_HZ|None|accel per Hz value used for the test. If unset, it will use the value from your `[resonance_tester]` config section (75 is the default)|
 |AXIS|x|axis you want to excitate. Can be set to either "x", "y", "a", "b"|
+|TRAVEL_SPEED|120|speed in mm/s used for all the travel movements (to go to the start position prior to the test)|
+|Z_HEIGHT|None|Z height wanted for the test. This value can be used if needed to override the Z value of the probe_point set in your `[resonance_tester]` config section|
 
 
 ## Complementary ressources

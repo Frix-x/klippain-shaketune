@@ -57,7 +57,6 @@ class GraphCreator(abc.ABC):
             new_file = self._folder / f'{self._type}_{self._graph_date}_{custom_name}.csv'
             # shutil.move() is needed to move the file across filesystems (mainly for BTT CB1 Pi default OS image)
             shutil.move(filename, new_file)
-            fm.wait_file_ready(new_file)
             lognames.append(new_file)
         return lognames
 
@@ -98,9 +97,9 @@ class BeltsGraphCreator(GraphCreator):
 
     def create_graph(self) -> None:
         lognames = self._move_and_prepare_files(
-            glob_pattern='raw_data_axis*.csv',
+            glob_pattern='shaketune-belt_*.csv',
             min_files_required=2,
-            custom_name_func=lambda f: f.stem.split('_')[3].upper(),
+            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
         )
         fig = belts_calibration(
             lognames=[str(path) for path in lognames],
@@ -245,15 +244,13 @@ class AxesMapFinder(GraphCreator):
 
     def find_axesmap(self) -> None:
         tmp_folder = Path('/tmp')
-        globbed_files = list(tmp_folder.glob(f'{self._chip_name}-*.csv'))
+        globbed_files = list(tmp_folder.glob('shaketune-axemap_*.csv'))
 
         if not globbed_files:
             raise FileNotFoundError('no CSV files found in the /tmp folder to find the axes map!')
 
-        # Find the CSV files with the latest timestamp and wait for it to be released by Klipper
+        # Find the CSV files with the latest timestamp and process it
         logname = sorted(globbed_files, key=lambda f: f.stat().st_mtime, reverse=True)[0]
-        fm.wait_file_ready(logname)
-
         results = axesmap_calibration(
             lognames=[str(logname)],
             accel=self._accel,
@@ -271,6 +268,6 @@ class AxesMapFinder(GraphCreator):
 
     def clean_old_files(self, keep_results: int) -> None:
         tmp_folder = Path('/tmp')
-        globbed_files = list(tmp_folder.glob(f'{self._chip_name}-*.csv'))
+        globbed_files = list(tmp_folder.glob('shaketune-axemap_*.csv'))
         for csv_file in globbed_files:
             csv_file.unlink()

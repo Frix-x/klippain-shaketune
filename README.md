@@ -1,4 +1,4 @@
-# Klipper Shake&Tune Module
+# Klipper Shake&Tune plugin
 
 This "Shake&Tune" repository is a standalone module from the [Klippain](https://github.com/Frix-x/klippain) ecosystem, designed to automate and calibrate the input shaper system on your Klipper 3D printer with a streamlined workflow and insightful vizualisations. This can be installed on any Klipper machine. It is not limited to those using Klippain.
 

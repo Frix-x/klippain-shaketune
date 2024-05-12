@@ -6,16 +6,6 @@ from ..shaketune_thread import ShakeTuneThread
 from .accelerometer import Accelerometer
 
 
-def find_axis_accelerometer(printer, axis: str = 'xy'):
-    accel_chip_names = printer.lookup_object('resonance_tester').accel_chip_names
-    for chip_axis, chip_name in accel_chip_names:
-        if axis in ['x', 'y'] and chip_axis == 'xy':
-            return chip_name
-        elif chip_axis == axis:
-            return chip_name
-    return None
-
-
 def axes_map_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> None:
     z_height = gcmd.get_float('Z_HEIGHT', default=20.0)
     speed = gcmd.get_float('SPEED', default=80.0, minval=20.0)
@@ -24,11 +14,12 @@ def axes_map_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> No
     accel_chip = gcmd.get('ACCEL_CHIP', default=None)
 
     if accel_chip is None:
-        accel_chip = find_axis_accelerometer(printer, 'xy')
+        accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy')
         if accel_chip is None:
             gcmd.error(
                 'No accelerometer specified for measurement! Multi-accelerometer configurations are not supported for this macro.'
             )
+        accelerometer = Accelerometer(printer.lookup_object(accel_chip))
 
     systime = printer.get_reactor().monotonic()
     toolhead = printer.lookup_object('toolhead')
@@ -57,10 +48,7 @@ def axes_map_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> No
     toolhead.dwell(0.5)
 
     # Start the measurements and do the movements (+X, +Y and then +Z)
-    accelerometer = Accelerometer(printer.lookup_object(accel_chip))
     accelerometer.start_measurement()
-    # gcode.run_script_from_command(f'ACCELEROMETER_MEASURE CHIP={accel_chip}')
-
     toolhead.dwell(1)
     toolhead.move([mid_x + 15, mid_y - 15, z_height, E], speed)
     toolhead.dwell(1)
@@ -68,9 +56,7 @@ def axes_map_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> No
     toolhead.dwell(1)
     toolhead.move([mid_x + 15, mid_y + 15, z_height + 15, E], speed)
     toolhead.dwell(1)
-
     accelerometer.stop_measurement('axemap')
-    # gcode.run_script_from_command(f'ACCELEROMETER_MEASURE CHIP={accel_chip} NAME=axemap')
 
     # Re-enable the input shaper if it was active
     if input_shaper is not None:
