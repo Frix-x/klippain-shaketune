@@ -3,6 +3,7 @@
 
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_thread import ShakeTuneThread
+from .accelerometer import Accelerometer
 
 
 def find_axis_accelerometer(printer, axis: str = 'xy'):
@@ -56,7 +57,10 @@ def axes_map_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> No
     toolhead.dwell(0.5)
 
     # Start the measurements and do the movements (+X, +Y and then +Z)
-    gcode.run_script_from_command(f'ACCELEROMETER_MEASURE CHIP={accel_chip}')
+    accelerometer = Accelerometer(printer.lookup_object(accel_chip))
+    accelerometer.start_measurement()
+    # gcode.run_script_from_command(f'ACCELEROMETER_MEASURE CHIP={accel_chip}')
+
     toolhead.dwell(1)
     toolhead.move([mid_x + 15, mid_y - 15, z_height, E], speed)
     toolhead.dwell(1)
@@ -64,7 +68,9 @@ def axes_map_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> No
     toolhead.dwell(1)
     toolhead.move([mid_x + 15, mid_y + 15, z_height + 15, E], speed)
     toolhead.dwell(1)
-    gcode.run_script_from_command(f'ACCELEROMETER_MEASURE CHIP={accel_chip} NAME=axemap')
+
+    accelerometer.stop_measurement('axemap')
+    # gcode.run_script_from_command(f'ACCELEROMETER_MEASURE CHIP={accel_chip} NAME=axemap')
 
     # Re-enable the input shaper if it was active
     if input_shaper is not None:
