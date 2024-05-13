@@ -4,8 +4,14 @@
 from pathlib import Path
 
 from .helpers.console_output import ConsoleOutput
-from .measurement import axes_map_calibration, axes_shaper_calibration, compare_belts_responses, excitate_axis_at_freq
-from .post_processing import AxesMapFinder, BeltsGraphCreator, ShaperGraphCreator
+from .measurement import (
+    axes_map_calibration,
+    axes_shaper_calibration,
+    compare_belts_responses,
+    create_vibrations_profile,
+    excitate_axis_at_freq,
+)
+from .post_processing import AxesMapFinder, BeltsGraphCreator, ShaperGraphCreator, VibrationsGraphCreator
 from .shaketune_config import ShakeTuneConfig
 from .shaketune_thread import ShakeTuneThread
 
@@ -36,6 +42,11 @@ class ShakeTune:
             desc=self.cmd_EXCITATE_AXIS_AT_FREQ_help,
         )
         self._gcode.register_command(
+            'AXES_MAP_CALIBRATION',
+            self.cmd_AXES_MAP_CALIBRATION,
+            desc=self.cmd_AXES_MAP_CALIBRATION_help,
+        )
+        self._gcode.register_command(
             'COMPARE_BELTS_RESPONSES',
             self.cmd_COMPARE_BELTS_RESPONSES,
             desc=self.cmd_COMPARE_BELTS_RESPONSES_help,
@@ -46,9 +57,9 @@ class ShakeTune:
             desc=self.cmd_AXES_SHAPER_CALIBRATION_help,
         )
         self._gcode.register_command(
-            'AXES_MAP_CALIBRATION',
-            self.cmd_AXES_MAP_CALIBRATION,
-            desc=self.cmd_AXES_MAP_CALIBRATION_help,
+            'CREATE_VIBRATIONS_PROFILE',
+            self.cmd_CREATE_VIBRATIONS_PROFILE,
+            desc=self.cmd_CREATE_VIBRATIONS_PROFILE_help,
         )
 
     cmd_EXCITATE_AXIS_AT_FREQ_help = (
@@ -57,7 +68,15 @@ class ShakeTune:
 
     def cmd_EXCITATE_AXIS_AT_FREQ(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
-        excitate_axis_at_freq(gcmd, self._gcode)
+        excitate_axis_at_freq(gcmd, self._gcode, self._printer)
+
+    cmd_AXES_MAP_CALIBRATION_help = 'Perform a set of movements to measure the orientation of the accelerometer and help you set the best axes_map configuration for your printer'
+
+    def cmd_AXES_MAP_CALIBRATION(self, gcmd) -> None:
+        ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
+        axes_map_finder = AxesMapFinder(self._config)
+        st_thread = ShakeTuneThread(self._config, axes_map_finder, self._printer.get_reactor(), self.timeout)
+        axes_map_calibration(gcmd, self._gcode, self._printer, st_thread)
 
     cmd_COMPARE_BELTS_RESPONSES_help = 'Perform a custom half-axis test to analyze and compare the frequency profiles of individual belts on CoreXY printers'
 
@@ -77,10 +96,10 @@ class ShakeTune:
         st_thread = ShakeTuneThread(self._config, shaper_graph_creator, self._printer.get_reactor(), self.timeout)
         axes_shaper_calibration(gcmd, self._gcode, self._printer, st_thread)
 
-    cmd_AXES_MAP_CALIBRATION_help = 'Perform a set of movements to measure the orientation of the accelerometer and help you set the best axes_map configuration for your printer'
+    cmd_CREATE_VIBRATIONS_PROFILE_help = 'Perform a set of movements to measure the orientation of the accelerometer and help you set the best axes_map configuration for your printer'
 
-    def cmd_AXES_MAP_CALIBRATION(self, gcmd) -> None:
+    def cmd_CREATE_VIBRATIONS_PROFILE(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
-        axes_map_finder = AxesMapFinder(self._config)
-        st_thread = ShakeTuneThread(self._config, axes_map_finder, self._printer.get_reactor(), self.timeout)
-        axes_map_calibration(gcmd, self._gcode, self._printer, st_thread)
+        vibration_profile_creator = VibrationsGraphCreator(self._config)
+        st_thread = ShakeTuneThread(self._config, vibration_profile_creator, self._printer.get_reactor(), self.timeout)
+        create_vibrations_profile(gcmd, self._gcode, self._printer, st_thread)

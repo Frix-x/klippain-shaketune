@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 
 from ..helpers import filemanager as fm
 from ..helpers.console_output import ConsoleOutput
-from ..helpers.motorlogparser import MotorLogParser
+from ..measurement.motorsconfigparser import MotorsConfigParser
 from ..shaketune_config import ShakeTuneConfig
 from .analyze_axesmap import axesmap_calibration
 from .graph_belts import belts_calibration
@@ -142,9 +142,9 @@ class ShaperGraphCreator(GraphCreator):
             raise ValueError('scv must be set to create the input shaper graph!')
 
         lognames = self._move_and_prepare_files(
-            glob_pattern='raw_data*.csv',
+            glob_pattern='shaketune-axis_*.csv',
             min_files_required=1,
-            custom_name_func=lambda f: f.stem.split('_')[3].upper(),
+            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
         )
         fig = shaper_calibration(
             lognames=[str(path) for path in lognames],
@@ -175,18 +175,14 @@ class VibrationsGraphCreator(GraphCreator):
 
         self._kinematics = None
         self._accel = None
-        self._chip_name = None
         self._motors = None
 
         self._setup_folder('vibrations')
 
-    def configure(self, kinematics: str, accel: float, chip_name: str, metadata: str) -> None:
+    def configure(self, kinematics: str, accel: float, motor_config_parser: MotorsConfigParser) -> None:
         self._kinematics = kinematics
         self._accel = accel
-        self._chip_name = chip_name
-
-        parser = MotorLogParser(self._config.klipper_log_folder / 'klippy.log', metadata)
-        self._motors = parser.get_motors()
+        self._motors = motor_config_parser.get_motors()
 
     def _archive_files(self, lognames: list[Path]) -> None:
         tar_path = self._folder / f'{self._type}_{self._graph_date}.tar.gz'
@@ -195,13 +191,13 @@ class VibrationsGraphCreator(GraphCreator):
                 tar.add(csv_file, arcname=csv_file.name, recursive=False)
 
     def create_graph(self) -> None:
-        if not self._accel or not self._chip_name or not self._kinematics:
+        if not self._accel or not self._kinematics:
             raise ValueError('accel, chip_name and kinematics must be set to create the vibrations profile graph!')
 
         lognames = self._move_and_prepare_files(
-            glob_pattern=f'{self._chip_name}-*.csv',
+            glob_pattern='shaketune-vib_*.csv',
             min_files_required=None,
-            custom_name_func=lambda f: f.name.replace(self._chip_name, self._type),
+            custom_name_func=lambda f: f.name,
         )
         fig = vibrations_profile(
             lognames=[str(path) for path in lognames],
@@ -236,11 +232,9 @@ class AxesMapFinder(GraphCreator):
         self._folder = config.get_results_folder()
 
         self._accel = None
-        self._chip_name = None
 
-    def configure(self, accel: int, chip_name: str) -> None:
+    def configure(self, accel: int) -> None:
         self._accel = accel
-        self._chip_name = chip_name
 
     def find_axesmap(self) -> None:
         tmp_folder = Path('/tmp')

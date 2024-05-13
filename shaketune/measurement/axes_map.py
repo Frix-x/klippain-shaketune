@@ -19,7 +19,7 @@ def axes_map_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> No
             gcmd.error(
                 'No accelerometer specified for measurement! Multi-accelerometer configurations are not supported for this macro.'
             )
-        accelerometer = Accelerometer(printer.lookup_object(accel_chip))
+    accelerometer = Accelerometer(printer.lookup_object(accel_chip))
 
     systime = printer.get_reactor().monotonic()
     toolhead = printer.lookup_object('toolhead')
@@ -71,5 +71,5 @@ def axes_map_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> No
     # Run post-processing
     ConsoleOutput.print('Analysis of the movements...')
     creator = st_thread.get_graph_creator()
-    creator.configure(accel, accel_chip)
+    creator.configure(accel)
     st_thread.run()

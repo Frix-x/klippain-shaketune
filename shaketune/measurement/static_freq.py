@@ -5,7 +5,7 @@ from . import AXIS_CONFIG
 from .resonance_test import vibrate_axis
 
 
-def excitate_axis_at_freq(gcmd, printer, gcode) -> None:
+def excitate_axis_at_freq(gcmd, gcode, printer) -> None:
     freq = gcmd.get_int('FREQUENCY', default=25, minval=1)
     duration = gcmd.get_int('DURATION', default=10, minval=1)
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
