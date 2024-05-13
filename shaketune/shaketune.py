@@ -3,9 +3,9 @@
 
 from pathlib import Path
 
-from .graph_creators import AxesMapFinder, BeltsGraphCreator, ShaperGraphCreator
 from .helpers.console_output import ConsoleOutput
-from .macros import axes_map_calibration, axes_shaper_calibration, compare_belts_responses, excitate_axis_at_freq
+from .measurement import axes_map_calibration, axes_shaper_calibration, compare_belts_responses, excitate_axis_at_freq
+from .post_processing import AxesMapFinder, BeltsGraphCreator, ShaperGraphCreator
 from .shaketune_config import ShakeTuneConfig
 from .shaketune_thread import ShakeTuneThread
 
