@@ -14,6 +14,14 @@ from scipy.signal import spectrogram
 
 from .console_output import ConsoleOutput
 
+# Constant used to define the standard axis direction and names
+AXIS_CONFIG = [
+    {'axis': 'x', 'direction': (1, 0, 0), 'label': 'axis_X'},
+    {'axis': 'y', 'direction': (0, 1, 0), 'label': 'axis_Y'},
+    {'axis': 'a', 'direction': (1, -1, 0), 'label': 'belt_A'},
+    {'axis': 'b', 'direction': (1, 1, 0), 'label': 'belt_B'},
+]
+
 
 def parse_log(logname):
     try:

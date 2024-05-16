@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
+from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
-from . import AXIS_CONFIG
 from .resonance_test import vibrate_axis
 
 
-def excitate_axis_at_freq(gcmd, gcode, printer) -> None:
+def excitate_axis_at_freq(gcmd, config) -> None:
     freq = gcmd.get_int('FREQUENCY', default=25, minval=1)
     duration = gcmd.get_int('DURATION', default=10, minval=1)
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
@@ -19,9 +19,11 @@ def excitate_axis_at_freq(gcmd, gcode, printer) -> None:
 
     ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq}Hz for {duration} seconds')
 
-    systime = printer.get_reactor().monotonic()
+    printer = config.get_printer()
+    gcode = printer.lookup_object('gcode')
     toolhead = printer.lookup_object('toolhead')
     res_tester = printer.lookup_object('resonance_tester')
+    systime = printer.get_reactor().monotonic()
 
     if accel_per_hz is None:
         accel_per_hz = res_tester.test.accel_per_hz

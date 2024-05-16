@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import abc
+import re
 import shutil
 import tarfile
 from datetime import datetime
@@ -189,6 +190,7 @@ class VibrationsGraphCreator(GraphCreator):
         with tarfile.open(tar_path, 'w:gz') as tar:
             for csv_file in lognames:
                 tar.add(csv_file, arcname=csv_file.name, recursive=False)
+                csv_file.unlink()
 
     def create_graph(self) -> None:
         if not self._accel or not self._kinematics:
@@ -197,7 +199,7 @@ class VibrationsGraphCreator(GraphCreator):
         lognames = self._move_and_prepare_files(
             glob_pattern='shaketune-vib_*.csv',
             min_files_required=None,
-            custom_name_func=lambda f: f.name,
+            custom_name_func=lambda f: re.search(r'shaketune-vib_(.*?)_\d{8}_\d{6}', f.name).group(1),
         )
         fig = vibrations_profile(
             lognames=[str(path) for path in lognames],

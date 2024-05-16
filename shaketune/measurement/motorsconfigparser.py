@@ -4,8 +4,7 @@
 # from the Klipper configuration and the TMC registers
 # Written by Frix_x#0161 #
 
-import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 TRINAMIC_DRIVERS = ['tmc2130', 'tmc2208', 'tmc2209', 'tmc2240', 'tmc2660', 'tmc5160']
 MOTORS = ['stepper_x', 'stepper_y', 'stepper_x1', 'stepper_y1', 'stepper_z', 'stepper_z1', 'stepper_z2', 'stepper_z3']
@@ -17,25 +16,20 @@ class Motor:
         self.name: str = name
         self._registers: Dict[str, Dict[str, Any]] = {}
         self._config: Dict[str, Any] = {}
-        self._driver: Tuple[str, Any] = ('', None)
-
-    def set_driver(self, driver_name: str, tmc_object: Any) -> None:
-        self._driver = (driver_name, tmc_object)
-
-    def get_driver(self) -> Tuple[str, Any]:
-        return self._driver
 
     def set_register(self, register: str, value_dict: dict) -> None:
+        # First we filter out entries with a value of 0 to avoid having too much uneeded data
+        value_dict = {k: v for k, v in value_dict.items() if v != 0}
+
         # Special parsing for CHOPCONF to extract meaningful values
         if register == 'CHOPCONF':
-            # Add intpol=0 if missing from the register dump
-            if 'intpol=' not in value_dict:
+            # Add intpol=0 if missing from the register dump to force printing it as it's important
+            if 'intpol' not in value_dict:
                 value_dict['intpol'] = '0'
-            # Simplify the microstep resolution format
+            # Remove the microsteps entry as the format here is not easy to read and
+            # it's already read in the correct format directly from the Klipper config
             if 'mres' in value_dict:
-                mres_match = re.search(r'(\d+)usteps', value_dict['mres'])
-                if mres_match:
-                    value_dict['mres'] = mres_match.group(1)
+                del value_dict['mres']
 
         # Special parsing for CHOPCONF to avoid pwm_ before each values
         if register == 'PWMCONF':
@@ -46,7 +40,7 @@ class Motor:
                 new_value_dict[key] = val
             value_dict = new_value_dict
 
-        # Then fill the registers while merging all the thresholds into the same THRS virtual register
+        # Then gets merged all the thresholds into the same THRS virtual register
         if register in ['TPWMTHRS', 'TCOOLTHRS']:
             existing_thrs = self._registers.get('THRS', {})
             merged_values = {**existing_thrs, **value_dict}
@@ -110,34 +104,41 @@ class Motor:
 
 
 class MotorsConfigParser:
-    def __init__(self, printer, motors: List[str] = MOTORS, drivers: List[str] = TRINAMIC_DRIVERS):
+    def __init__(self, config, motors: List[str] = MOTORS, drivers: List[str] = TRINAMIC_DRIVERS):
+        self._printer = config.get_printer()
+
         self._motors: List[Motor] = []
-        self._printer = printer
 
         for motor_name in motors:
             for driver in drivers:
-                tmc_object = printer.lookup_object(f'{driver} {motor_name}', None)
+                tmc_object = self._printer.lookup_object(f'{driver} {motor_name}', None)
                 if tmc_object is None:
                     continue
                 motor = self._create_motor(motor_name, driver, tmc_object)
                 self._motors.append(motor)
 
+        pconfig = self._printer.lookup_object('configfile')
+        self.kinematics = pconfig.status_raw_config['printer']['kinematics']
+
     # Create a Motor object with the given name, driver and TMC object
     # and fill it with the relevant configuration and registers
     def _create_motor(self, motor_name: str, driver: str, tmc_object: Any) -> Motor:
         motor = Motor(motor_name)
-        motor.set_driver(driver.upper(), tmc_object)
+        motor.set_config('tmc', driver)
         self._parse_klipper_config(motor, tmc_object)
         self._parse_tmc_registers(motor, tmc_object)
         return motor
 
-    def _parse_klipper_config(self, motor: Motor, tmc: Any) -> None:
+    def _parse_klipper_config(self, motor: Motor, tmc_object: Any) -> None:
         # The TMCCommandHelper isn't a direct member of the TMC object... but we can still get it this way
-        tmc_cmdhelper = tmc.get_status.__self__
+        tmc_cmdhelper = tmc_object.get_status.__self__
 
         motor_currents = tmc_cmdhelper.current_helper.get_current()
         motor.set_config('run_current', motor_currents[0])
         motor.set_config('hold_current', motor_currents[1])
+
+        pconfig = self._printer.lookup_object('configfile')
+        motor.set_config('microsteps', int(pconfig.status_raw_config[motor.name]['microsteps']))
 
         autotune_object = self._printer.lookup_object(f'autotune_tmc {motor.name}', None)
         if autotune_object is not None:
@@ -147,24 +148,21 @@ class MotorsConfigParser:
         else:
             motor.set_config('autotune_enabled', False)
 
-    def _parse_tmc_registers(self, motor: Motor, tmc: Any) -> None:
+    def _parse_tmc_registers(self, motor: Motor, tmc_object: Any) -> None:
         # The TMCCommandHelper isn't a direct member of the TMC object... but we can still get it this way
-        tmc_cmdhelper = tmc.get_status.__self__
+        tmc_cmdhelper = tmc_object.get_status.__self__
 
         for register in RELEVANT_TMC_REGISTERS:
-            # value = tmc_cmdhelper.read_register(register)
-            # motor.set_register(register, value)
-
             val = tmc_cmdhelper.fields.registers.get(register)
             if (val is not None) and (register not in tmc_cmdhelper.read_registers):
                 # write-only register
-                fields_string = self._extract_register_values(register, val)
+                fields_string = self._extract_register_values(tmc_cmdhelper, register, val)
             elif register in tmc_cmdhelper.read_registers:
                 # readable register
                 val = tmc_cmdhelper.mcu_tmc.get_register(register)
                 if tmc_cmdhelper.read_translate is not None:
                     register, val = tmc_cmdhelper.read_translate(register, val)
-                fields_string = self._extract_register_values(register, val)
+                fields_string = self._extract_register_values(tmc_cmdhelper, register, val)
 
             motor.set_register(register, fields_string)
 
@@ -173,7 +171,7 @@ class MotorsConfigParser:
         reg_fields = tmc_cmdhelper.fields.all_fields.get(register, {})
         reg_fields = sorted([(mask, name) for name, mask in reg_fields.items()])
         fields = {}
-        for mask, field_name in reg_fields:
+        for _, field_name in reg_fields:
             field_value = tmc_cmdhelper.fields.get_field(field_name, val, register)
             fields[field_name] = field_value
         return fields
@@ -181,7 +179,7 @@ class MotorsConfigParser:
     # Find and return the motor by its name
     def get_motor(self, motor_name: str) -> Optional[Motor]:
         for motor in self._motors:
-            if motor._name == motor_name:
+            if motor.name == motor_name:
                 return motor
         return None
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 
+from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_thread import ShakeTuneThread
-from . import AXIS_CONFIG
 from .accelerometer import Accelerometer
 from .resonance_test import vibrate_axis
 
 
-def axes_shaper_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> None:
+def axes_shaper_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
     min_freq = gcmd.get_float('FREQ_START', default=5, minval=1)
     max_freq = gcmd.get_float('FREQ_END', default=133.33, minval=1)
     hz_per_sec = gcmd.get_float('HZ_PER_SEC', default=1, minval=1)
@@ -21,9 +21,11 @@ def axes_shaper_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) ->
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=None, minval=1)
 
-    systime = printer.get_reactor().monotonic()
+    printer = config.get_printer()
+    gcode = printer.lookup_object('gcode')
     toolhead = printer.lookup_object('toolhead')
     res_tester = printer.lookup_object('resonance_tester')
+    systime = printer.get_reactor().monotonic()
 
     if scv is None:
         toolhead_info = toolhead.get_status(systime)
@@ -92,7 +94,7 @@ def axes_shaper_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) ->
         accelerometer.stop_measurement(config['label'], append_time=True)
 
         # And finally generate the graph for each measured axis
-        ConsoleOutput.print(f'{config['axis'].upper()} axis frequency profile generation...')
+        ConsoleOutput.print(f'{config["axis"].upper()} axis frequency profile generation...')
         ConsoleOutput.print('This may take some time (1-3min)')
         st_thread.run()
 

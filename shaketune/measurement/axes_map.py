@@ -6,12 +6,17 @@ from ..shaketune_thread import ShakeTuneThread
 from .accelerometer import Accelerometer
 
 
-def axes_map_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> None:
+def axes_map_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
     z_height = gcmd.get_float('Z_HEIGHT', default=20.0)
     speed = gcmd.get_float('SPEED', default=80.0, minval=20.0)
     accel = gcmd.get_int('ACCEL', default=1500, minval=100)
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
     accel_chip = gcmd.get('ACCEL_CHIP', default=None)
+
+    printer = config.get_printer()
+    gcode = printer.lookup_object('gcode')
+    toolhead = printer.lookup_object('toolhead')
+    systime = printer.get_reactor().monotonic()
 
     if accel_chip is None:
         accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy')
@@ -21,8 +26,6 @@ def axes_map_calibration(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> No
             )
     accelerometer = Accelerometer(printer.lookup_object(accel_chip))
 
-    systime = printer.get_reactor().monotonic()
-    toolhead = printer.lookup_object('toolhead')
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']
     old_mcr = toolhead_info['minimum_cruise_ratio']

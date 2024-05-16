@@ -564,23 +564,23 @@ def plot_motor_config_txt(fig, motors, differences):
     motor_details = [(motors[0], 'X motor'), (motors[1], 'Y motor')]
 
     distance = 0.12
-    if motors[0].get_property('autotune_enabled'):
-        distance = 0.24
+    if motors[0].get_config('autotune_enabled'):
+        distance = 0.27
         config_blocks = [
-            f"| {lbl}: {mot.get_property('motor').upper()} on {mot.get_property('tmc').upper()} @ {mot.get_property('voltage')}V {mot.get_property('run_current')}A"
+            f"| {lbl}: {mot.get_config('motor').upper()} on {mot.get_config('tmc').upper()} @ {mot.get_config('voltage'):0.1f}V {mot.get_config('run_current'):0.2f}A - {mot.get_config('microsteps')}usteps"
             for mot, lbl in motor_details
         ]
         config_blocks.append('| TMC Autotune enabled')
     else:
         config_blocks = [
-            f"| {lbl}: {mot.get_property('tmc').upper()} @ {mot.get_property('run_current')}A"
+            f"| {lbl}: {mot.get_config('tmc').upper()} @ {mot.get_config('run_current'):0.2f}A - {mot.get_config('microsteps')}usteps"
             for mot, lbl in motor_details
         ]
         config_blocks.append('| TMC Autotune not detected')
 
     for idx, block in enumerate(config_blocks):
         fig.text(
-            0.40, 0.990 - 0.015 * idx, block, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple']
+            0.41, 0.990 - 0.015 * idx, block, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple']
         )
 
     tmc_registers = motors[0].get_registers()
@@ -589,7 +589,7 @@ def plot_motor_config_txt(fig, motors, differences):
         settings_str = ' '.join(f'{k}={v}' for k, v in settings.items())
         tmc_block = f'| {register.upper()}: {settings_str}'
         fig.text(
-            0.40 + distance,
+            0.41 + distance,
             0.990 - 0.015 * idx,
             tmc_block,
             ha='left',
@@ -601,7 +601,7 @@ def plot_motor_config_txt(fig, motors, differences):
     if differences is not None:
         differences_text = f'| Y motor diff: {differences}'
         fig.text(
-            0.40 + distance,
+            0.41 + distance,
             0.990 - 0.015 * (idx + 1),
             differences_text,
             ha='left',

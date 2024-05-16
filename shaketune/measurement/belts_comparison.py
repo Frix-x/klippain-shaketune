@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 
+from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_thread import ShakeTuneThread
-from . import AXIS_CONFIG
 from .accelerometer import Accelerometer
 from .resonance_test import vibrate_axis
 
 
-def compare_belts_responses(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> None:
+def compare_belts_responses(gcmd, config, st_thread: ShakeTuneThread) -> None:
     min_freq = gcmd.get_float('FREQ_START', default=5.0, minval=1)
     max_freq = gcmd.get_float('FREQ_END', default=133.33, minval=1)
     hz_per_sec = gcmd.get_float('HZ_PER_SEC', default=1.0, minval=1)
@@ -16,9 +16,11 @@ def compare_belts_responses(gcmd, gcode, printer, st_thread: ShakeTuneThread) ->
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=None, minval=1)
 
-    systime = printer.get_reactor().monotonic()
+    printer = config.get_printer()
+    gcode = printer.lookup_object('gcode')
     toolhead = printer.lookup_object('toolhead')
     res_tester = printer.lookup_object('resonance_tester')
+    systime = printer.get_reactor().monotonic()
 
     accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy')
     if accel_chip is None:
@@ -68,7 +70,7 @@ def compare_belts_responses(gcmd, gcode, printer, st_thread: ShakeTuneThread) ->
         input_shaper = None
 
     # Filter axis configurations to get the A and B axis only
-    filtered_config = [a for a in AXIS_CONFIG if a['axis'] in ('x', 'y')]
+    filtered_config = [a for a in AXIS_CONFIG if a['axis'] in ('a', 'b')]
     for config in filtered_config:
         accelerometer.start_measurement()
         vibrate_axis(toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz)

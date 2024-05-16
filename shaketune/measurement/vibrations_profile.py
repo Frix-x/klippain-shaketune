@@ -11,7 +11,7 @@ from .motorsconfigparser import MotorsConfigParser
 MIN_SPEED = 2  # mm/s
 
 
-def create_vibrations_profile(gcmd, gcode, printer, st_thread: ShakeTuneThread) -> None:
+def create_vibrations_profile(gcmd, config, st_thread: ShakeTuneThread) -> None:
     size = gcmd.get_float('SIZE', default=100.0, minval=50.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=20.0)
     max_speed = gcmd.get_float('MAX_SPEED', default=200.0, minval=10.0)
@@ -23,29 +23,30 @@ def create_vibrations_profile(gcmd, gcode, printer, st_thread: ShakeTuneThread) 
     if (size / (max_speed / 60)) < 0.25:
         gcmd.error('The size of the movement is too small for the given speed! Increase SIZE or decrease MAX_SPEED!')
 
-    # Check that input shaper is already configured
+    printer = config.get_printer()
+    gcode = printer.lookup_object('gcode')
+    toolhead = printer.lookup_object('toolhead')
     input_shaper = printer.lookup_object('input_shaper', None)
+    systime = printer.get_reactor().monotonic()
+
+    # Check that input shaper is already configured
     if input_shaper is None:
         gcmd.error('Input shaper is not configured! Please run the shaper calibration macro first.')
 
-    # TODO: Add the kinematics check to define the main_angles
-    #       but this needs to retrieve it from the printer configuration
-    # {% if kinematics == "cartesian" %}
-    #     # Cartesian motors are on X and Y axis directly
-    #     RESPOND MSG="Cartesian kinematics mode"
-    #     {% set main_angles = [0, 90] %}
-    # {% elif kinematics == "corexy" %}
-    #     # CoreXY motors are on A and B axis (45 and 135 degrees)
-    #     RESPOND MSG="CoreXY kinematics mode"
-    #     {% set main_angles = [45, 135] %}
-    # {% else %}
-    #     { action_raise_error("Only Cartesian and CoreXY kinematics are supported at the moment for the vibrations measurement tool!") }
-    # {% endif %}
-    kinematics = 'cartesian'
-    main_angles = [0, 90]
+    motors_config_parser = MotorsConfigParser(config, motors=['stepper_x', 'stepper_y'])
 
-    systime = printer.get_reactor().monotonic()
-    toolhead = printer.lookup_object('toolhead')
+    if motors_config_parser.kinematics == 'cartesian' or motors_config_parser.kinematics == 'corexz':
+        # Cartesian motors are on X and Y axis directly, same for CoreXZ
+        main_angles = [0, 90]
+    elif motors_config_parser.kinematics == 'corexy':
+        # CoreXY motors are on A and B axis (45 and 135 degrees)
+        main_angles = [45, 135]
+    else:
+        gcmd.error(
+            'Only Cartesian and CoreXY kinematics are supported at the moment for the vibrations measurement tool!'
+        )
+    ConsoleOutput.print(f'{motors_config_parser.kinematics.upper()} kinematics mode')
+
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']
     old_mcr = toolhead_info['minimum_cruise_ratio']
@@ -66,6 +67,7 @@ def create_vibrations_profile(gcmd, gcode, printer, st_thread: ShakeTuneThread) 
 
     nb_speed_samples = int((max_speed - MIN_SPEED) / speed_increment + 1)
     for curr_angle in main_angles:
+        ConsoleOutput.print(f'-> Measuring angle: {curr_angle} degrees...')
         radian_angle = math.radians(curr_angle)
 
         # Find the best accelerometer chip for the current angle if not specified
@@ -86,6 +88,7 @@ def create_vibrations_profile(gcmd, gcode, printer, st_thread: ShakeTuneThread) 
         # Sweep the speed range to record the vibrations at different speeds
         for curr_speed_sample in range(nb_speed_samples):
             curr_speed = MIN_SPEED + curr_speed_sample * speed_increment
+            ConsoleOutput.print(f'Current speed: {curr_speed} mm/s')
 
             # Reduce the segments length for the lower speed range (0-100mm/s). The minimum length is 1/3 of the SIZE and is gradually increased
             # to the nominal SIZE at 100mm/s. No further size changes are made above this speed. The goal is to ensure that the print head moves
@@ -126,12 +129,9 @@ def create_vibrations_profile(gcmd, gcode, printer, st_thread: ShakeTuneThread) 
     )
     toolhead.wait_moves()
 
-    # Get the motors and TMC configurations from Klipper
-    motors_config_parser = MotorsConfigParser(printer, motors=['stepper_x', 'stepper_y'])
-
     # Run post-processing
     ConsoleOutput.print('Machine vibrations profile generation...')
     ConsoleOutput.print('This may take some time (5-8min)')
     creator = st_thread.get_graph_creator()
-    creator.configure(kinematics, accel, motors_config_parser)
+    creator.configure(motors_config_parser.kinematics, accel, motors_config_parser)
     st_thread.run()
