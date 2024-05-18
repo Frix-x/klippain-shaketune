@@ -1,13 +1,13 @@
 # Belt relative difference measurements
 
-The `BELTS_SHAPER_CALIBRATION` macro is dedicated for CoreXY machines where it can help you to diagnose belt path problems by measuring and plotting the differences between their behavior. It will also help you tension your belts at the same tension.
+The `COMPARE_BELTS_RESPONSES` macro is dedicated for CoreXY machines where it can help you to diagnose belt path problems by measuring and plotting the differences between their behavior. It will also help you tension your belts at the same tension.
 
 
 ## Usage
 
 **Before starting, ensure that the belts are properly tensioned**. For example, you can follow the [Voron belt tensioning documentation](https://docs.vorondesign.com/tuning/secondary_printer_tuning.html#belt-tension). This is crucial: you need a good starting point to then iterate from it!
 
-Then, call the `BELTS_SHAPER_CALIBRATION` macro and look for the graphs in the results folder. Here are the parameters available:
+Then, call the `COMPARE_BELTS_RESPONSES` macro and look for the graphs in the results folder. Here are the parameters available:
 
 | parameters | default value | description |
 |-----------:|---------------|-------------|
@@ -15,7 +15,7 @@ Then, call the `BELTS_SHAPER_CALIBRATION` macro and look for the graphs in the r
 |FREQ_END|133|Maximum excitation frequency|
 |HZ_PER_SEC|1|Number of Hz per seconds for the test|
 |KEEP_N_RESULTS|3|Total number of results to keep in the result folder after running the test. The older results are automatically cleaned up|
-|KEEP_CSV|True|Weither or not to keep the CSV data files alonside the PNG graphs|
+|KEEP_CSV|0|Weither or not to keep the CSV data files alonside the PNG graphs|
 
 
 ## Graphs description
