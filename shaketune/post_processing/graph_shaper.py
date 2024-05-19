@@ -369,11 +369,11 @@ def shaper_calibration(
         if compat:
             title_line3 = '| Older Klipper version detected, damping ratio'
             title_line4 = '| and SCV are not used for filter recommendations!'
-            title_line5 = f'| Accel per Hz used: {accel_per_hz}' if accel_per_hz is not None else ''
+            title_line5 = f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz' if accel_per_hz is not None else ''
         else:
-            title_line3 = f'| Square corner velocity: {scv}mm/s'
+            title_line3 = f'| Square corner velocity: {scv} mm/s'
             title_line4 = f'| Max allowed smoothing: {max_smoothing}'
-            title_line5 = f'| Accel per Hz used: {accel_per_hz}' if accel_per_hz is not None else ''
+            title_line5 = f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz' if accel_per_hz is not None else ''
     except Exception:
         ConsoleOutput.print('Warning: CSV filename look to be different than expected (%s)' % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
@@ -381,9 +381,9 @@ def shaper_calibration(
         title_line4 = ''
         title_line5 = ''
     fig.text(0.12, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
-    fig.text(0.58, 0.965, title_line3, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
-    fig.text(0.58, 0.951, title_line4, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
-    fig.text(0.58, 0.919, title_line5, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
+    fig.text(0.58, 0.963, title_line3, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
+    fig.text(0.58, 0.948, title_line4, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
+    fig.text(0.58, 0.933, title_line5, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
 
     # Plot the graphs
     plot_freq_response(

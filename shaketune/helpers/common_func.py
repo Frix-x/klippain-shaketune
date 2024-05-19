@@ -243,25 +243,3 @@ def identify_low_energy_zones(power_total, detection_threshold=0.1):
     sorted_valleys = sorted(valley_means_percentage, key=lambda x: x[2])
 
     return sorted_valleys
-
-
-# Calculate or estimate a "similarity" factor between two PSD curves and scale it to a percentage. This is
-# used here to quantify how close the two belts path behavior and responses are close together.
-def compute_curve_similarity_factor(x1, y1, x2, y2, sim_sigmoid_k=0.6):
-    # Interpolate PSDs to match the same frequency bins and do a cross-correlation
-    y2_interp = np.interp(x1, x2, y2)
-    cross_corr = np.correlate(y1, y2_interp, mode='full')
-
-    # Find the peak of the cross-correlation and compute a similarity normalized by the energy of the signals
-    peak_value = np.max(cross_corr)
-    similarity = peak_value / (np.sqrt(np.sum(y1**2) * np.sum(y2_interp**2)))
-
-    # Apply sigmoid scaling to get better numbers and get a final percentage value
-    scaled_similarity = sigmoid_scale(-np.log(1 - similarity), sim_sigmoid_k)
-
-    return scaled_similarity
-
-
-# Simple helper to compute a sigmoid scalling (from 0 to 100%)
-def sigmoid_scale(x, k=1):
-    return 1 / (1 + np.exp(-k * x)) * 100

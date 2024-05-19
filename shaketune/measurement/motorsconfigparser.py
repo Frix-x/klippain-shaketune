@@ -109,13 +109,14 @@ class MotorsConfigParser:
 
         self._motors: List[Motor] = []
 
-        for motor_name in motors:
-            for driver in drivers:
-                tmc_object = self._printer.lookup_object(f'{driver} {motor_name}', None)
-                if tmc_object is None:
-                    continue
-                motor = self._create_motor(motor_name, driver, tmc_object)
-                self._motors.append(motor)
+        if motors is not None:
+            for motor_name in motors:
+                for driver in drivers:
+                    tmc_object = self._printer.lookup_object(f'{driver} {motor_name}', None)
+                    if tmc_object is None:
+                        continue
+                    motor = self._create_motor(motor_name, driver, tmc_object)
+                    self._motors.append(motor)
 
         pconfig = self._printer.lookup_object('configfile')
         self.kinematics = pconfig.status_raw_config['printer']['kinematics']

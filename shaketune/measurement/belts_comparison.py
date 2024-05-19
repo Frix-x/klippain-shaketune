@@ -5,6 +5,7 @@ from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_thread import ShakeTuneThread
 from .accelerometer import Accelerometer
+from .motorsconfigparser import MotorsConfigParser
 from .resonance_test import vibrate_axis
 
 
@@ -55,10 +56,12 @@ def compare_belts_responses(gcmd, config, st_thread: ShakeTuneThread) -> None:
         point = (x, y, z)
 
     toolhead.manual_move(point, feedrate_travel)
+    toolhead.dwell(0.5)
 
     # Configure the graph creator
+    motors_config_parser = MotorsConfigParser(config, motors=None)
     creator = st_thread.get_graph_creator()
-    creator.configure(accel_per_hz)
+    creator.configure(motors_config_parser.kinematics, accel_per_hz)
 
     # set the needed acceleration values for the test
     toolhead_info = toolhead.get_status(systime)

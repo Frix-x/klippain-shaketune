@@ -94,9 +94,13 @@ class BeltsGraphCreator(GraphCreator):
     def __init__(self, config: ShakeTuneConfig):
         super().__init__(config)
 
+        self._kinematics = None
+        self._accel_per_hz = None
+
         self._setup_folder('belts')
 
-    def configure(self, accel_per_hz: float = None) -> None:
+    def configure(self, kinematics: str = None, accel_per_hz: float = None) -> None:
+        self._kinematics = kinematics
         self._accel_per_hz = accel_per_hz
 
     def create_graph(self) -> None:
@@ -107,6 +111,7 @@ class BeltsGraphCreator(GraphCreator):
         )
         fig = belts_calibration(
             lognames=[str(path) for path in lognames],
+            kinematics=self._kinematics,
             klipperdir=str(self._config.klipper_folder),
             accel_per_hz=self._accel_per_hz,
             st_version=self._version,
