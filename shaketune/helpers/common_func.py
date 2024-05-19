@@ -11,7 +11,16 @@ from pathlib import Path
 
 import numpy as np
 from scipy.signal import spectrogram
+
 from .console_output import ConsoleOutput
+
+# Constant used to define the standard axis direction and names
+AXIS_CONFIG = [
+    {'axis': 'x', 'direction': (1, 0, 0), 'label': 'axis_X'},
+    {'axis': 'y', 'direction': (0, 1, 0), 'label': 'axis_Y'},
+    {'axis': 'a', 'direction': (1, -1, 0), 'label': 'belt_A'},
+    {'axis': 'b', 'direction': (1, 1, 0), 'label': 'belt_B'},
+]
 
 
 def parse_log(logname):
@@ -70,6 +79,7 @@ def get_git_version():
         # Get the absolute path of the script, resolving any symlinks
         # Then get 2 times to parent dir to be at the git root folder
         from git import GitCommandError, Repo
+
         script_path = Path(__file__).resolve()
         repo_path = script_path.parents[1]
         repo = Repo(repo_path)

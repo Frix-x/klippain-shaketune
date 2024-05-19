@@ -109,7 +109,8 @@ def axesmap_calibration(lognames, accel=None):
     axes_map = ','.join([f'{spike[0][0]}{spike[1]}' for spike in spikes_sorted])
     # alignment_error, sensitivity_error = compute_errors(filtered_data, spikes_sorted, accel, NUM_POINTS)
 
-    results = f'Detected axes_map:\n  {axes_map}\n'
+    results = f'Be aware that this macro is experimental and has been known to sometimes produce incorrect results. Use it with caution and always check the results!\n'
+    results += f'Detected axes_map:\n  {axes_map}\n'
 
     # TODO: work on this function that is currently not giving good results...
     # results += "Accelerometer angle deviation:\n"

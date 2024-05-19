@@ -11,14 +11,15 @@ Then, call the `AXES_SHAPER_CALIBRATION` macro and look for the graphs in the re
 
 | parameters | default value | description |
 |-----------:|---------------|-------------|
-|FREQ_START|5|Starting excitation frequency|
-|FREQ_END|133|Maximum excitation frequency|
-|HZ_PER_SEC|1|Number of Hz per seconds for the test|
-|AXIS|"all"|Axis you want to test in the list of "all", "X" or "Y"|
-|SCV|printer square corner velocity|Square corner velocity you want to use to calculate shaper recommendations. Using higher SCV values usually results in more smoothing and lower maximum accelerations|
-|MAX_SMOOTHING|None|Max smoothing allowed when calculating shaper recommendations|
-|KEEP_N_RESULTS|3|Total number of results to keep in the result folder after running the test. The older results are automatically cleaned up|
-|KEEP_CSV|0|Weither or not to keep the CSV data file alonside the PNG graphs|
+|FREQ_START|5|starting excitation frequency|
+|FREQ_END|133|maximum excitation frequency|
+|HZ_PER_SEC|1|number of Hz per seconds for the test|
+|ACCEL_PER_HZ|None|accel per Hz value used for the test. If unset, it will use the value from your `[resonance_tester]` config section (75 is the default)|
+|AXIS|"all"|axis you want to test in the list of "all", "X" or "Y"|
+|SCV|printer square corner velocity|square corner velocity you want to use to calculate shaper recommendations. Using higher SCV values usually results in more smoothing and lower maximum accelerations|
+|MAX_SMOOTHING|None|max smoothing allowed when calculating shaper recommendations|
+|TRAVEL_SPEED|120|speed in mm/s used for all the travel movements (to go to the start position prior to the test)|
+|Z_HEIGHT|None|Z height wanted for the test. This value can be used if needed to override the Z value of the probe_point set in your `[resonance_tester]` config section|
 
 
 ## Graphs description
