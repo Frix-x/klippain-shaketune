@@ -29,18 +29,26 @@ Follow these steps to install the Shake&Tune module in your printer:
   1. Then, append the following to your `printer.cfg` file and restart Klipper (if prefered, you can include only the needed macros: using `*.cfg` is a convenient way to include them all at once):
      ```
      [shaketune]
-     # result_folder: ~/printer_data/config/K-ShakeTune_results
+     # result_folder: ~/printer_data/config/ShakeTune_results
+     #    The folder where the results will be stored. It will be created if it doesn't exist.
      # number_of_results_to_keep: 3
+     #    The number of results to keep in the result_folder. The oldest results will
+     #    be automatically deleted after each runs.
      # keep_raw_csv: False
+     #    If True, the raw CSV files will be kept in the result_folder alongside the
+     #    PNG graphs. If False, they will be deleted and only the graphs will be kept.
+     # show_macros_in_webui: True
+     #    Mainsail and Fluidd doesn't create buttons for "system" macros that are not in the
+     #    printer.cfg file. If you want to see the macros in the webui, set this to True.
      ```
 
 ## Usage
 
 Ensure your machine is homed, then invoke one of the following macros as needed:
+  - `EXCITATE_AXIS_AT_FREQ` to maintain a specific excitation frequency, useful to inspect and find out what is resonating.
   - `AXES_MAP_CALIBRATION` to automatically find Klipper's `axes_map` parameter for your accelerometer orientation (be careful, this is experimental for now and known to give bad results).
   - `COMPARE_BELTS_RESPONSES` for a differential belt resonance graph, useful for checking relative belt tensions and belt path behaviors on a CoreXY printer.
   - `AXES_SHAPER_CALIBRATION` for standard input shaper graphs, used to mitigate ringing/ghosting by tuning Klipper's input shaper filters.
   - `CREATE_VIBRATIONS_PROFILE` for vibrations graphs as a function of toolhead direction and speed, used to find problematic ranges where the printer could be exposed to more VFAs and optimize your slicer speed profiles and TMC driver parameters.
-  - `EXCITATE_AXIS_AT_FREQ` to maintain a specific excitation frequency, useful to inspect and find out what is resonating.
 
 For further insights on the usage of these macros and the generated graphs, refer to the [K-Shake&Tune module documentation](./docs/README.md).
