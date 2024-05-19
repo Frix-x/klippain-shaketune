@@ -56,6 +56,10 @@ def compare_belts_responses(gcmd, config, st_thread: ShakeTuneThread) -> None:
 
     toolhead.manual_move(point, feedrate_travel)
 
+    # Configure the graph creator
+    creator = st_thread.get_graph_creator()
+    creator.configure(accel_per_hz)
+
     # set the needed acceleration values for the test
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']

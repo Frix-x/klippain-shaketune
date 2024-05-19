@@ -96,6 +96,9 @@ class BeltsGraphCreator(GraphCreator):
 
         self._setup_folder('belts')
 
+    def configure(self, accel_per_hz: float = None) -> None:
+        self._accel_per_hz = accel_per_hz
+
     def create_graph(self) -> None:
         lognames = self._move_and_prepare_files(
             glob_pattern='shaketune-belt_*.csv',
@@ -105,6 +108,7 @@ class BeltsGraphCreator(GraphCreator):
         fig = belts_calibration(
             lognames=[str(path) for path in lognames],
             klipperdir=str(self._config.klipper_folder),
+            accel_per_hz=self._accel_per_hz,
             st_version=self._version,
         )
         self._save_figure_and_cleanup(fig, lognames)
@@ -134,9 +138,10 @@ class ShaperGraphCreator(GraphCreator):
 
         self._setup_folder('shaper')
 
-    def configure(self, scv: float, max_smoothing: float = None) -> None:
+    def configure(self, scv: float, max_smoothing: float = None, accel_per_hz: float = None) -> None:
         self._scv = scv
         self._max_smoothing = max_smoothing
+        self._accel_per_hz = accel_per_hz
 
     def create_graph(self) -> None:
         if not self._scv:
@@ -152,6 +157,7 @@ class ShaperGraphCreator(GraphCreator):
             klipperdir=str(self._config.klipper_folder),
             max_smoothing=self._max_smoothing,
             scv=self._scv,
+            accel_per_hz=self._accel_per_hz,
             st_version=self._version,
         )
         self._save_figure_and_cleanup(fig, lognames, lognames[0].stem.split('_')[-1])

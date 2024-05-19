@@ -452,7 +452,7 @@ def compute_signal_data(data, max_freq):
 ######################################################################
 
 
-def belts_calibration(lognames, klipperdir='~/klipper', max_freq=200.0, st_version=None):
+def belts_calibration(lognames, klipperdir='~/klipper', max_freq=200.0, accel_per_hz=None, st_version='unknown'):
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
@@ -538,6 +538,7 @@ def main():
     opts = optparse.OptionParser(usage)
     opts.add_option('-o', '--output', type='string', dest='output', default=None, help='filename of output graph')
     opts.add_option('-f', '--max_freq', type='float', default=200.0, help='maximum frequency to graph')
+    opts.add_option('--accel_per_hz', type='float', default=None, help='accel_per_hz used during the measurement')
     opts.add_option(
         '-k', '--klipper_dir', type='string', dest='klipperdir', default='~/klipper', help='main klipper directory'
     )
@@ -547,7 +548,7 @@ def main():
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
 
-    fig = belts_calibration(args, options.klipperdir, options.max_freq)
+    fig = belts_calibration(args, options.klipperdir, options.max_freq, options.accel_per_hz, 'unknown')
     fig.savefig(options.output, dpi=150)
 
 

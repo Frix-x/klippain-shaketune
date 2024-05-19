@@ -60,7 +60,7 @@ def axes_shaper_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
 
     # Configure the graph creator
     creator = st_thread.get_graph_creator()
-    creator.configure(scv, max_sm)
+    creator.configure(scv, max_sm, accel_per_hz)
 
     # set the needed acceleration values for the test
     toolhead_info = toolhead.get_status(systime)
