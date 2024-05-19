@@ -1,4 +1,4 @@
-# Klipper Shake&Tune Module
+# Klipper Shake&Tune plugin
 
 This "Shake&Tune" repository is a standalone module from the [Klippain](https://github.com/Frix-x/klippain) ecosystem, designed to automate and calibrate the input shaper system on your Klipper 3D printer with a streamlined workflow and insightful vizualisations. This can be installed on any Klipper machine. It is not limited to those using Klippain.
 
@@ -17,9 +17,6 @@ Check out the **[detailed documentation of the Shake&Tune module here](./docs/RE
 |:----------------:|:------------:|:---------------------:|
 | [<img src="./docs/images/belts_example.png">](./docs/macros/belts_tuning.md) | [<img src="./docs/images/axis_example.png">](./docs/macros/axis_tuning.md) | [<img src="./docs/images/vibrations_example.png">](./docs/macros/vibrations_profile.md) |
 
-  > **Note**:
-  >
-  > Be aware that Shake&Tune uses the [Gcode shell command plugin](https://github.com/dw-0/kiauh/blob/master/docs/gcode_shell_command.md) under the hood to call the Python scripts that generate the graphs. While my scripts should be safe, the Gcode shell command plugin also has great potential for abuse if not used carefully for other purposes, since it opens shell access from Klipper.
 
 ## Installation
 
@@ -31,7 +28,10 @@ Follow these steps to install the Shake&Tune module in your printer:
      ```
   1. Then, append the following to your `printer.cfg` file and restart Klipper (if prefered, you can include only the needed macros: using `*.cfg` is a convenient way to include them all at once):
      ```
-     [include K-ShakeTune/*.cfg]
+     [shaketune]
+     # result_folder: ~/printer_data/config/K-ShakeTune_results
+     # number_of_results_to_keep: 3
+     # keep_raw_csv: False
      ```
 
 ## Usage

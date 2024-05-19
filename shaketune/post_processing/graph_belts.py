@@ -20,7 +20,7 @@ import numpy as np
 matplotlib.use('Agg')
 
 from ..helpers.common_func import detect_peaks, parse_log, setup_klipper_import
-from ..helpers.locale_utils import print_with_c_locale, set_locale
+from ..helpers.console_output import ConsoleOutput
 
 ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'  # For paired peaks names
 
@@ -423,8 +423,9 @@ def compute_signal_data(data, max_freq):
 ######################################################################
 
 
-def belts_calibration(lognames, kinematics, klipperdir='~/klipper', max_freq=200.0, st_version=None):
-    set_locale()
+def belts_calibration(
+    lognames, kinematics, klipperdir='~/klipper', max_freq=200.0, accel_per_hz=None, st_version='unknown'
+):
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
@@ -461,11 +462,11 @@ def belts_calibration(lognames, kinematics, klipperdir='~/klipper', max_freq=200
     ss_res = np.sum((interp_psd2 - interp_psd1) ** 2)
     ss_tot = np.sum((interp_psd2 - np.mean(interp_psd2)) ** 2)
     similarity_factor = (1 - (ss_res / ss_tot)) * 100
-    print_with_c_locale(f'Belts estimated similarity: {similarity_factor:.1f}%')
+    ConsoleOutput.print(f'Belts estimated similarity: {similarity_factor:.1f}%')
 
     # mhi = compute_mhi(similarity_factor, num_peaks, num_unpaired_peaks)
     mhi = compute_mhi(similarity_factor, signal1, signal2)
-    print_with_c_locale(f'[experimental] Mechanical health: {mhi}')
+    ConsoleOutput.print(f'[experimental] Mechanical health: {mhi}')
 
     fig, ((ax1, ax3)) = plt.subplots(
         1,
@@ -494,7 +495,7 @@ def belts_calibration(lognames, kinematics, klipperdir='~/klipper', max_freq=200
         if kinematics is not None:
             title_line2 += ' -- ' + kinematics.upper() + ' kinematics'
     except Exception:
-        print_with_c_locale(
+        ConsoleOutput.print(
             'Warning: CSV filenames look to be different than expected (%s , %s)' % (lognames[0], lognames[1])
         )
         title_line2 = lognames[0].split('/')[-1] + ' / ' + lognames[1].split('/')[-1]
@@ -505,8 +506,12 @@ def belts_calibration(lognames, kinematics, klipperdir='~/klipper', max_freq=200
     if kinematics == 'corexy':
         title_line3 = f'| Estimated similarity: {similarity_factor:.1f}%'
         title_line4 = f'| {mhi} (experimental)'
-        fig.text(0.55, 0.980, title_line3, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
-        fig.text(0.55, 0.945, title_line4, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
+        fig.text(0.55, 0.985, title_line3, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
+        fig.text(0.55, 0.950, title_line4, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
+
+    # Add the accel_per_hz value to the title
+    title_line5 = f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz'
+    fig.text(0.55, 0.915, title_line5, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
 
     # Plot the graphs
     plot_compare_frequency(ax1, signal1, signal2, signal1_belt, signal2_belt, max_freq)
@@ -530,6 +535,7 @@ def main():
     opts = optparse.OptionParser(usage)
     opts.add_option('-o', '--output', type='string', dest='output', default=None, help='filename of output graph')
     opts.add_option('-f', '--max_freq', type='float', default=200.0, help='maximum frequency to graph')
+    opts.add_option('--accel_per_hz', type='float', default=None, help='accel_per_hz used during the measurement')
     opts.add_option(
         '-k', '--klipper_dir', type='string', dest='klipperdir', default='~/klipper', help='main klipper directory'
     )
@@ -546,7 +552,9 @@ def main():
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
 
-    fig = belts_calibration(args, options.kinematics, options.klipperdir, options.max_freq)
+    fig = belts_calibration(
+        args, options.kinematics, options.klipperdir, options.max_freq, options.accel_per_hz, 'unknown'
+    )
     fig.savefig(options.output, dpi=150)
 
 

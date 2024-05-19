@@ -27,7 +27,7 @@ from ..helpers.common_func import (
     parse_log,
     setup_klipper_import,
 )
-from ..helpers.locale_utils import print_with_c_locale, set_locale
+from ..helpers.console_output import ConsoleOutput
 
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_EFFECT_THRESHOLD = 0.12
@@ -72,19 +72,19 @@ def calibrate_shaper(datas, max_smoothing, scv, max_freq):
             max_smoothing=max_smoothing,
             test_damping_ratios=None,
             max_freq=max_freq,
-            logger=print_with_c_locale,
+            logger=ConsoleOutput.print,
         )
     except TypeError:
-        print_with_c_locale(
+        ConsoleOutput.print(
             '[WARNING] You seem to be using an older version of Klipper that is not compatible with all the latest Shake&Tune features!'
         )
-        print_with_c_locale(
+        ConsoleOutput.print(
             'Shake&Tune now runs in compatibility mode: be aware that the results may be slightly off, since the real damping ratio cannot be used to create the filter recommendations'
         )
         compat = True
-        shaper, all_shapers = helper.find_best_shaper(calibration_data, max_smoothing, print_with_c_locale)
+        shaper, all_shapers = helper.find_best_shaper(calibration_data, max_smoothing, ConsoleOutput.print)
 
-    print_with_c_locale(
+    ConsoleOutput.print(
         '\n-> Recommended shaper is %s @ %.1f Hz (when using a square corner velocity of %.1f and a damping ratio of %.3f)'
         % (shaper.name.upper(), shaper.freq, scv, zeta)
     )
@@ -294,15 +294,22 @@ def plot_spectrogram(ax, t, bins, pdata, peaks, max_freq):
 ######################################################################
 
 
-def shaper_calibration(lognames, klipperdir='~/klipper', max_smoothing=None, scv=5.0, max_freq=200.0, st_version=None):
-    set_locale()
+def shaper_calibration(
+    lognames,
+    klipperdir='~/klipper',
+    max_smoothing=None,
+    scv=5.0,
+    max_freq=200.0,
+    accel_per_hz=None,
+    st_version='unknown',
+):
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
     # Parse data from the log files while ignoring CSV in the wrong format
     datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
     if len(datas) > 1:
-        print_with_c_locale('Warning: incorrect number of .csv files detected. Only the first one will be used!')
+        ConsoleOutput.print('Warning: incorrect number of .csv files detected. Only the first one will be used!')
 
     # Compute shapers, PSD outputs and spectrogram
     performance_shaper, shapers, calibration_data, fr, zeta, compat = calibrate_shaper(
@@ -329,7 +336,7 @@ def shaper_calibration(lognames, klipperdir='~/klipper', max_smoothing=None, scv
     # Print the peaks info in the console
     peak_freqs_formated = ['{:.1f}'.format(f) for f in peaks_freqs]
     num_peaks_above_effect_threshold = np.sum(calibration_data.psd_sum[peaks] > peaks_threshold[1])
-    print_with_c_locale(
+    ConsoleOutput.print(
         '\nPeaks detected on the graph: %d @ %s Hz (%d above effect threshold)'
         % (num_peaks, ', '.join(map(str, peak_freqs_formated)), num_peaks_above_effect_threshold)
     )
@@ -360,19 +367,23 @@ def shaper_calibration(lognames, klipperdir='~/klipper', max_smoothing=None, scv
         dt = datetime.strptime(f'{filename_parts[1]} {filename_parts[2]}', '%Y%m%d %H%M%S')
         title_line2 = dt.strftime('%x %X') + ' -- ' + filename_parts[3].upper().split('.')[0] + ' axis'
         if compat:
-            title_line3 = '| Compatibility mode with older Klipper,'
-            title_line4 = '| and no custom S&T parameters are used!'
+            title_line3 = '| Older Klipper version detected, damping ratio'
+            title_line4 = '| and SCV are not used for filter recommendations!'
+            title_line5 = f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz' if accel_per_hz is not None else ''
         else:
-            title_line3 = '| Square corner velocity: ' + str(scv) + 'mm/s'
-            title_line4 = '| Max allowed smoothing: ' + str(max_smoothing)
+            title_line3 = f'| Square corner velocity: {scv} mm/s'
+            title_line4 = f'| Max allowed smoothing: {max_smoothing}'
+            title_line5 = f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz' if accel_per_hz is not None else ''
     except Exception:
-        print_with_c_locale('Warning: CSV filename look to be different than expected (%s)' % (lognames[0]))
+        ConsoleOutput.print('Warning: CSV filename look to be different than expected (%s)' % (lognames[0]))
         title_line2 = lognames[0].split('/')[-1]
         title_line3 = ''
         title_line4 = ''
+        title_line5 = ''
     fig.text(0.12, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
-    fig.text(0.58, 0.960, title_line3, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
-    fig.text(0.58, 0.946, title_line4, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
+    fig.text(0.58, 0.965, title_line3, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
+    fig.text(0.58, 0.951, title_line4, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
+    fig.text(0.58, 0.919, title_line5, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
 
     # Plot the graphs
     plot_freq_response(
@@ -402,6 +413,7 @@ def main():
     opts.add_option(
         '--scv', '--square_corner_velocity', type='float', dest='scv', default=5.0, help='square corner velocity'
     )
+    opts.add_option('--accel_per_hz', type='float', default=None, help='accel_per_hz used during the measurement')
     opts.add_option(
         '-k', '--klipper_dir', type='string', dest='klipperdir', default='~/klipper', help='main klipper directory'
     )
@@ -413,7 +425,9 @@ def main():
     if options.max_smoothing is not None and options.max_smoothing < 0.05:
         opts.error('Too small max_smoothing specified (must be at least 0.05)')
 
-    fig = shaper_calibration(args, options.klipperdir, options.max_smoothing, options.scv, options.max_freq)
+    fig = shaper_calibration(
+        args, options.klipperdir, options.max_smoothing, options.scv, options.max_freq, options.accel_per_hz, 'unknown'
+    )
     fig.savefig(options.output, dpi=150)
 
 

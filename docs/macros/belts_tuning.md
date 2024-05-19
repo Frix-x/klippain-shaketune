@@ -1,6 +1,6 @@
 # Belt relative difference measurements
 
-The `COMPARE_BELTS_RESPONSES` macro is dedicated for CoreXY machines where it can help you to diagnose belt path problems by measuring and plotting the differences between their behavior. It will also help you tension your belts at the same tension.
+The `COMPARE_BELTS_RESPONSES` macro is dedicated for CoreXY machines where it can help you to diagnose belt path problems by measuring and plotting the differences between their behavior. It will also help you tension your belts at the same tension. Using it on Cartesian printers doesn't really make sense, as it's normal to have different responses in that case.
 
 
 ## Usage
@@ -11,11 +11,12 @@ Then, call the `COMPARE_BELTS_RESPONSES` macro and look for the graphs in the re
 
 | parameters | default value | description |
 |-----------:|---------------|-------------|
-|FREQ_START|5|Starting excitation frequency|
-|FREQ_END|133|Maximum excitation frequency|
-|HZ_PER_SEC|1|Number of Hz per seconds for the test|
-|KEEP_N_RESULTS|3|Total number of results to keep in the result folder after running the test. The older results are automatically cleaned up|
-|KEEP_CSV|0|Weither or not to keep the CSV data files alonside the PNG graphs|
+|FREQ_START|5|starting excitation frequency|
+|FREQ_END|133|maximum excitation frequency|
+|HZ_PER_SEC|1|number of Hz per seconds for the test|
+|ACCEL_PER_HZ|None|accel per Hz value used for the test. If unset, it will use the value from your `[resonance_tester]` config section (75 is the default)|
+|TRAVEL_SPEED|120|speed in mm/s used for all the travel movements (to go to the start position prior to the test)|
+|Z_HEIGHT|None|Z height wanted for the test. This value can be used if needed to override the Z value of the probe_point set in your `[resonance_tester]` config section|
 
 
 ## Graphs description
@@ -45,6 +46,10 @@ Paired peaks of exactly the same frequency will be on the same point (labeled A1
 
   1. **The estimated similarity** measure provides a quantitative view of how closely the frequency profiles of the two belts match across their entire range. A similarity value close to 100% means that the belts are well matched, indicating equal tension and uniform mechanical behavior.
   2. **The mechanical health indicator** provides another assessment of the printer's operating condition based on the estimated similarity and influenced by the number of paired and unpaired peaks. A noisy signal generally lowers the value of this indicator, indicating potential problems. However, this measure can sometimes be misleading, so it's important not to rely on it alone and to consider it in conjunction with the other information displayed.
+
+  > **Note**:
+  >
+  > If you are using this tool to check or adjust the tension after installing new belts, you will need to measure again after a few hours of printing, as the tension can change slightly as the belts stretch and settle to their final tension. Usually 24 hours should be sufficient.
 
 
 ## Advanced explanation on why 1 or 2 peaks
