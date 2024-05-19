@@ -111,6 +111,7 @@ class BeltsGraphCreator(GraphCreator):
         )
         fig = belts_calibration(
             lognames=[str(path) for path in lognames],
+            kinematics=self._kinematics,
             klipperdir=str(self._config.klipper_folder),
             accel_per_hz=self._accel_per_hz,
             st_version=self._version,

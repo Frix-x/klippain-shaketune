@@ -56,6 +56,7 @@ def compare_belts_responses(gcmd, config, st_thread: ShakeTuneThread) -> None:
         point = (x, y, z)
 
     toolhead.manual_move(point, feedrate_travel)
+    toolhead.dwell(0.5)
 
     # Configure the graph creator
     motors_config_parser = MotorsConfigParser(config, motors=None)

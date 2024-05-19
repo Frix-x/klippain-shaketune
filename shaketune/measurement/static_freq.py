@@ -50,6 +50,7 @@ def excitate_axis_at_freq(gcmd, config) -> None:
         point = (x, y, z)
 
     toolhead.manual_move(point, feedrate_travel)
+    toolhead.dwell(0.5)
 
     min_freq = freq - 1
     max_freq = freq + 1

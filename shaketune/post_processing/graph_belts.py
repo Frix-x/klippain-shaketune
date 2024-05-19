@@ -22,7 +22,7 @@ matplotlib.use('Agg')
 from ..helpers.common_func import detect_peaks, parse_log, setup_klipper_import
 from ..helpers.console_output import ConsoleOutput
 
-ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'  # For paired peaks names
+ALPHABET = 'αβγδεζηθικλμνξοπρστυφχψω'  # For paired peak names (using the Greek alphabet to avoid confusion with belt names)
 
 PEAKS_DETECTION_THRESHOLD = 0.1  # Threshold to detect peaks in the PSD signal (10% of max)
 DC_MAX_PEAKS = 2  # Maximum ideal number of peaks
@@ -524,7 +524,7 @@ def belts_calibration(
 
     # Adding Shake&Tune version in the top right corner
     if st_version != 'unknown':
-        fig.text(0.995, 0.985, st_version, ha='right', va='bottom', fontsize=8, color=KLIPPAIN_COLORS['purple'])
+        fig.text(0.995, 0.980, st_version, ha='right', va='bottom', fontsize=8, color=KLIPPAIN_COLORS['purple'])
 
     return fig
 

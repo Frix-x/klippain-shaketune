@@ -57,6 +57,7 @@ def axes_shaper_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
         point = (x, y, z)
 
     toolhead.manual_move(point, feedrate_travel)
+    toolhead.dwell(0.5)
 
     # Configure the graph creator
     creator = st_thread.get_graph_creator()

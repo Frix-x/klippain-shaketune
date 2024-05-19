@@ -25,7 +25,7 @@ Then, call the `COMPARE_BELTS_RESPONSES` macro and look for the graphs in the re
 
 ### Belts frequency profiles
 
-On these graphs, **you want both curves to look similar and overlap to form a single curve**: try to make them fit as closely as possible in frequency **and** in amplitude. Usually a belt graph is composed of one or two main peaks (more than 2 peaks can hint about mechanical problems). It's acceptable to have "noise" around the main peaks, but it should be present on both curves with a comparable amplitude. Keep in mind that when you tighten a belt, its peaks should move diagonally toward the upper right corner, changing significantly in amplitude and slightly in frequency. Additionally, the magnitude order of the main peaks *should typically* range from ~500k to ~2M on most machines.
+On these graphs, **you want both curves to look similar and overlap to form a single curve**: try to make them fit as closely as possible in frequency **and** in amplitude. Usually a belt graph is composed of one or two main paired peaks (more than 2 peaks can hint about mechanical problems). It's acceptable to have "noise" around the main peaks, but it should be present on both curves with a comparable amplitude. Keep in mind that when you tighten a belt, its peaks should move diagonally toward the upper right corner, changing significantly in amplitude and slightly in frequency. Additionally, the magnitude order of the main peaks *should typically* range from ~500k to ~2M on most machines.
 
 Aside from the actual belt tension, the resonant frequency/amplitude of the curves depends primarily on three parameters:
   - the *mass of the toolhead*, which is identical on CoreXY, CrossXY and H-Bot machines for both belts. So this will unlikely have any effect here
@@ -40,7 +40,7 @@ The Cross-Belts plot is an innovative cool way to compare the frequency profiles
 
 The good zone, wider at the bottom (low-amplitude regions where the deviation doesn't matter much) and narrower at the top right (high-energy region where the main peaks lie), represents acceptable deviations. So **you want all points to be close to the ideal center line and as many as possible within the green zone**, as this means that the bands are well tuned and behave similarly.
 
-Paired peaks of exactly the same frequency will be on the same point (labeled A1/A2, ...) and the distance from the center line will show the difference in energy. For paired peaks that also have a frequency delta between them, they are displayed as two points (labeled A1 and A2, ...) and the additional distance between them along the plotted line represents their frequency delta.
+Paired peaks of exactly the same frequency will be on the same point (labeled α1/α2, β1/β2, ...) and the distance from the center line will show the difference in energy. For paired peaks that also have a frequency delta between them, they are displayed as two points (labeled α1 and α2, ...) and the additional distance between them along the plotted line represents their frequency delta.
 
 ### Estimated similarity and mechanical issues indicator
 
