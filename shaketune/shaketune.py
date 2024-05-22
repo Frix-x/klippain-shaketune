@@ -39,20 +39,36 @@ class ShakeTune:
         ConsoleOutput.register_output_callback(gcode.respond_info)
 
         commands = [
-            ('EXCITATE_AXIS_AT_FREQ', self.cmd_EXCITATE_AXIS_AT_FREQ, 'Maintain a specified excitation frequency for a period of time to diagnose and locate a source of vibration'),
-            ('AXES_MAP_CALIBRATION', self.cmd_AXES_MAP_CALIBRATION, 'Perform a set of movements to measure the orientation of the accelerometer and help you set the best axes_map configuration for your printer'),
-            ('COMPARE_BELTS_RESPONSES', self.cmd_COMPARE_BELTS_RESPONSES, 'Perform a custom half-axis test to analyze and compare the frequency profiles of individual belts on CoreXY printers'),
-            ('AXES_SHAPER_CALIBRATION', self.cmd_AXES_SHAPER_CALIBRATION, 'Perform standard axis input shaper tests on one or both XY axes to select the best input shaper filter'),
-            ('CREATE_VIBRATIONS_PROFILE', self.cmd_CREATE_VIBRATIONS_PROFILE, 'Perform a set of movements to measure the orientation of the accelerometer and help you set the best axes_map configuration for your printer')
+            (
+                'EXCITATE_AXIS_AT_FREQ',
+                self.cmd_EXCITATE_AXIS_AT_FREQ,
+                'Maintain a specified excitation frequency for a period of time to diagnose and locate a source of vibration',
+            ),
+            (
+                'AXES_MAP_CALIBRATION',
+                self.cmd_AXES_MAP_CALIBRATION,
+                'Perform a set of movements to measure the orientation of the accelerometer and help you set the best axes_map configuration for your printer',
+            ),
+            (
+                'COMPARE_BELTS_RESPONSES',
+                self.cmd_COMPARE_BELTS_RESPONSES,
+                'Perform a custom half-axis test to analyze and compare the frequency profiles of individual belts on CoreXY printers',
+            ),
+            (
+                'AXES_SHAPER_CALIBRATION',
+                self.cmd_AXES_SHAPER_CALIBRATION,
+                'Perform standard axis input shaper tests on one or both XY axes to select the best input shaper filter',
+            ),
+            (
+                'CREATE_VIBRATIONS_PROFILE',
+                self.cmd_CREATE_VIBRATIONS_PROFILE,
+                'Perform a set of movements to measure the orientation of the accelerometer and help you set the best axes_map configuration for your printer',
+            ),
         ]
         command_descriptions = {name: desc for name, _, desc in commands}
 
         for name, command, description in commands:
-            gcode.register_command(
-                f'_{name}' if show_macros else name,
-                command,
-                desc=description
-            )
+            gcode.register_command(f'_{name}' if show_macros else name, command, desc=description)
 
         # Load the dummy macros with their description in order to show them in the web interfaces
         if show_macros:
@@ -60,19 +76,30 @@ class ShakeTune:
             dirname = os.path.dirname(os.path.realpath(__file__))
             filename = os.path.join(dirname, 'dummy_macros.cfg')
             try:
-                dummy_macros = pconfig.read_config(filename)
+                dummy_macros_cfg = pconfig.read_config(filename)
             except Exception as err:
                 raise config.error("Cannot load Shake&Tune dummy macro '%s'" % (filename,)) from err
-            for macro in dummy_macros.get_prefix_sections(''):
-                section = macro.get_name()
-                command = section.split(' ', 1)[1]
-                if command in command_descriptions:
-                    description = command_descriptions[command]
-                else:
-                    description = 'Shake&Tune macro'
-                macro.fileconfig._sections[section]['description'] = description
-                self._printer.load_object(dummy_macros, section)
 
+            for gcode_macro in dummy_macros_cfg.get_prefix_sections('gcode_macro '):
+                gcode_macro_name = gcode_macro.get_name()
+
+                # Replace the dummy description by the one here (to avoid code duplication and define it in only one place)
+                command = gcode_macro_name.split(' ', 1)[1]
+                description = command_descriptions.get(command, 'Shake&Tune macro')
+                gcode_macro.fileconfig.set(gcode_macro_name, 'description', description)
+
+                # Add the section to the Klipper configuration object with all its options
+                if not config.fileconfig.has_section(gcode_macro_name.lower()):
+                    config.fileconfig.add_section(gcode_macro_name.lower())
+                for option in gcode_macro.fileconfig.options(gcode_macro_name):
+                    value = gcode_macro.fileconfig.get(gcode_macro_name, option)
+                    config.fileconfig.set(gcode_macro_name.lower(), option, value)
+
+                    # Small trick to ensure the new injected sections are considered valid by Klipper config system
+                    config.access_tracking[(gcode_macro_name.lower(), option.lower())] = 1
+
+                # Finally, load the section within the printer objects
+                self._printer.load_object(config, gcode_macro_name.lower())
 
     def cmd_EXCITATE_AXIS_AT_FREQ(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
