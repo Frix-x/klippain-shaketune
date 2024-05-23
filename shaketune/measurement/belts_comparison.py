@@ -23,16 +23,31 @@ def compare_belts_responses(gcmd, config, st_thread: ShakeTuneThread) -> None:
     res_tester = printer.lookup_object('resonance_tester')
     systime = printer.get_reactor().monotonic()
 
-    accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy')
+    if accel_per_hz is None:
+        accel_per_hz = res_tester.test.accel_per_hz
+    max_accel = max_freq * accel_per_hz
+
+    # Configure the graph creator
+    motors_config_parser = MotorsConfigParser(config, motors=None)
+    creator = st_thread.get_graph_creator()
+    creator.configure(motors_config_parser.kinematics, accel_per_hz)
+
+    if motors_config_parser.kinematics == 'corexy':
+        filtered_config = [a for a in AXIS_CONFIG if a['axis'] in ('a', 'b')]
+        accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy')
+    elif motors_config_parser.kinematics == 'corexz':
+        filtered_config = [a for a in AXIS_CONFIG if a['axis'] in ('corexz_x', 'corexz_z')]
+        # For CoreXZ kinematics, we can use the X axis accelerometer as most of the time they are moving bed printers
+        accel_chip = Accelerometer.find_axis_accelerometer(printer, 'x')
+    else:
+        gcmd.error('Only CoreXY and CoreXZ kinematics are supported for the belt comparison tool!')
+    ConsoleOutput.print(f'{motors_config_parser.kinematics.upper()} kinematics mode')
+
     if accel_chip is None:
         gcmd.error(
             'No suitable accelerometer found for measurement! Multi-accelerometer configurations are not supported for this macro.'
         )
     accelerometer = Accelerometer(printer.lookup_object(accel_chip))
-
-    if accel_per_hz is None:
-        accel_per_hz = res_tester.test.accel_per_hz
-    max_accel = max_freq * accel_per_hz
 
     # Move to the starting point
     test_points = res_tester.test.get_start_test_points()
@@ -58,11 +73,6 @@ def compare_belts_responses(gcmd, config, st_thread: ShakeTuneThread) -> None:
     toolhead.manual_move(point, feedrate_travel)
     toolhead.dwell(0.5)
 
-    # Configure the graph creator
-    motors_config_parser = MotorsConfigParser(config, motors=None)
-    creator = st_thread.get_graph_creator()
-    creator.configure(motors_config_parser.kinematics, accel_per_hz)
-
     # set the needed acceleration values for the test
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']
@@ -76,8 +86,7 @@ def compare_belts_responses(gcmd, config, st_thread: ShakeTuneThread) -> None:
     else:
         input_shaper = None
 
-    # Filter axis configurations to get the A and B axis only
-    filtered_config = [a for a in AXIS_CONFIG if a['axis'] in ('a', 'b')]
+    # Run the test for each axis
     for config in filtered_config:
         accelerometer.start_measurement()
         vibrate_axis(toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz)

@@ -20,6 +20,8 @@ AXIS_CONFIG = [
     {'axis': 'y', 'direction': (0, 1, 0), 'label': 'axis_Y'},
     {'axis': 'a', 'direction': (1, -1, 0), 'label': 'belt_A'},
     {'axis': 'b', 'direction': (1, 1, 0), 'label': 'belt_B'},
+    {'axis': 'corexz_x', 'direction': (1, 0, 1), 'label': 'belt_X'},
+    {'axis': 'corexz_z', 'direction': (-1, 0, 1), 'label': 'belt_Z'},
 ]
 
 
