@@ -22,7 +22,9 @@ matplotlib.use('Agg')
 from ..helpers.common_func import detect_peaks, parse_log, setup_klipper_import
 from ..helpers.console_output import ConsoleOutput
 
-ALPHABET = 'αβγδεζηθικλμνξοπρστυφχψω'  # For paired peak names (using the Greek alphabet to avoid confusion with belt names)
+ALPHABET = (
+    'αβγδεζηθικλμνξοπρστυφχψω'  # For paired peak names (using the Greek alphabet to avoid confusion with belt names)
+)
 
 PEAKS_DETECTION_THRESHOLD = 0.1  # Threshold to detect peaks in the PSD signal (10% of max)
 DC_MAX_PEAKS = 2  # Maximum ideal number of peaks
@@ -503,7 +505,7 @@ def belts_calibration(
 
     # We add the estimated similarity and the MHI value to the title only if the kinematics is CoreXY
     # as it make no sense to compute these values for other kinematics that doesn't have paired belts
-    if kinematics == 'corexy':
+    if kinematics in ['corexy', 'corexz']:
         title_line3 = f'| Estimated similarity: {similarity_factor:.1f}%'
         title_line4 = f'| {mhi} (experimental)'
         fig.text(0.55, 0.985, title_line3, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
