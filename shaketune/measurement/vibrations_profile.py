@@ -34,13 +34,10 @@ def create_vibrations_profile(gcmd, config, st_thread: ShakeTuneThread) -> None:
         gcmd.error('Input shaper is not configured! Please run the shaper calibration macro first.')
 
     motors_config_parser = MotorsConfigParser(config, motors=['stepper_x', 'stepper_y'])
-
     if motors_config_parser.kinematics == 'cartesian' or motors_config_parser.kinematics == 'corexz':
-        # Cartesian motors are on X and Y axis directly, same for CoreXZ
-        main_angles = [0, 90]
+        main_angles = [0, 90]  # Cartesian motors are on X and Y axis directly, same for CoreXZ
     elif motors_config_parser.kinematics == 'corexy':
-        # CoreXY motors are on A and B axis (45 and 135 degrees)
-        main_angles = [45, 135]
+        main_angles = [45, 135]  # CoreXY motors are on A and B axis (45 and 135 degrees)
     else:
         gcmd.error(
             'Only Cartesian, CoreXY and CoreXZ kinematics are supported at the moment for the vibrations measurement tool!'
@@ -74,13 +71,14 @@ def create_vibrations_profile(gcmd, config, st_thread: ShakeTuneThread) -> None:
         # and then find the best accelerometer chip for the current angle if not manually specified
         angle_to_axis = {0: 'x', 90: 'y'}
         accel_axis = angle_to_axis.get(curr_angle, 'xy')
-        if accel_chip is None:
-            accel_chip = Accelerometer.find_axis_accelerometer(printer, accel_axis)
-        k_accelerometer = printer.lookup_object(accel_chip, None)
+        current_accel_chip = accel_chip  # to retain the manually specified chip
+        if current_accel_chip is None:
+            current_accel_chip = Accelerometer.find_axis_accelerometer(printer, accel_axis)
+        k_accelerometer = printer.lookup_object(current_accel_chip, None)
         if k_accelerometer is None:
-            gcmd.error(f'Error: accelerometer "{accel_chip}" not found!')
+            gcmd.error(f'Error: accelerometer [{current_accel_chip}] not found!')
         accelerometer = Accelerometer(k_accelerometer)
-        ConsoleOutput.print(f'Accelerometer chip for {curr_angle} degree angle: {accel_chip}')
+        ConsoleOutput.print(f'Accelerometer chip used for this angle: [{current_accel_chip}]')
 
         # Sweep the speed range to record the vibrations at different speeds
         for curr_speed_sample in range(nb_speed_samples):
