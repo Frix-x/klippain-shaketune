@@ -84,9 +84,7 @@ def axes_shaper_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
         # First we need to find the accelerometer chip suited for the axis
         accel_chip = Accelerometer.find_axis_accelerometer(printer, config['axis'])
         if accel_chip is None:
-            gcmd.error(
-                'No suitable accelerometer found for measurement! Multi-accelerometer configurations are not supported for this macro.'
-            )
+            gcmd.error('No suitable accelerometer found for measurement!')
         accelerometer = Accelerometer(printer.lookup_object(accel_chip))
 
         # Then do the actual measurements
@@ -98,6 +96,7 @@ def axes_shaper_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
         ConsoleOutput.print(f'{config["axis"].upper()} axis frequency profile generation...')
         ConsoleOutput.print('This may take some time (1-3min)')
         st_thread.run()
+        st_thread.wait_for_completion()
 
     # Re-enable the input shaper if it was active
     if input_shaper is not None:

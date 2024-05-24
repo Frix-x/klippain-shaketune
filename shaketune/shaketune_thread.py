@@ -4,6 +4,7 @@
 import os
 import threading
 import traceback
+from typing import Optional
 
 from .helpers import filemanager as fm
 from .helpers.console_output import ConsoleOutput
@@ -11,33 +12,41 @@ from .shaketune_config import ShakeTuneConfig
 
 
 class ShakeTuneThread(threading.Thread):
-    def __init__(self, config: ShakeTuneConfig, graph_creator, reactor, timeout: float):
+    def __init__(self, config: ShakeTuneConfig, graph_creator, timeout: Optional[float] = None) -> None:
         super(ShakeTuneThread, self).__init__()
         self._config = config
         self.graph_creator = graph_creator
-        self._reactor = reactor
         self._timeout = timeout
+
+        self._internal_thread = None
+        self._stop_event = threading.Event()
 
     def get_graph_creator(self):
         return self.graph_creator
 
     def run(self) -> None:
         # Start the target function in a new thread
-        internal_thread = threading.Thread(target=self._shaketune_thread, args=(self.graph_creator,))
-        internal_thread.start()
+        self._internal_thread = threading.Thread(target=self._shaketune_thread, args=(self.graph_creator,))
+        self._internal_thread.start()
 
-        # Monitor the thread execution and stop it if it takes too long
-        event_time = self._reactor.monotonic()
-        end_time = event_time + self._timeout
-        while event_time < end_time:
-            event_time = self._reactor.pause(event_time + 0.05)
-            if not internal_thread.is_alive():
-                break
+        # If a timeout is specified, start a timer thread to monitor the timeout
+        if self._timeout is not None:
+            timer_thread = threading.Timer(self._timeout, self._handle_timeout)
+            timer_thread.start()
 
-    # This function run in its own thread is used to do the CSV analysis and create the graphs
+    def _handle_timeout(self) -> None:
+        if self._internal_thread.is_alive():
+            self._stop_event.set()
+            ConsoleOutput.print('Timeout: Shake&Tune computation did not finish within the specified timeout!')
+
+    def wait_for_completion(self) -> None:
+        if self._internal_thread is not None:
+            self._internal_thread.join()
+
+    # This function run in a thread is used to do the CSV analysis and create the graphs
     def _shaketune_thread(self, graph_creator) -> None:
         # Trying to reduce the Shake&Tune prost-processing thread priority to avoid slowing down the main Klipper process
-        # as this could lead to random "Timer" errors when already running CANbus, etc...
+        # as this could lead to random "Timer too close" errors when already running CANbus, etc...
         try:
             os.nice(20)
         except Exception:

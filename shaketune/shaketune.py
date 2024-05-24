@@ -27,7 +27,7 @@ class ShakeTune:
         if res_tester is None:
             config.error('No [resonance_tester] config section found in printer.cfg! Please add one to use Shake&Tune.')
 
-        self.timeout = config.getfloat('timeout', 2.0, above=0.0)
+        self.timeout = config.getfloat('timeout', 300, above=0.0)
         result_folder = config.get('result_folder', default='~/printer_data/config/ShakeTune_results')
         result_folder_path = Path(result_folder).expanduser() if result_folder else None
         keep_n_results = config.getint('number_of_results_to_keep', default=3, minval=0)
@@ -108,23 +108,23 @@ class ShakeTune:
     def cmd_AXES_MAP_CALIBRATION(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
         axes_map_finder = AxesMapFinder(self._config)
-        st_thread = ShakeTuneThread(self._config, axes_map_finder, self._printer.get_reactor(), self.timeout)
+        st_thread = ShakeTuneThread(self._config, axes_map_finder, self.timeout)
         axes_map_calibration(gcmd, self._pconfig, st_thread)
 
     def cmd_COMPARE_BELTS_RESPONSES(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
         belt_graph_creator = BeltsGraphCreator(self._config)
-        st_thread = ShakeTuneThread(self._config, belt_graph_creator, self._printer.get_reactor(), self.timeout)
+        st_thread = ShakeTuneThread(self._config, belt_graph_creator, self.timeout)
         compare_belts_responses(gcmd, self._pconfig, st_thread)
 
     def cmd_AXES_SHAPER_CALIBRATION(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
         shaper_graph_creator = ShaperGraphCreator(self._config)
-        st_thread = ShakeTuneThread(self._config, shaper_graph_creator, self._printer.get_reactor(), self.timeout)
+        st_thread = ShakeTuneThread(self._config, shaper_graph_creator, self.timeout)
         axes_shaper_calibration(gcmd, self._pconfig, st_thread)
 
     def cmd_CREATE_VIBRATIONS_PROFILE(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
         vibration_profile_creator = VibrationsGraphCreator(self._config)
-        st_thread = ShakeTuneThread(self._config, vibration_profile_creator, self._printer.get_reactor(), self.timeout)
+        st_thread = ShakeTuneThread(self._config, vibration_profile_creator, self.timeout)
         create_vibrations_profile(gcmd, self._pconfig, st_thread)
