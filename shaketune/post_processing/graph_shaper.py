@@ -32,7 +32,7 @@ from ..helpers.console_output import ConsoleOutput
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_EFFECT_THRESHOLD = 0.12
 SPECTROGRAM_LOW_PERCENTILE_FILTER = 5
-MAX_SMOOTHING = 0.1
+MAX_VIBRATIONS = 5.0
 
 KLIPPAIN_COLORS = {
     'purple': '#70088C',
@@ -98,7 +98,7 @@ def calibrate_shaper(datas, max_smoothing, scv, max_freq):
 
 
 def plot_freq_response(
-    ax, calibration_data, shapers, performance_shaper, peaks, peaks_freqs, peaks_threshold, fr, zeta, max_freq
+    ax, calibration_data, shapers, klipper_shaper_choice, peaks, peaks_freqs, peaks_threshold, fr, zeta, max_freq
 ):
     freqs = calibration_data.freqs
     psd = calibration_data.psd_sum
@@ -128,13 +128,7 @@ def plot_freq_response(
     ax2 = ax.twinx()
     ax2.yaxis.set_visible(False)
 
-    lowvib_shaper_vibrs = float('inf')
-    lowvib_shaper = None
-    lowvib_shaper_freq = None
-    lowvib_shaper_accel = 0
-
     # Draw the shappers curves and add their specific parameters in the legend
-    # This adds also a way to find the best shaper with a low level of vibrations (with a resonable level of smoothing)
     for shaper in shapers:
         shaper_max_accel = round(shaper.max_accel / 100.0) * 100.0
         label = '%s (%.1f Hz, vibr=%.1f%%, sm~=%.2f, accel<=%.f)' % (
@@ -146,58 +140,75 @@ def plot_freq_response(
         )
         ax2.plot(freqs, shaper.vals, label=label, linestyle='dotted')
 
-        # Get the performance shaper
-        if shaper.name == performance_shaper:
-            performance_shaper_freq = shaper.freq
-            performance_shaper_vibr = shaper.vibrs * 100.0
-            performance_shaper_vals = shaper.vals
+        # Get the Klipper recommended shaper (usually it's a good low vibration compromise)
+        if shaper.name == klipper_shaper_choice:
+            klipper_shaper_freq = shaper.freq
+            klipper_shaper_vals = shaper.vals
+            klipper_shaper_accel = shaper_max_accel
 
-        # Get the low vibration shaper
+    # This adds also the two selected shapers with good performances or low level of vibrations
+    perf_shaper_vibrs = float('inf')
+    perf_shaper = None
+    perf_shaper_vals = None
+    perf_shaper_freq = None
+    perf_shaper_accel = 0
+    for shaper in shapers:
+        shaper_max_accel = round(shaper.max_accel / 100.0) * 100.0
+        # Get the a new performance filter that have higher accel than Klipper filter reco but still under 5% vibration
+        # as this looks to be reasonable when injecting the SCV and damping ratio in the computation...
         if (
-            shaper.vibrs * 100 < lowvib_shaper_vibrs
-            or (shaper.vibrs * 100 == lowvib_shaper_vibrs and shaper_max_accel > lowvib_shaper_accel)
-        ) and shaper.smoothing < MAX_SMOOTHING:
-            lowvib_shaper_accel = shaper_max_accel
-            lowvib_shaper = shaper.name
-            lowvib_shaper_freq = shaper.freq
-            lowvib_shaper_vibrs = shaper.vibrs * 100
-            lowvib_shaper_vals = shaper.vals
+            shaper_max_accel > klipper_shaper_accel
+            and shaper.vibrs * 100 < MAX_VIBRATIONS
+            and (
+                shaper.vibrs * 100 < perf_shaper_vibrs
+                or (shaper.vibrs * 100 == perf_shaper_vibrs and shaper_max_accel > perf_shaper_accel)
+            )
+        ):
+            perf_shaper_accel = shaper_max_accel
+            perf_shaper = shaper.name
+            perf_shaper_freq = shaper.freq
+            perf_shaper_vibrs = shaper.vibrs * 100
+            perf_shaper_vals = shaper.vals
 
-    # User recommendations are added to the legend: one is Klipper's original suggestion that is usually good for performances
-    # and the other one is the custom "low vibration" recommendation that looks for a suitable shaper that doesn't have excessive
-    # smoothing and that have a lower vibration level. If both recommendation are the same shaper, or if no suitable "low
-    # vibration" shaper is found, then only a single line as the "best shaper" recommendation is added to the legend
-    if (
-        lowvib_shaper is not None
-        and lowvib_shaper != performance_shaper
-        and lowvib_shaper_vibrs <= performance_shaper_vibr
-    ):
+    # User recommendations are added to the legend: one is Klipper's original suggestion that is usually good for low vibrations
+    # and the other one is the custom "performance" recommendation that looks for a suitable shaper that doesn't have excessive
+    # vibrations level but have higher accelerations. If both recommendation are the same shaper, or if no suitable "performance"
+    # shaper is found, then only a single line as the "best shaper" recommendation is added to the legend
+    if perf_shaper is not None and perf_shaper != klipper_shaper_choice and perf_shaper_accel >= klipper_shaper_accel:
         ax2.plot(
             [],
             [],
             ' ',
-            label='Recommended performance shaper: %s @ %.1f Hz'
-            % (performance_shaper.upper(), performance_shaper_freq),
+            label='Recommended performance shaper: %s @ %.1f Hz' % (perf_shaper.upper(), perf_shaper_freq),
         )
         ax.plot(
-            freqs, psd * performance_shaper_vals, label='With %s applied' % (performance_shaper.upper()), color='cyan'
+            freqs,
+            psd * perf_shaper_vals,
+            label='With %s applied' % (perf_shaper.upper()),
+            color='cyan',
         )
         ax2.plot(
             [],
             [],
             ' ',
-            label='Recommended low vibrations shaper: %s @ %.1f Hz' % (lowvib_shaper.upper(), lowvib_shaper_freq),
+            label='Recommended low vibrations shaper: %s @ %.1f Hz'
+            % (klipper_shaper_choice.upper(), klipper_shaper_freq),
         )
-        ax.plot(freqs, psd * lowvib_shaper_vals, label='With %s applied' % (lowvib_shaper.upper()), color='lime')
+        ax.plot(
+            freqs, psd * klipper_shaper_vals, label='With %s applied' % (klipper_shaper_choice.upper()), color='lime'
+        )
     else:
         ax2.plot(
             [],
             [],
             ' ',
-            label='Recommended best shaper: %s @ %.1f Hz' % (performance_shaper.upper(), performance_shaper_freq),
+            label='Recommended best shaper: %s @ %.1f Hz' % (klipper_shaper_choice.upper(), klipper_shaper_freq),
         )
         ax.plot(
-            freqs, psd * performance_shaper_vals, label='With %s applied' % (performance_shaper.upper()), color='cyan'
+            freqs,
+            psd * klipper_shaper_vals,
+            label='With %s applied' % (klipper_shaper_choice.upper()),
+            color='cyan',
         )
 
     # And the estimated damping ratio is finally added at the end of the legend
@@ -312,7 +323,7 @@ def shaper_calibration(
         ConsoleOutput.print('Warning: incorrect number of .csv files detected. Only the first one will be used!')
 
     # Compute shapers, PSD outputs and spectrogram
-    performance_shaper, shapers, calibration_data, fr, zeta, compat = calibrate_shaper(
+    klipper_shaper_choice, shapers, calibration_data, fr, zeta, compat = calibrate_shaper(
         datas[0], max_smoothing, scv, max_freq
     )
     pdata, bins, t = compute_spectrogram(datas[0])
@@ -387,7 +398,7 @@ def shaper_calibration(
 
     # Plot the graphs
     plot_freq_response(
-        ax1, calibration_data, shapers, performance_shaper, peaks, peaks_freqs, peaks_threshold, fr, zeta, max_freq
+        ax1, calibration_data, shapers, klipper_shaper_choice, peaks, peaks_freqs, peaks_threshold, fr, zeta, max_freq
     )
     plot_spectrogram(ax2, t, bins, pdata, peaks_freqs, max_freq)
 
