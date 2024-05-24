@@ -43,7 +43,7 @@ def create_vibrations_profile(gcmd, config, st_thread: ShakeTuneThread) -> None:
         main_angles = [45, 135]
     else:
         gcmd.error(
-            'Only Cartesian and CoreXY kinematics are supported at the moment for the vibrations measurement tool!'
+            'Only Cartesian, CoreXY and CoreXZ kinematics are supported at the moment for the vibrations measurement tool!'
         )
     ConsoleOutput.print(f'{motors_config_parser.kinematics.upper()} kinematics mode')
 

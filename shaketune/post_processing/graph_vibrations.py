@@ -637,12 +637,12 @@ def vibrations_profile(
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
-    if kinematics == 'cartesian':
+    if kinematics == 'cartesian' or kinematics == 'corexz':
         main_angles = [0, 90]
     elif kinematics == 'corexy':
         main_angles = [45, 135]
     else:
-        raise ValueError('Only Cartesian and CoreXY kinematics are supported by this tool at the moment!')
+        raise ValueError('Only Cartesian, CoreXY and CoreXZ kinematics are supported by this tool at the moment!')
 
     psds = defaultdict(lambda: defaultdict(list))
     psds_sum = defaultdict(lambda: defaultdict(list))
@@ -830,8 +830,8 @@ def main():
         opts.error('No CSV file(s) to analyse')
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
-    if options.kinematics not in ['cartesian', 'corexy']:
-        opts.error('Only cartesian and corexy kinematics are supported by this tool at the moment!')
+    if options.kinematics not in ['cartesian', 'corexy', 'corexz']:
+        opts.error('Only cartesian, corexy and corexz kinematics are supported by this tool at the moment!')
 
     fig = vibrations_profile(args, options.klipperdir, options.kinematics, options.accel, options.max_freq)
     fig.savefig(options.output, dpi=150)
