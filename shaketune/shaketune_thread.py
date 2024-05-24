@@ -45,7 +45,7 @@ class ShakeTuneThread(threading.Thread):
 
     # This function run in a thread is used to do the CSV analysis and create the graphs
     def _shaketune_thread(self, graph_creator) -> None:
-        # Trying to reduce the Shake&Tune prost-processing thread priority to avoid slowing down the main Klipper process
+        # Trying to reduce the Shake&Tune post-processing thread priority to avoid slowing down the main Klipper process
         # as this could lead to random "Timer too close" errors when already running CANbus, etc...
         try:
             os.nice(20)
