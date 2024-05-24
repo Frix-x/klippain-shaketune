@@ -10,7 +10,6 @@ from typing import Callable, Optional
 
 from matplotlib.figure import Figure
 
-from ..helpers import filemanager as fm
 from ..helpers.console_output import ConsoleOutput
 from ..measurement.motorsconfigparser import MotorsConfigParser
 from ..shaketune_config import ShakeTuneConfig
@@ -53,7 +52,6 @@ class GraphCreator(abc.ABC):
 
         lognames = []
         for filename in sorted(globbed_files, key=lambda f: f.stat().st_mtime, reverse=True)[:min_files_required]:
-            fm.wait_file_ready(filename)
             custom_name = custom_name_func(filename) if custom_name_func else filename.name
             new_file = self._folder / f'{self._type}_{self._graph_date}_{custom_name}.csv'
             # shutil.move() is needed to move the file across filesystems (mainly for BTT CB1 Pi default OS image)

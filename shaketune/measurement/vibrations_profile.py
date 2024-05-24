@@ -70,20 +70,17 @@ def create_vibrations_profile(gcmd, config, st_thread: ShakeTuneThread) -> None:
         ConsoleOutput.print(f'-> Measuring angle: {curr_angle} degrees...')
         radian_angle = math.radians(curr_angle)
 
-        # Find the best accelerometer chip for the current angle if not specified
-        if curr_angle == 0:
-            accel_axis = 'x'
-        elif curr_angle == 90:
-            accel_axis = 'y'
-        else:
-            accel_axis = 'xy'
+        # Map angles to accelerometer axes and default to 'xy' if angle is not 0 or 90 degrees
+        # and then find the best accelerometer chip for the current angle if not manually specified
+        angle_to_axis = {0: 'x', 90: 'y'}
+        accel_axis = angle_to_axis.get(curr_angle, 'xy')
         if accel_chip is None:
             accel_chip = Accelerometer.find_axis_accelerometer(printer, accel_axis)
-            if accel_chip is None:
-                gcmd.error(
-                    'No accelerometer specified for measurement! Multi-accelerometer configurations are not supported for this macro.'
-                )
-        accelerometer = Accelerometer(printer.lookup_object(accel_chip))
+        k_accelerometer = printer.lookup_object(accel_chip, None)
+        if k_accelerometer is None:
+            gcmd.error(f'Error: accelerometer "{accel_chip}" not found!')
+        accelerometer = Accelerometer(k_accelerometer)
+        ConsoleOutput.print(f'Accelerometer chip for {curr_angle} degree angle: {accel_chip}')
 
         # Sweep the speed range to record the vibrations at different speeds
         for curr_speed_sample in range(nb_speed_samples):

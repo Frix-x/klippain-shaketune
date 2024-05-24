@@ -6,7 +6,6 @@ import threading
 import traceback
 from typing import Optional
 
-from .helpers import filemanager as fm
 from .helpers.console_output import ConsoleOutput
 from .shaketune_config import ShakeTuneConfig
 
@@ -52,7 +51,9 @@ class ShakeTuneThread(threading.Thread):
         except Exception:
             ConsoleOutput.print('Warning: failed reducing Shake&Tune thread priority, continuing...')
 
-        fm.ensure_folders_exist(self._config.get_results_subfolders())
+        # Ensure the output folders exist
+        for folder in self._config.get_results_subfolders():
+            folder.mkdir(parents=True, exist_ok=True)
 
         try:
             graph_creator.create_graph()

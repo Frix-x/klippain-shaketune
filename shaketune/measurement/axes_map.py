@@ -11,20 +11,17 @@ def axes_map_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
     speed = gcmd.get_float('SPEED', default=80.0, minval=20.0)
     accel = gcmd.get_int('ACCEL', default=1500, minval=100)
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
-    accel_chip = gcmd.get('ACCEL_CHIP', default=None)
 
     printer = config.get_printer()
     gcode = printer.lookup_object('gcode')
     toolhead = printer.lookup_object('toolhead')
     systime = printer.get_reactor().monotonic()
 
-    if accel_chip is None:
-        accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy')
-        if accel_chip is None:
-            gcmd.error(
-                'No accelerometer specified for measurement! Multi-accelerometer configurations are not supported for this macro.'
-            )
-    accelerometer = Accelerometer(printer.lookup_object(accel_chip))
+    accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy')
+    k_accelerometer = printer.lookup_object(accel_chip, None)
+    if k_accelerometer is None:
+        gcmd.error('Error: multi-accelerometer configurations are not supported for this macro!')
+    accelerometer = Accelerometer(k_accelerometer)
 
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']

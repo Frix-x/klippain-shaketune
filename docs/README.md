@@ -89,7 +89,6 @@ Here are the parameters available when calling this macro:
 |SPEED|80|speed of the toolhead in mm/s for the movements|
 |ACCEL|1500 (or max printer accel)|accel in mm/s^2 used for all the moves|
 |TRAVEL_SPEED|120|speed in mm/s used for all the travels moves|
-|ACCEL_CHIP|None|accelerometer to use for the test. If unset, it will automatically select the proper accelerometer based on what is configured in your `[resonance_tester]` config section|
 
 The machine will move slightly in +X, +Y, and +Z, and output in the console: `Detected axes_map: -z,y,x`.
 
