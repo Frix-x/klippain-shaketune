@@ -6,13 +6,31 @@
 # Written by Frix_x#0161 #
 
 import optparse
+import os
+from datetime import datetime
 
+import matplotlib
+import matplotlib.colors
+import matplotlib.font_manager
+import matplotlib.pyplot as plt
+import matplotlib.ticker
 import numpy as np
-from scipy.signal import butter, filtfilt
+import pywt
+from scipy import stats
 
+matplotlib.use('Agg')
+
+from ..helpers.common_func import parse_log
 from ..helpers.console_output import ConsoleOutput
 
-NUM_POINTS = 500
+KLIPPAIN_COLORS = {
+    'purple': '#70088C',
+    'orange': '#FF8D32',
+    'dark_purple': '#150140',
+    'dark_orange': '#F24130',
+    'red_pink': '#F2055C',
+}
+MACHINE_AXES = ['x', 'y', 'z']
 
 
 ######################################################################
@@ -20,58 +38,206 @@ NUM_POINTS = 500
 ######################################################################
 
 
-def accel_signal_filter(data, cutoff=2, fs=100, order=5):
-    nyq = 0.5 * fs
-    normal_cutoff = cutoff / nyq
-    b, a = butter(order, normal_cutoff, btype='low', analog=False)
-    filtered_data = filtfilt(b, a, data)
-    filtered_data -= np.mean(filtered_data)
-    return filtered_data
+def wavelet_denoise(data, wavelet='db1', level=1):
+    coeffs = pywt.wavedec(data, wavelet, mode='smooth')
+    threshold = np.median(np.abs(coeffs[-level])) / 0.6745 * np.sqrt(2 * np.log(len(data)))
+    new_coeffs = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
+    denoised_data = pywt.waverec(new_coeffs, wavelet)
+
+    # Compute noise by subtracting denoised data from original data
+    noise = data - denoised_data[: len(data)]
+    return denoised_data, noise
 
 
-def find_first_spike(data):
-    min_index, max_index = np.argmin(data), np.argmax(data)
-    return ('-', min_index) if min_index < max_index else ('', max_index)
+def process_acceleration_data(time, accel_x, accel_y, accel_z):
+    # Calculate the constant offset (gravity component)
+    offset_x = np.mean(accel_x)
+    offset_y = np.mean(accel_y)
+    offset_z = np.mean(accel_z)
+
+    # Remove the constant offset from acceleration data
+    accel_x -= offset_x
+    accel_y -= offset_y
+    accel_z -= offset_z
+
+    # Apply wavelet denoising
+    accel_x, noise_x = wavelet_denoise(accel_x)
+    accel_y, noise_y = wavelet_denoise(accel_y)
+    accel_z, noise_z = wavelet_denoise(accel_z)
+
+    # Integrate acceleration to get velocity using trapezoidal rule
+    velocity_x = np.array([np.trapz(accel_x[:i], time[:i]) for i in range(1, len(time))])
+    velocity_y = np.array([np.trapz(accel_y[:i], time[:i]) for i in range(1, len(time))])
+    velocity_z = np.array([np.trapz(accel_z[:i], time[:i]) for i in range(1, len(time))])
+
+    # Correct drift in velocity by resetting to zero at the beginning and end
+    velocity_x -= np.linspace(velocity_x[0], velocity_x[-1], len(velocity_x))
+    velocity_y -= np.linspace(velocity_y[0], velocity_y[-1], len(velocity_y))
+    velocity_z -= np.linspace(velocity_z[0], velocity_z[-1], len(velocity_z))
+
+    # Integrate velocity to get position using trapezoidal rule
+    position_x = np.array([np.trapz(velocity_x[:i], time[:i]) for i in range(1, len(time))])
+    position_y = np.array([np.trapz(velocity_y[:i], time[:i]) for i in range(1, len(time))])
+    position_z = np.array([np.trapz(velocity_z[:i], time[:i]) for i in range(1, len(time))])
+
+    noise_intensity = np.mean([np.std(noise_x), np.std(noise_y), np.std(noise_z)])
+
+    return offset_x, offset_y, offset_z, position_x, position_y, position_z, noise_intensity
 
 
-def get_movement_vector(data, start_idx, end_idx):
-    if start_idx < end_idx:
-        vector = []
-        for i in range(3):
-            vector.append(np.mean(data[i][start_idx:end_idx], axis=0))
-        return vector
-    else:
-        return np.zeros(3)
+def scale_positions_to_fixed_length(position_x, position_y, position_z, fixed_length):
+    # Calculate the total distance traveled in 3D space
+    total_distance = np.sqrt(np.diff(position_x) ** 2 + np.diff(position_y) ** 2 + np.diff(position_z) ** 2).sum()
+    scale_factor = fixed_length / total_distance
+
+    # Apply the scale factor to the positions
+    position_x *= scale_factor
+    position_y *= scale_factor
+    position_z *= scale_factor
+
+    return position_x, position_y, position_z
 
 
-def angle_between(v1, v2):
-    v1_u = v1 / np.linalg.norm(v1)
-    v2_u = v2 / np.linalg.norm(v2)
-    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+def find_nearest_perfect_vector(average_direction_vector):
+    # Define the perfect vectors
+    perfect_vectors = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1], [-1, 0, 0], [0, -1, 0], [0, 0, -1]])
+
+    # Find the nearest perfect vector
+    dot_products = perfect_vectors @ average_direction_vector
+    nearest_vector_idx = np.argmax(dot_products)
+    nearest_vector = perfect_vectors[nearest_vector_idx]
+
+    # Calculate the angle error
+    angle_error = np.arccos(dot_products[nearest_vector_idx]) * 180 / np.pi
+
+    return nearest_vector, angle_error
 
 
-def compute_errors(filtered_data, spikes_sorted, accel_value, num_points):
-    # Get the movement start points in the correct order from the sorted bag of spikes
-    movement_starts = [spike[0][1] for spike in spikes_sorted]
+def linear_regression_direction(position_x, position_y, position_z, trim_length=0.25):
+    # Trim the start and end of the position data to keep only the center of the segment
+    # as the start and stop positions are not always perfectly aligned and can be a bit noisy
+    t = len(position_x)
+    trim_start = int(t * trim_length)
+    trim_end = int(t * (1 - trim_length))
+    position_x = position_x[trim_start:trim_end]
+    position_y = position_y[trim_start:trim_end]
+    position_z = position_z[trim_start:trim_end]
 
-    # Theoretical unit vectors for X, Y, Z printer axes
-    printer_axes = {'x': np.array([1, 0, 0]), 'y': np.array([0, 1, 0]), 'z': np.array([0, 0, 1])}
+    # Compute the direction vector using linear regression over the position data
+    time = np.arange(len(position_x))
+    slope_x, intercept_x, _, _, _ = stats.linregress(time, position_x)
+    slope_y, intercept_y, _, _, _ = stats.linregress(time, position_y)
+    slope_z, intercept_z, _, _, _ = stats.linregress(time, position_z)
+    end_position = np.array(
+        [slope_x * time[-1] + intercept_x, slope_y * time[-1] + intercept_y, slope_z * time[-1] + intercept_z]
+    )
+    direction_vector = end_position - np.array([intercept_x, intercept_y, intercept_z])
+    direction_vector = direction_vector / np.linalg.norm(direction_vector)
+    return direction_vector
 
-    alignment_errors = {}
-    sensitivity_errors = {}
-    for i, axis in enumerate(['x', 'y', 'z']):
-        movement_start = movement_starts[i]
-        movement_end = movement_start + num_points
-        movement_vector = get_movement_vector(filtered_data, movement_start, movement_end)
-        alignment_errors[axis] = angle_between(movement_vector, printer_axes[axis])
 
-        measured_accel_magnitude = np.linalg.norm(movement_vector)
-        if accel_value != 0:
-            sensitivity_errors[axis] = abs(measured_accel_magnitude - accel_value) / accel_value * 100
-        else:
-            sensitivity_errors[axis] = None
+######################################################################
+# Graphing
+######################################################################
 
-    return alignment_errors, sensitivity_errors
+
+def plot_compare_frequency(ax, time, accel_x, accel_y, accel_z, offset, i):
+    # Plot acceleration data
+    ax.plot(time, accel_x, label='X' if i == 0 else '', color=KLIPPAIN_COLORS['purple'], zorder=50 if i == 0 else 10)
+    ax.plot(time, accel_y, label='Y' if i == 0 else '', color=KLIPPAIN_COLORS['orange'], zorder=50 if i == 1 else 10)
+    ax.plot(time, accel_z, label='Z' if i == 0 else '', color=KLIPPAIN_COLORS['red_pink'], zorder=50 if i == 2 else 10)
+
+    # Setting axis parameters, grid and graph title
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Acceleration (mm/s²)')
+
+    ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+    ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+    ax.ticklabel_format(axis='y', style='scientific', scilimits=(0, 0))
+    ax.grid(which='major', color='grey')
+    ax.grid(which='minor', color='lightgrey')
+    fontP = matplotlib.font_manager.FontProperties()
+    fontP.set_size('small')
+    ax.set_title(
+        'Acceleration (gravity offset removed)',
+        fontsize=14,
+        color=KLIPPAIN_COLORS['dark_orange'],
+        weight='bold',
+    )
+
+    ax.legend(loc='upper left', prop=fontP)
+
+    # Add gravity offset to the graph
+    if i == 0:
+        ax2 = ax.twinx()  # To split the legends in two box
+        ax2.yaxis.set_visible(False)
+        ax2.plot([], [], ' ', label=f'Measured gravity: {offset / 1000:0.3f} m/s²')
+        ax2.legend(loc='upper right', prop=fontP)
+
+
+def plot_3d_path(ax, i, position_x, position_y, position_z, average_direction_vector, angle_error):
+    ax.plot(position_x, position_y, position_z, color=KLIPPAIN_COLORS['orange'], linestyle=':', linewidth=2)
+    ax.scatter(position_x[0], position_y[0], position_z[0], color=KLIPPAIN_COLORS['red_pink'], zorder=10)
+    ax.text(
+        position_x[0] + 1,
+        position_y[0],
+        position_z[0],
+        str(i + 1),
+        color='black',
+        fontsize=16,
+        fontweight='bold',
+        zorder=20,
+    )
+
+    # Plot the average direction vector
+    start_position = np.array([position_x[0], position_y[0], position_z[0]])
+    end_position = start_position + average_direction_vector * np.linalg.norm(
+        [position_x[-1] - position_x[0], position_y[-1] - position_y[0], position_z[-1] - position_z[0]]
+    )
+    axes = ['X', 'Y', 'Z']
+    ax.plot(
+        [start_position[0], end_position[0]],
+        [start_position[1], end_position[1]],
+        [start_position[2], end_position[2]],
+        label=f'{axes[i]} angle: {angle_error:0.2f}°',
+        color=KLIPPAIN_COLORS['purple'],
+        linestyle='-',
+        linewidth=2,
+    )
+
+    # Setting axis parameters, grid and graph title
+    ax.set_xlabel('X Position (mm)')
+    ax.set_ylabel('Y Position (mm)')
+    ax.set_zlabel('Z Position (mm)')
+
+    ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+    ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+    ax.grid(which='major', color='grey')
+    ax.grid(which='minor', color='lightgrey')
+    fontP = matplotlib.font_manager.FontProperties()
+    fontP.set_size('small')
+    ax.set_title(
+        'Estimated movement in 3D space',
+        fontsize=14,
+        color=KLIPPAIN_COLORS['dark_orange'],
+        weight='bold',
+    )
+
+    ax.legend(loc='upper left', prop=fontP)
+
+
+def format_direction_vector(vectors):
+    formatted_vector = []
+    for vector in vectors:
+        for i in range(len(vector)):
+            if vector[i] > 0:
+                formatted_vector.append(MACHINE_AXES[i])
+                break
+            elif vector[i] < 0:
+                formatted_vector.append(f'-{MACHINE_AXES[i]}')
+                break
+
+    return ', '.join(formatted_vector)
 
 
 ######################################################################
@@ -79,50 +245,100 @@ def compute_errors(filtered_data, spikes_sorted, accel_value, num_points):
 ######################################################################
 
 
-def parse_log(logname):
-    with open(logname) as f:
-        for header in f:
-            if not header.startswith('#'):
-                break
-        if not header.startswith('freq,psd_x,psd_y,psd_z,psd_xyz'):
-            # Raw accelerometer data
-            return np.loadtxt(logname, comments='#', delimiter=',')
-    # Power spectral density data or shaper calibration data
-    raise ValueError(
-        'File %s does not contain raw accelerometer data and therefore '
-        'is not supported by this script. Please use the official Klipper '
-        'calibrate_shaper.py script to process it instead.' % (logname,)
+def axesmap_calibration(lognames, fixed_length=None, accel=None, st_version='unknown'):
+    # Parse data from the log files while ignoring CSV in the wrong format
+    raw_datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
+    if len(raw_datas) != 3:
+        raise ValueError('This tool needs 3 CSVs to work with (like axesmap_X.csv, axesmap_Y.csv and axesmap_Z.csv)')
+    if fixed_length is None:
+        raise ValueError('You must specify the length of the measured segments!')
+
+    fig, ((ax1, ax2)) = plt.subplots(
+        1,
+        2,
+        gridspec_kw={
+            'width_ratios': [5, 3],
+            'bottom': 0.080,
+            'top': 0.840,
+            'left': 0.055,
+            'right': 0.960,
+            'hspace': 0.166,
+            'wspace': 0.060,
+        },
     )
+    fig.set_size_inches(15, 7)
+    ax2.remove()
+    ax2 = fig.add_subplot(122, projection='3d')
 
+    cumulative_start_position = np.array([0, 0, 0])
+    direction_vectors = []
+    total_noise_intensity = 0.0
+    for i, data in enumerate(raw_datas):
+        time = data[:, 0]
+        accel_x = data[:, 1]
+        accel_y = data[:, 2]
+        accel_z = data[:, 3]
 
-def axesmap_calibration(lognames, accel=None):
-    # Parse the raw data and get them ready for analysis
-    raw_datas = [parse_log(filename) for filename in lognames]
-    if len(raw_datas) > 1:
-        raise ValueError('Analysis of multiple CSV files at once is not possible with this script')
+        offset_x, offset_y, offset_z, position_x, position_y, position_z, noise_intensity = process_acceleration_data(
+            time, accel_x, accel_y, accel_z
+        )
+        position_x, position_y, position_z = scale_positions_to_fixed_length(
+            position_x, position_y, position_z, fixed_length
+        )
+        position_x += cumulative_start_position[0]
+        position_y += cumulative_start_position[1]
+        position_z += cumulative_start_position[2]
 
-    filtered_data = [accel_signal_filter(raw_datas[0][:, i + 1]) for i in range(3)]
-    spikes = [find_first_spike(filtered_data[i]) for i in range(3)]
-    spikes_sorted = sorted([(spikes[0], 'x'), (spikes[1], 'y'), (spikes[2], 'z')], key=lambda x: x[0][1])
+        gravity = np.linalg.norm(np.array([offset_x, offset_y, offset_z]))
+        average_direction_vector = linear_regression_direction(position_x, position_y, position_z)
+        direction_vector, angle_error = find_nearest_perfect_vector(average_direction_vector)
+        direction_vectors.append(direction_vector)
 
-    # Using the previous variables to get the axes_map and errors
-    axes_map = ','.join([f'{spike[0][0]}{spike[1]}' for spike in spikes_sorted])
-    # alignment_error, sensitivity_error = compute_errors(filtered_data, spikes_sorted, accel, NUM_POINTS)
+        total_noise_intensity += noise_intensity
 
-    results = f'Be aware that this macro is experimental and has been known to sometimes produce incorrect results. Use it with caution and always check the results!\n'
-    results += f'Detected axes_map:\n  {axes_map}\n'
+        plot_compare_frequency(ax1, time, accel_x, accel_y, accel_z, gravity, i)
+        plot_3d_path(ax2, i, position_x, position_y, position_z, average_direction_vector, angle_error)
 
-    # TODO: work on this function that is currently not giving good results...
-    # results += "Accelerometer angle deviation:\n"
-    # for axis, angle in alignment_error.items():
-    #     angle_degrees = np.degrees(angle) # Convert radians to degrees
-    #     results += f"  {axis.upper()} axis: {angle_degrees:.2f} degrees\n"
+        # Update the cumulative start position for the next segment
+        cumulative_start_position = np.array([position_x[-1], position_y[-1], position_z[-1]])
 
-    # results += "Accelerometer sensitivity error:\n"
-    # for axis, error in sensitivity_error.items():
-    #     results += f"  {axis.upper()} axis: {error:.2f}%\n"
+    average_noise_intensity = total_noise_intensity / len(raw_datas)
+    formatted_direction_vector = format_direction_vector(direction_vectors)
 
-    return results
+    # Add title
+    title_line1 = 'AXES MAP CALIBRATION TOOL'
+    fig.text(
+        0.060, 0.947, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold'
+    )
+    try:
+        filename = lognames[0].split('/')[-1]
+        dt = datetime.strptime(f"{filename.split('_')[1]} {filename.split('_')[2]}", '%Y%m%d %H%M%S')
+        title_line2 = dt.strftime('%x %X')
+        if accel is not None:
+            title_line2 += f' -- at {accel:0.0f} mm/s²'
+    except Exception:
+        ConsoleOutput.print(
+            'Warning: CSV filenames look to be different than expected (%s , %s, %s)'
+            % (lognames[0], lognames[1], lognames[2])
+        )
+        title_line2 = lognames[0].split('/')[-1] + ' ...'
+    fig.text(0.060, 0.939, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
+
+    title_line3 = f'| Detected axes_map: {formatted_direction_vector}'
+    title_line4 = f'| Accelerometer noise level: {average_noise_intensity:.2f} mm/s²'
+    fig.text(0.50, 0.985, title_line3, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
+    fig.text(0.50, 0.950, title_line4, ha='left', va='top', fontsize=11, color=KLIPPAIN_COLORS['dark_purple'])
+
+    # Adding a small Klippain logo to the top left corner of the figure
+    ax_logo = fig.add_axes([0.001, 0.894, 0.105, 0.105], anchor='NW')
+    ax_logo.imshow(plt.imread(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'klippain.png')))
+    ax_logo.axis('off')
+
+    # Adding Shake&Tune version in the top right corner
+    if st_version != 'unknown':
+        fig.text(0.995, 0.980, st_version, ha='right', va='bottom', fontsize=8, color=KLIPPAIN_COLORS['purple'])
+
+    return fig
 
 
 def main():
@@ -133,6 +349,9 @@ def main():
     opts.add_option(
         '-a', '--accel', type='string', dest='accel', default=None, help='acceleration value used to do the movements'
     )
+    opts.add_option(
+        '-l', '--length', type='float', dest='length', default=None, help='recorded length for each segment'
+    )
     options, args = opts.parse_args()
     if len(args) < 1:
         opts.error('No CSV file(s) to analyse')
@@ -142,13 +361,17 @@ def main():
         accel_value = float(options.accel)
     except ValueError:
         opts.error('Invalid acceleration value. It should be a numeric value.')
+    if options.length is None:
+        opts.error('You must specify the length of the measured segments (option -l)')
+    try:
+        length_value = float(options.length)
+    except ValueError:
+        opts.error('Invalid length value. It should be a numeric value.')
+    if options.output is None:
+        opts.error('You must specify an output file.png to use the script (option -o)')
 
-    results = axesmap_calibration(args, accel_value)
-    ConsoleOutput.print(results)
-
-    if options.output is not None:
-        with open(options.output, 'w') as f:
-            f.write(results)
+    fig = axesmap_calibration(args, length_value, accel_value, 'unknown')
+    fig.savefig(options.output, dpi=150)
 
 
 if __name__ == '__main__':

@@ -10,7 +10,6 @@ from typing import Callable, Optional
 
 from matplotlib.figure import Figure
 
-from ..helpers.console_output import ConsoleOutput
 from ..measurement.motorsconfigparser import MotorsConfigParser
 from ..shaketune_config import ShakeTuneConfig
 from .analyze_axesmap import axesmap_calibration
@@ -238,41 +237,38 @@ class AxesMapFinder(GraphCreator):
     def __init__(self, config: ShakeTuneConfig):
         super().__init__(config)
 
-        self._graph_date = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self._type = 'axesmap'
-        self._folder = config.get_results_folder()
-
         self._accel = None
+        self._graph_date = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        self._setup_folder('axesmap')
 
     def configure(self, accel: int) -> None:
         self._accel = accel
 
-    def find_axesmap(self) -> None:
-        tmp_folder = Path('/tmp')
-        globbed_files = list(tmp_folder.glob('shaketune-axemap_*.csv'))
-
-        if not globbed_files:
-            raise FileNotFoundError('no CSV files found in the /tmp folder to find the axes map!')
-
-        # Find the CSV files with the latest timestamp and process it
-        logname = sorted(globbed_files, key=lambda f: f.stat().st_mtime, reverse=True)[0]
-        results = axesmap_calibration(
-            lognames=[str(logname)],
-            accel=self._accel,
-        )
-        ConsoleOutput.print(results)
-
-        result_filename = self._folder / f'{self._type}_{self._graph_date}.txt'
-        with result_filename.open('w') as f:
-            f.write(results)
-
-    # While the AxesMapFinder doesn't directly create a graph, we need to implement this
-    # method to allow using it seemlessly like all the other GraphCreator objects
     def create_graph(self) -> None:
-        self.find_axesmap()
+        lognames = self._move_and_prepare_files(
+            glob_pattern='shaketune-axesmap_*.csv',
+            min_files_required=3,
+            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
+        )
+        fig = axesmap_calibration(
+            lognames=[str(path) for path in lognames],
+            accel=self._accel,
+            st_version=self._version,
+        )
+        self._save_figure_and_cleanup(fig, lognames)
 
-    def clean_old_files(self, keep_results: int) -> None:
-        tmp_folder = Path('/tmp')
-        globbed_files = list(tmp_folder.glob('shaketune-axemap_*.csv'))
-        for csv_file in globbed_files:
-            csv_file.unlink()
+    def clean_old_files(self, keep_results: int = 3) -> None:
+        # Get all PNG files in the directory as a list of Path objects
+        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
+
+        if len(files) <= keep_results:
+            return  # No need to delete any files
+
+        # Delete the older files
+        for old_file in files[keep_results:]:
+            file_date = '_'.join(old_file.stem.split('_')[1:3])
+            for suffix in ['X', 'Y', 'Z']:
+                csv_file = self._folder / f'axesmap_{file_date}_{suffix}.csv'
+                csv_file.unlink(missing_ok=True)
+            old_file.unlink()
