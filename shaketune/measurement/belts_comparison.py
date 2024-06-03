@@ -3,13 +3,13 @@
 
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
-from ..shaketune_thread import ShakeTuneThread
+from ..shaketune_process import ShakeTuneProcess
 from .accelerometer import Accelerometer
 from .motorsconfigparser import MotorsConfigParser
 from .resonance_test import vibrate_axis
 
 
-def compare_belts_responses(gcmd, config, st_thread: ShakeTuneThread) -> None:
+def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     min_freq = gcmd.get_float('FREQ_START', default=5.0, minval=1)
     max_freq = gcmd.get_float('FREQ_END', default=133.33, minval=1)
     hz_per_sec = gcmd.get_float('HZ_PER_SEC', default=1.0, minval=1)
@@ -29,7 +29,7 @@ def compare_belts_responses(gcmd, config, st_thread: ShakeTuneThread) -> None:
 
     # Configure the graph creator
     motors_config_parser = MotorsConfigParser(config, motors=None)
-    creator = st_thread.get_graph_creator()
+    creator = st_process.get_graph_creator()
     creator.configure(motors_config_parser.kinematics, accel_per_hz)
 
     if motors_config_parser.kinematics == 'corexy':
@@ -102,4 +102,4 @@ def compare_belts_responses(gcmd, config, st_thread: ShakeTuneThread) -> None:
     # Run post-processing
     ConsoleOutput.print('Belts comparative frequency profile generation...')
     ConsoleOutput.print('This may take some time (3-5min)')
-    st_thread.run()
+    st_process.run()

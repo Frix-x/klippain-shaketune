@@ -3,12 +3,12 @@
 
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
-from ..shaketune_thread import ShakeTuneThread
+from ..shaketune_process import ShakeTuneProcess
 from .accelerometer import Accelerometer
 from .resonance_test import vibrate_axis
 
 
-def axes_shaper_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
+def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     min_freq = gcmd.get_float('FREQ_START', default=5, minval=1)
     max_freq = gcmd.get_float('FREQ_END', default=133.33, minval=1)
     hz_per_sec = gcmd.get_float('HZ_PER_SEC', default=1, minval=1)
@@ -60,7 +60,7 @@ def axes_shaper_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
     toolhead.dwell(0.5)
 
     # Configure the graph creator
-    creator = st_thread.get_graph_creator()
+    creator = st_process.get_graph_creator()
     creator.configure(scv, max_sm, accel_per_hz)
 
     # set the needed acceleration values for the test
@@ -95,8 +95,8 @@ def axes_shaper_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
         # And finally generate the graph for each measured axis
         ConsoleOutput.print(f'{config["axis"].upper()} axis frequency profile generation...')
         ConsoleOutput.print('This may take some time (1-3min)')
-        st_thread.run()
-        st_thread.wait_for_completion()
+        st_process.run()
+        st_process.wait_for_completion()
 
     # Re-enable the input shaper if it was active
     if input_shaper is not None:
