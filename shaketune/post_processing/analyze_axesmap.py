@@ -262,6 +262,7 @@ def get_accel_column(data, axis_map, axis_index):
 
 def axesmap_calibration(lognames, fixed_length, accel=None, current_axes_map='x,y,z', st_version='unknown'):
     # Parse data from the log files while ignoring CSV in the wrong format
+    lognames.sort(key=lambda x: x.split('_')[-1].split('.')[0].lower())
     raw_datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
     if len(raw_datas) != 3:
         raise ValueError('This tool needs 3 CSVs to work with (like axesmap_X.csv, axesmap_Y.csv and axesmap_Z.csv)')
@@ -371,7 +372,11 @@ def main():
         '-l', '--length', type='float', dest='length', default=None, help='recorded length for each segment'
     )
     opts.add_option(
-        '--current_axes_map', type='string', dest='c_axes_map', default='x,y,z', help='configured axes_map during the measurement'
+        '--current_axes_map',
+        type='string',
+        dest='c_axes_map',
+        default='x,y,z',
+        help='configured axes_map during the measurement',
     )
     options, args = opts.parse_args()
     if len(args) < 1:
@@ -391,7 +396,7 @@ def main():
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
 
-    fig = axesmap_calibration(args, length_value, accel_value, option.c_axes_map, 'unknown')
+    fig = axesmap_calibration(args, length_value, accel_value, options.c_axes_map, 'unknown')
     fig.savefig(options.output, dpi=150)
 
 
