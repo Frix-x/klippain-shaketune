@@ -69,8 +69,7 @@ class ShakeTuneThread(threading.Thread):
 
         graph_creator.clean_old_files(self._config.keep_n_results)
 
-        if graph_creator.get_type() != 'axesmap':
-            ConsoleOutput.print(f'{graph_creator.get_type()} graphs created successfully!')
-            ConsoleOutput.print(
-                f'Cleaned up the output folder (only the last {self._config.keep_n_results} results were kept)!'
-            )
+        ConsoleOutput.print(f'{graph_creator.get_type()} graphs created successfully!')
+        ConsoleOutput.print(
+            f'Cleaned up the output folder (only the last {self._config.keep_n_results} results were kept)!'
+        )

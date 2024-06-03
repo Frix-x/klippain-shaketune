@@ -5,6 +5,8 @@ from ..helpers.console_output import ConsoleOutput
 from ..shaketune_thread import ShakeTuneThread
 from .accelerometer import Accelerometer
 
+SEGMENT_LENGTH = 30  # mm
+
 
 def axes_map_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
     z_height = gcmd.get_float('Z_HEIGHT', default=20.0)
@@ -22,6 +24,8 @@ def axes_map_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
     if k_accelerometer is None:
         gcmd.error('Error: multi-accelerometer configurations are not supported for this macro!')
     accelerometer = Accelerometer(k_accelerometer)
+    pconfig = printer.lookup_object('configfile')
+    current_axes_map = pconfig.status_raw_config[accel_chip]['axes_map']
 
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']
@@ -44,25 +48,25 @@ def axes_map_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
     _, _, _, E = toolhead.get_position()
 
     # Going to the start position
-    toolhead.move([mid_x - 15, mid_y - 15, z_height, E], feedrate_travel)
+    toolhead.move([mid_x - SEGMENT_LENGTH / 2, mid_y - SEGMENT_LENGTH / 2, z_height, E], feedrate_travel)
     toolhead.dwell(0.5)
 
     # Start the measurements and do the movements (+X, +Y and then +Z)
     accelerometer.start_measurement()
     toolhead.dwell(0.5)
-    toolhead.move([mid_x + 15, mid_y - 15, z_height, E], speed)
-    toolhead.dwell(0.250)
+    toolhead.move([mid_x + SEGMENT_LENGTH / 2, mid_y - SEGMENT_LENGTH / 2, z_height, E], speed)
+    toolhead.dwell(0.5)
     accelerometer.stop_measurement('axesmap_X', append_time=True)
-    toolhead.dwell(0.250)
+    toolhead.dwell(0.5)
     accelerometer.start_measurement()
-    toolhead.dwell(0.250)
-    toolhead.move([mid_x + 15, mid_y + 15, z_height, E], speed)
-    toolhead.dwell(0.250)
+    toolhead.dwell(0.5)
+    toolhead.move([mid_x + SEGMENT_LENGTH / 2, mid_y + SEGMENT_LENGTH / 2, z_height, E], speed)
+    toolhead.dwell(0.5)
     accelerometer.stop_measurement('axesmap_Y', append_time=True)
-    toolhead.dwell(0.250)
+    toolhead.dwell(0.5)
     accelerometer.start_measurement()
-    toolhead.dwell(0.250)
-    toolhead.move([mid_x + 15, mid_y + 15, z_height + (15 * 2), E], speed)
+    toolhead.dwell(0.5)
+    toolhead.move([mid_x + SEGMENT_LENGTH / 2, mid_y + SEGMENT_LENGTH / 2, z_height + SEGMENT_LENGTH, E], speed)
     toolhead.dwell(0.5)
     accelerometer.stop_measurement('axesmap_Z', append_time=True)
 
@@ -79,5 +83,5 @@ def axes_map_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
     # Run post-processing
     ConsoleOutput.print('Analysis of the movements...')
     creator = st_thread.get_graph_creator()
-    creator.configure(accel)
+    creator.configure(accel, SEGMENT_LENGTH, current_axes_map)
     st_thread.run()

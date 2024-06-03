@@ -49,6 +49,10 @@ def wavelet_denoise(data, wavelet='db1', level=1):
     return denoised_data, noise
 
 
+def integrate_trapz(accel, time):
+    return np.array([np.trapz(accel[:i], time[:i]) for i in range(2, len(time) + 1)])
+
+
 def process_acceleration_data(time, accel_x, accel_y, accel_z):
     # Calculate the constant offset (gravity component)
     offset_x = np.mean(accel_x)
@@ -66,9 +70,9 @@ def process_acceleration_data(time, accel_x, accel_y, accel_z):
     accel_z, noise_z = wavelet_denoise(accel_z)
 
     # Integrate acceleration to get velocity using trapezoidal rule
-    velocity_x = np.array([np.trapz(accel_x[:i], time[:i]) for i in range(1, len(time))])
-    velocity_y = np.array([np.trapz(accel_y[:i], time[:i]) for i in range(1, len(time))])
-    velocity_z = np.array([np.trapz(accel_z[:i], time[:i]) for i in range(1, len(time))])
+    velocity_x = integrate_trapz(accel_x, time)
+    velocity_y = integrate_trapz(accel_y, time)
+    velocity_z = integrate_trapz(accel_z, time)
 
     # Correct drift in velocity by resetting to zero at the beginning and end
     velocity_x -= np.linspace(velocity_x[0], velocity_x[-1], len(velocity_x))
@@ -76,9 +80,9 @@ def process_acceleration_data(time, accel_x, accel_y, accel_z):
     velocity_z -= np.linspace(velocity_z[0], velocity_z[-1], len(velocity_z))
 
     # Integrate velocity to get position using trapezoidal rule
-    position_x = np.array([np.trapz(velocity_x[:i], time[:i]) for i in range(1, len(time))])
-    position_y = np.array([np.trapz(velocity_y[:i], time[:i]) for i in range(1, len(time))])
-    position_z = np.array([np.trapz(velocity_z[:i], time[:i]) for i in range(1, len(time))])
+    position_x = integrate_trapz(velocity_x, time[1:])
+    position_y = integrate_trapz(velocity_y, time[1:])
+    position_z = integrate_trapz(velocity_z, time[1:])
 
     noise_intensity = np.mean([np.std(noise_x), np.std(noise_y), np.std(noise_z)])
 
@@ -240,18 +244,27 @@ def format_direction_vector(vectors):
     return ', '.join(formatted_vector)
 
 
+# Helper to remap accelrometer axes in case the current axes_map is not the default x,y,z
+def get_accel_column(data, axis_map, axis_index):
+    axis_char = axis_map[axis_index].strip()
+    sign = -1 if axis_char.startswith('-') else 1
+    axis = axis_char[-1].lower()  # Ensure it's in lowercase
+    try:
+        return data[:, 'xyz'.index(axis) + 1] * sign
+    except ValueError:
+        raise ValueError(f"Invalid axis character '{axis}' in axis map.")
+
+
 ######################################################################
 # Startup and main routines
 ######################################################################
 
 
-def axesmap_calibration(lognames, fixed_length=None, accel=None, st_version='unknown'):
+def axesmap_calibration(lognames, fixed_length, accel=None, current_axes_map='x,y,z', st_version='unknown'):
     # Parse data from the log files while ignoring CSV in the wrong format
     raw_datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
     if len(raw_datas) != 3:
         raise ValueError('This tool needs 3 CSVs to work with (like axesmap_X.csv, axesmap_Y.csv and axesmap_Z.csv)')
-    if fixed_length is None:
-        raise ValueError('You must specify the length of the measured segments!')
 
     fig, ((ax1, ax2)) = plt.subplots(
         1,
@@ -270,14 +283,17 @@ def axesmap_calibration(lognames, fixed_length=None, accel=None, st_version='unk
     ax2.remove()
     ax2 = fig.add_subplot(122, projection='3d')
 
+    axis_map = [axis.strip() for axis in current_axes_map.split(',')]
+
     cumulative_start_position = np.array([0, 0, 0])
     direction_vectors = []
     total_noise_intensity = 0.0
     for i, data in enumerate(raw_datas):
+        # Get the accel data according to the current axes_map
         time = data[:, 0]
-        accel_x = data[:, 1]
-        accel_y = data[:, 2]
-        accel_z = data[:, 3]
+        accel_x = get_accel_column(data, axis_map, 0)
+        accel_y = get_accel_column(data, axis_map, 1)
+        accel_z = get_accel_column(data, axis_map, 2)
 
         offset_x, offset_y, offset_z, position_x, position_y, position_z, noise_intensity = process_acceleration_data(
             time, accel_x, accel_y, accel_z
@@ -304,6 +320,8 @@ def axesmap_calibration(lognames, fixed_length=None, accel=None, st_version='unk
 
     average_noise_intensity = total_noise_intensity / len(raw_datas)
     formatted_direction_vector = format_direction_vector(direction_vectors)
+    ConsoleOutput.print(f'Detected axes_map: {formatted_direction_vector}')
+    ConsoleOutput.print(f'Average accelerometer noise level: {average_noise_intensity:.2f} mm/s²')
 
     # Add title
     title_line1 = 'AXES MAP CALIBRATION TOOL'
@@ -352,6 +370,9 @@ def main():
     opts.add_option(
         '-l', '--length', type='float', dest='length', default=None, help='recorded length for each segment'
     )
+    opts.add_option(
+        '--current_axes_map', type='string', dest='c_axes_map', default='x,y,z', help='configured axes_map during the measurement'
+    )
     options, args = opts.parse_args()
     if len(args) < 1:
         opts.error('No CSV file(s) to analyse')
@@ -370,7 +391,7 @@ def main():
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
 
-    fig = axesmap_calibration(args, length_value, accel_value, 'unknown')
+    fig = axesmap_calibration(args, length_value, accel_value, option.c_axes_map, 'unknown')
     fig.savefig(options.output, dpi=150)
 
 

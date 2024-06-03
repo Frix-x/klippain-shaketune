@@ -238,12 +238,16 @@ class AxesMapFinder(GraphCreator):
         super().__init__(config)
 
         self._accel = None
+        self._segment_length = None
+        self._current_axes_map = None
         self._graph_date = datetime.now().strftime('%Y%m%d_%H%M%S')
 
         self._setup_folder('axesmap')
 
-    def configure(self, accel: int) -> None:
+    def configure(self, accel: int, segment_length: float, current_axes_map: str) -> None:
         self._accel = accel
+        self._segment_length = segment_length
+        self._current_axes_map = current_axes_map
 
     def create_graph(self) -> None:
         lognames = self._move_and_prepare_files(
@@ -254,6 +258,8 @@ class AxesMapFinder(GraphCreator):
         fig = axesmap_calibration(
             lognames=[str(path) for path in lognames],
             accel=self._accel,
+            fixed_length=self._segment_length,
+            current_axes_map=self._current_axes_map,
             st_version=self._version,
         )
         self._save_figure_and_cleanup(fig, lognames)
