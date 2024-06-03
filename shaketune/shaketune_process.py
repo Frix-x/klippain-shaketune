@@ -21,7 +21,7 @@ class ShakeTuneProcess:
     def get_graph_creator(self):
         return self.graph_creator
 
-    def start(self) -> None:
+    def run(self) -> None:
         # Start the target function in a new process (a thread is known to cause issues with Klipper and CANbus due to the GIL)
         self._process = multiprocessing.Process(
             target=self._shaketune_process_wrapper, args=(self.graph_creator, self._timeout)
