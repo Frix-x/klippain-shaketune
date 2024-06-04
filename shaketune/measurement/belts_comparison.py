@@ -17,6 +17,9 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=None, minval=1)
 
+    if accel_per_hz == '':
+        accel_per_hz = None
+
     printer = config.get_printer()
     gcode = printer.lookup_object('gcode')
     toolhead = printer.lookup_object('toolhead')

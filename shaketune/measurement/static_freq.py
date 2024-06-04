@@ -13,6 +13,9 @@ def excitate_axis_at_freq(gcmd, config) -> None:
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=None, minval=1)
 
+    if accel_per_hz == '':
+        accel_per_hz = None
+
     axis_config = next((item for item in AXIS_CONFIG if item['axis'] == axis), None)
     if axis_config is None:
         raise gcmd.error('AXIS selection invalid. Should be either x, y, a or b!')
