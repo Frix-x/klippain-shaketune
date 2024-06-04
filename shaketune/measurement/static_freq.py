@@ -15,7 +15,7 @@ def excitate_axis_at_freq(gcmd, config) -> None:
 
     axis_config = next((item for item in AXIS_CONFIG if item['axis'] == axis), None)
     if axis_config is None:
-        gcmd.error('AXIS selection invalid. Should be either x, y, a or b!')
+        raise gcmd.error('AXIS selection invalid. Should be either x, y, a or b!')
 
     ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq}Hz for {duration} seconds')
 
@@ -31,10 +31,10 @@ def excitate_axis_at_freq(gcmd, config) -> None:
     # Move to the starting point
     test_points = res_tester.test.get_start_test_points()
     if len(test_points) > 1:
-        gcmd.error('Only one test point in the [resonance_tester] section is supported by Shake&Tune.')
+        raise gcmd.error('Only one test point in the [resonance_tester] section is supported by Shake&Tune.')
     if test_points[0] == (-1, -1, -1):
         if z_height is None:
-            gcmd.error(
+            raise gcmd.error(
                 'Z_HEIGHT parameter is required if the test_point in [resonance_tester] section is set to -1,-1,-1'
             )
         # Use center of bed in case the test point in [resonance_tester] is set to -1,-1,-1

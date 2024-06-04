@@ -15,7 +15,7 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     axis_input = gcmd.get('AXIS', default='all').lower()
     if axis_input not in ['x', 'y', 'all']:
-        gcmd.error('AXIS selection invalid. Should be either x, y, or all!')
+        raise gcmd.error('AXIS selection invalid. Should be either x, y, or all!')
     scv = gcmd.get_float('SCV', default=None, minval=0)
     max_sm = gcmd.get_float('MAX_SMOOTHING', default=None, minval=0)
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
@@ -38,10 +38,10 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # Move to the starting point
     test_points = res_tester.test.get_start_test_points()
     if len(test_points) > 1:
-        gcmd.error('Only one test point in the [resonance_tester] section is supported by Shake&Tune.')
+        raise gcmd.error('Only one test point in the [resonance_tester] section is supported by Shake&Tune.')
     if test_points[0] == (-1, -1, -1):
         if z_height is None:
-            gcmd.error(
+            raise gcmd.error(
                 'Z_HEIGHT parameter is required if the test_point in [resonance_tester] section is set to -1,-1,-1'
             )
         # Use center of bed in case the test point in [resonance_tester] is set to -1,-1,-1
@@ -84,7 +84,7 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         # First we need to find the accelerometer chip suited for the axis
         accel_chip = Accelerometer.find_axis_accelerometer(printer, config['axis'])
         if accel_chip is None:
-            gcmd.error('No suitable accelerometer found for measurement!')
+            raise gcmd.error('No suitable accelerometer found for measurement!')
         accelerometer = Accelerometer(printer.lookup_object(accel_chip))
 
         # Then do the actual measurements

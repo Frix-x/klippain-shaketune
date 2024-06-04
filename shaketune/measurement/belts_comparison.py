@@ -40,11 +40,11 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
         # For CoreXZ kinematics, we can use the X axis accelerometer as most of the time they are moving bed printers
         accel_chip = Accelerometer.find_axis_accelerometer(printer, 'x')
     else:
-        gcmd.error('Only CoreXY and CoreXZ kinematics are supported for the belt comparison tool!')
+        raise gcmd.error('Only CoreXY and CoreXZ kinematics are supported for the belt comparison tool!')
     ConsoleOutput.print(f'{motors_config_parser.kinematics.upper()} kinematics mode')
 
     if accel_chip is None:
-        gcmd.error(
+        raise gcmd.error(
             'No suitable accelerometer found for measurement! Multi-accelerometer configurations are not supported for this macro.'
         )
     accelerometer = Accelerometer(printer.lookup_object(accel_chip))
@@ -52,10 +52,10 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # Move to the starting point
     test_points = res_tester.test.get_start_test_points()
     if len(test_points) > 1:
-        gcmd.error('Only one test point in the [resonance_tester] section is supported by Shake&Tune.')
+        raise gcmd.error('Only one test point in the [resonance_tester] section is supported by Shake&Tune.')
     if test_points[0] == (-1, -1, -1):
         if z_height is None:
-            gcmd.error(
+            raise gcmd.error(
                 'Z_HEIGHT parameter is required if the test_point in [resonance_tester] section is set to -1,-1,-1'
             )
         # Use center of bed in case the test point in [resonance_tester] is set to -1,-1,-1

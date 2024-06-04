@@ -21,7 +21,7 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
     accel_chip = gcmd.get('ACCEL_CHIP', default=None)
 
     if (size / (max_speed / 60)) < 0.25:
-        gcmd.error('The size of the movement is too small for the given speed! Increase SIZE or decrease MAX_SPEED!')
+        raise gcmd.error('The size of the movement is too small for the given speed! Increase SIZE or decrease MAX_SPEED!')
 
     printer = config.get_printer()
     gcode = printer.lookup_object('gcode')
@@ -31,7 +31,7 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
 
     # Check that input shaper is already configured
     if input_shaper is None:
-        gcmd.error('Input shaper is not configured! Please run the shaper calibration macro first.')
+        raise gcmd.error('Input shaper is not configured! Please run the shaper calibration macro first.')
 
     motors_config_parser = MotorsConfigParser(config, motors=['stepper_x', 'stepper_y'])
     if motors_config_parser.kinematics == 'cartesian' or motors_config_parser.kinematics == 'corexz':
@@ -39,7 +39,7 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
     elif motors_config_parser.kinematics == 'corexy':
         main_angles = [45, 135]  # CoreXY motors are on A and B axis (45 and 135 degrees)
     else:
-        gcmd.error(
+        raise gcmd.error(
             'Only Cartesian, CoreXY and CoreXZ kinematics are supported at the moment for the vibrations measurement tool!'
         )
     ConsoleOutput.print(f'{motors_config_parser.kinematics.upper()} kinematics mode')
@@ -76,7 +76,7 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
             current_accel_chip = Accelerometer.find_axis_accelerometer(printer, accel_axis)
         k_accelerometer = printer.lookup_object(current_accel_chip, None)
         if k_accelerometer is None:
-            gcmd.error(f'Error: accelerometer [{current_accel_chip}] not found!')
+            raise gcmd.error(f'Accelerometer [{current_accel_chip}] not found!')
         accelerometer = Accelerometer(k_accelerometer)
         ConsoleOutput.print(f'Accelerometer chip used for this angle: [{current_accel_chip}]')
 
