@@ -53,7 +53,7 @@ class ShakeTuneProcess:
         # Trying to reduce Shake&Tune process priority to avoid slowing down the main Klipper process
         # as this could lead to random "Timer too close" errors when already running CANbus, etc...
         try:
-            os.nice(15)
+            os.nice(19)
         except Exception:
             ConsoleOutput.print('Warning: failed reducing Shake&Tune process priority, continuing...')
 
@@ -76,8 +76,7 @@ class ShakeTuneProcess:
 
         graph_creator.clean_old_files(self._config.keep_n_results)
 
-        if graph_creator.get_type() != 'axesmap':
-            ConsoleOutput.print(f'{graph_creator.get_type()} graphs created successfully!')
-            ConsoleOutput.print(
-                f'Cleaned up the output folder (only the last {self._config.keep_n_results} results were kept)!'
-            )
+        ConsoleOutput.print(f'{graph_creator.get_type()} graphs created successfully!')
+        ConsoleOutput.print(
+            f'Cleaned up the output folder (only the last {self._config.keep_n_results} results were kept)!'
+        )
