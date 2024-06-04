@@ -146,6 +146,7 @@ class MotorsConfigParser:
             motor.set_config('autotune_enabled', True)
             motor.set_config('motor', autotune_object.motor)
             motor.set_config('voltage', autotune_object.voltage)
+            motor.set_config('pwm_freq_target', autotune_object.pwm_freq_target)
         else:
             motor.set_config('autotune_enabled', False)
 

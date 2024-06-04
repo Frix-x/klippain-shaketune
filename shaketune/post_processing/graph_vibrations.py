@@ -570,7 +570,9 @@ def plot_motor_config_txt(fig, motors, differences):
             f"| {lbl}: {mot.get_config('motor').upper()} on {mot.get_config('tmc').upper()} @ {mot.get_config('voltage'):0.1f}V {mot.get_config('run_current'):0.2f}A - {mot.get_config('microsteps')}usteps"
             for mot, lbl in motor_details
         ]
-        config_blocks.append('| TMC Autotune enabled')
+        config_blocks.append(
+            f'| TMC Autotune enabled (PWM freq target: X={motors[0].get_config('pwm_freq_target')}kHz / Y={motors[1].get_config("pwm_freq_target")}kHz)'
+        )
     else:
         config_blocks = [
             f"| {lbl}: {mot.get_config('tmc').upper()} @ {mot.get_config('run_current'):0.2f}A - {mot.get_config('microsteps')}usteps"
