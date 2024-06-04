@@ -2,13 +2,13 @@
 
 
 from ..helpers.console_output import ConsoleOutput
-from ..shaketune_thread import ShakeTuneThread
+from ..shaketune_process import ShakeTuneProcess
 from .accelerometer import Accelerometer
 
 SEGMENT_LENGTH = 30  # mm
 
 
-def axes_map_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
+def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     z_height = gcmd.get_float('Z_HEIGHT', default=20.0)
     speed = gcmd.get_float('SPEED', default=80.0, minval=20.0)
     accel = gcmd.get_int('ACCEL', default=1500, minval=100)
@@ -86,6 +86,6 @@ def axes_map_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
 
     # Run post-processing
     ConsoleOutput.print('Analysis of the movements...')
-    creator = st_thread.get_graph_creator()
+    creator = st_process.get_graph_creator()
     creator.configure(accel, SEGMENT_LENGTH)
-    st_thread.run()
+    st_process.run()

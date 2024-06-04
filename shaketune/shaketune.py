@@ -14,7 +14,7 @@ from .measurement import (
 )
 from .post_processing import AxesMapFinder, BeltsGraphCreator, ShaperGraphCreator, VibrationsGraphCreator
 from .shaketune_config import ShakeTuneConfig
-from .shaketune_thread import ShakeTuneThread
+from .shaketune_process import ShakeTuneProcess
 
 
 class ShakeTune:
@@ -108,23 +108,23 @@ class ShakeTune:
     def cmd_AXES_MAP_CALIBRATION(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
         axes_map_finder = AxesMapFinder(self._config)
-        st_thread = ShakeTuneThread(self._config, axes_map_finder, self.timeout)
-        axes_map_calibration(gcmd, self._pconfig, st_thread)
+        st_process = ShakeTuneProcess(self._config, axes_map_finder, self.timeout)
+        axes_map_calibration(gcmd, self._pconfig, st_process)
 
     def cmd_COMPARE_BELTS_RESPONSES(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
         belt_graph_creator = BeltsGraphCreator(self._config)
-        st_thread = ShakeTuneThread(self._config, belt_graph_creator, self.timeout)
-        compare_belts_responses(gcmd, self._pconfig, st_thread)
+        st_process = ShakeTuneProcess(self._config, belt_graph_creator, self.timeout)
+        compare_belts_responses(gcmd, self._pconfig, st_process)
 
     def cmd_AXES_SHAPER_CALIBRATION(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
         shaper_graph_creator = ShaperGraphCreator(self._config)
-        st_thread = ShakeTuneThread(self._config, shaper_graph_creator, self.timeout)
-        axes_shaper_calibration(gcmd, self._pconfig, st_thread)
+        st_process = ShakeTuneProcess(self._config, shaper_graph_creator, self.timeout)
+        axes_shaper_calibration(gcmd, self._pconfig, st_process)
 
     def cmd_CREATE_VIBRATIONS_PROFILE(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
         vibration_profile_creator = VibrationsGraphCreator(self._config)
-        st_thread = ShakeTuneThread(self._config, vibration_profile_creator, self.timeout)
-        create_vibrations_profile(gcmd, self._pconfig, st_thread)
+        st_process = ShakeTuneProcess(self._config, vibration_profile_creator, self.timeout)
+        create_vibrations_profile(gcmd, self._pconfig, st_process)

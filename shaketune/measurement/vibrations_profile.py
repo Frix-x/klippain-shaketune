@@ -4,14 +4,14 @@
 import math
 
 from ..helpers.console_output import ConsoleOutput
-from ..shaketune_thread import ShakeTuneThread
+from ..shaketune_process import ShakeTuneProcess
 from .accelerometer import Accelerometer
 from .motorsconfigparser import MotorsConfigParser
 
 MIN_SPEED = 2  # mm/s
 
 
-def create_vibrations_profile(gcmd, config, st_thread: ShakeTuneThread) -> None:
+def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> None:
     size = gcmd.get_float('SIZE', default=100.0, minval=50.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=20.0)
     max_speed = gcmd.get_float('MAX_SPEED', default=200.0, minval=10.0)
@@ -127,6 +127,6 @@ def create_vibrations_profile(gcmd, config, st_thread: ShakeTuneThread) -> None:
     # Run post-processing
     ConsoleOutput.print('Machine vibrations profile generation...')
     ConsoleOutput.print('This may take some time (5-8min)')
-    creator = st_thread.get_graph_creator()
+    creator = st_process.get_graph_creator()
     creator.configure(motors_config_parser.kinematics, accel, motors_config_parser)
-    st_thread.run()
+    st_process.run()

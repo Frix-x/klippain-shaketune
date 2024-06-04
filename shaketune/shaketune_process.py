@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-
 import os
+import multiprocessing
 import threading
 import traceback
 from typing import Optional
@@ -10,51 +10,58 @@ from .helpers.console_output import ConsoleOutput
 from .shaketune_config import ShakeTuneConfig
 
 
-class ShakeTuneThread(threading.Thread):
+class ShakeTuneProcess:
     def __init__(self, config: ShakeTuneConfig, graph_creator, timeout: Optional[float] = None) -> None:
-        super(ShakeTuneThread, self).__init__()
         self._config = config
         self.graph_creator = graph_creator
         self._timeout = timeout
 
-        self._internal_thread = None
-        self._stop_event = threading.Event()
+        self._process = None
 
     def get_graph_creator(self):
         return self.graph_creator
 
     def run(self) -> None:
-        # Start the target function in a new thread
-        self._internal_thread = threading.Thread(target=self._shaketune_thread, args=(self.graph_creator,))
-        self._internal_thread.start()
-
-        # If a timeout is specified, start a timer thread to monitor the timeout
-        if self._timeout is not None:
-            timer_thread = threading.Timer(self._timeout, self._handle_timeout)
-            timer_thread.start()
-
-    def _handle_timeout(self) -> None:
-        if self._internal_thread.is_alive():
-            self._stop_event.set()
-            ConsoleOutput.print('Timeout: Shake&Tune computation did not finish within the specified timeout!')
+        # Start the target function in a new process (a thread is known to cause issues with Klipper and CANbus due to the GIL)
+        self._process = multiprocessing.Process(
+            target=self._shaketune_process_wrapper, args=(self.graph_creator, self._timeout)
+        )
+        self._process.start()
 
     def wait_for_completion(self) -> None:
-        if self._internal_thread is not None:
-            self._internal_thread.join()
+        if self._process is not None:
+            self._process.join()
 
-    # This function run in a thread is used to do the CSV analysis and create the graphs
-    def _shaketune_thread(self, graph_creator) -> None:
-        # Trying to reduce the Shake&Tune post-processing thread priority to avoid slowing down the main Klipper process
+    # This function is a simple wrapper to start the Shake&Tune process. It's needed in order to get the timeout
+    # as a Timer in a thread INSIDE the Shake&Tune child process to not interfere with the main Klipper process
+    def _shaketune_process_wrapper(self, graph_creator, timeout) -> None:
+        if timeout is not None:
+            timer = threading.Timer(timeout, self._handle_timeout)
+            timer.start()
+
+        try:
+            self._shaketune_process(graph_creator)
+        finally:
+            if timeout is not None:
+                timer.cancel()
+
+    def _handle_timeout(self) -> None:
+        ConsoleOutput.print('Timeout: Shake&Tune computation did not finish within the specified timeout!')
+        os._exit(1)  # Forcefully exit the process
+
+    def _shaketune_process(self, graph_creator) -> None:
+        # Trying to reduce Shake&Tune process priority to avoid slowing down the main Klipper process
         # as this could lead to random "Timer too close" errors when already running CANbus, etc...
         try:
-            os.nice(20)
+            os.nice(19)
         except Exception:
-            ConsoleOutput.print('Warning: failed reducing Shake&Tune thread priority, continuing...')
+            ConsoleOutput.print('Warning: failed reducing Shake&Tune process priority, continuing...')
 
         # Ensure the output folders exist
         for folder in self._config.get_results_subfolders():
             folder.mkdir(parents=True, exist_ok=True)
 
+        # Generate the graphs
         try:
             graph_creator.create_graph()
         except FileNotFoundError as e:
