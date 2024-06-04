@@ -147,9 +147,30 @@ def linear_regression_direction(position_x, position_y, position_z, trim_length=
 
 def plot_compare_frequency(ax, time, accel_x, accel_y, accel_z, offset, i):
     # Plot acceleration data
-    ax.plot(time, accel_x, label='X' if i == 0 else '', color=KLIPPAIN_COLORS['purple'], zorder=50 if i == 0 else 10)
-    ax.plot(time, accel_y, label='Y' if i == 0 else '', color=KLIPPAIN_COLORS['orange'], zorder=50 if i == 1 else 10)
-    ax.plot(time, accel_z, label='Z' if i == 0 else '', color=KLIPPAIN_COLORS['red_pink'], zorder=50 if i == 2 else 10)
+    ax.plot(
+        time,
+        accel_x,
+        label='X' if i == 0 else '',
+        color=KLIPPAIN_COLORS['purple'],
+        linewidth=0.5,
+        zorder=50 if i == 0 else 10,
+    )
+    ax.plot(
+        time,
+        accel_y,
+        label='Y' if i == 0 else '',
+        color=KLIPPAIN_COLORS['orange'],
+        linewidth=0.5,
+        zorder=50 if i == 1 else 10,
+    )
+    ax.plot(
+        time,
+        accel_z,
+        label='Z' if i == 0 else '',
+        color=KLIPPAIN_COLORS['red_pink'],
+        linewidth=0.5,
+        zorder=50 if i == 2 else 10,
+    )
 
     # Setting axis parameters, grid and graph title
     ax.set_xlabel('Time (s)')
@@ -240,19 +261,7 @@ def format_direction_vector(vectors):
             elif vector[i] < 0:
                 formatted_vector.append(f'-{MACHINE_AXES[i]}')
                 break
-
     return ', '.join(formatted_vector)
-
-
-# Helper to remap accelrometer axes in case the current axes_map is not the default x,y,z
-def get_accel_column(data, axis_map, axis_index):
-    axis_char = axis_map[axis_index].strip()
-    sign = -1 if axis_char.startswith('-') else 1
-    axis = axis_char[-1].lower()  # Ensure it's in lowercase
-    try:
-        return data[:, 'xyz'.index(axis) + 1] * sign
-    except ValueError:
-        raise ValueError(f"Invalid axis character '{axis}' in axis map.")
 
 
 ######################################################################
@@ -260,10 +269,15 @@ def get_accel_column(data, axis_map, axis_index):
 ######################################################################
 
 
-def axesmap_calibration(lognames, fixed_length, accel=None, current_axes_map='x,y,z', st_version='unknown'):
-    # Parse data from the log files while ignoring CSV in the wrong format
-    lognames.sort(key=lambda x: x.split('_')[-1].split('.')[0].lower())
-    raw_datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
+def axesmap_calibration(lognames, fixed_length, accel=None, st_version='unknown'):
+    # Parse data from the log files while ignoring CSV in the wrong format (sorted by axis name)
+    raw_datas = {}
+    for logname in lognames:
+        data = parse_log(logname)
+        if data is not None:
+            _axis = logname.split('_')[-1].split('.')[0].lower()
+            raw_datas[_axis] = data
+
     if len(raw_datas) != 3:
         raise ValueError('This tool needs 3 CSVs to work with (like axesmap_X.csv, axesmap_Y.csv and axesmap_Z.csv)')
 
@@ -284,17 +298,18 @@ def axesmap_calibration(lognames, fixed_length, accel=None, current_axes_map='x,
     ax2.remove()
     ax2 = fig.add_subplot(122, projection='3d')
 
-    axis_map = [axis.strip() for axis in current_axes_map.split(',')]
-
     cumulative_start_position = np.array([0, 0, 0])
     direction_vectors = []
     total_noise_intensity = 0.0
-    for i, data in enumerate(raw_datas):
+    for i, machine_axis in enumerate(MACHINE_AXES):
+        if machine_axis not in raw_datas:
+            raise ValueError(f'Missing CSV file for axis {machine_axis}')
+
         # Get the accel data according to the current axes_map
-        time = data[:, 0]
-        accel_x = get_accel_column(data, axis_map, 0)
-        accel_y = get_accel_column(data, axis_map, 1)
-        accel_z = get_accel_column(data, axis_map, 2)
+        time = raw_datas[machine_axis][:, 0]
+        accel_x = raw_datas[machine_axis][:, 1]
+        accel_y = raw_datas[machine_axis][:, 2]
+        accel_z = raw_datas[machine_axis][:, 3]
 
         offset_x, offset_y, offset_z, position_x, position_y, position_z, noise_intensity = process_acceleration_data(
             time, accel_x, accel_y, accel_z
@@ -309,6 +324,9 @@ def axesmap_calibration(lognames, fixed_length, accel=None, current_axes_map='x,
         gravity = np.linalg.norm(np.array([offset_x, offset_y, offset_z]))
         average_direction_vector = linear_regression_direction(position_x, position_y, position_z)
         direction_vector, angle_error = find_nearest_perfect_vector(average_direction_vector)
+        ConsoleOutput.print(
+            f'Machine axis {machine_axis.upper()} -> nearest accelerometer direction vector: {direction_vector} (angle error: {angle_error:.2f}°)'
+        )
         direction_vectors.append(direction_vector)
 
         total_noise_intensity += noise_intensity
@@ -320,9 +338,18 @@ def axesmap_calibration(lognames, fixed_length, accel=None, current_axes_map='x,
         cumulative_start_position = np.array([position_x[-1], position_y[-1], position_z[-1]])
 
     average_noise_intensity = total_noise_intensity / len(raw_datas)
+    if average_noise_intensity <= 350:
+        average_noise_intensity_text = '-> OK'
+    elif 350 < average_noise_intensity <= 700:
+        average_noise_intensity_text = '-> WARNING: accelerometer noise is a bit high'
+    else:
+        average_noise_intensity_text = '-> ERROR: accelerometer noise is too high!'
+
     formatted_direction_vector = format_direction_vector(direction_vectors)
-    ConsoleOutput.print(f'Detected axes_map: {formatted_direction_vector}')
-    ConsoleOutput.print(f'Average accelerometer noise level: {average_noise_intensity:.2f} mm/s²')
+    ConsoleOutput.print(f'--> Detected axes_map: {formatted_direction_vector}')
+    ConsoleOutput.print(
+        f'Average accelerometer noise level: {average_noise_intensity:.2f} mm/s² {average_noise_intensity_text}'
+    )
 
     # Add title
     title_line1 = 'AXES MAP CALIBRATION TOOL'
@@ -344,7 +371,7 @@ def axesmap_calibration(lognames, fixed_length, accel=None, current_axes_map='x,
     fig.text(0.060, 0.939, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     title_line3 = f'| Detected axes_map: {formatted_direction_vector}'
-    title_line4 = f'| Accelerometer noise level: {average_noise_intensity:.2f} mm/s²'
+    title_line4 = f'| Accelerometer noise level: {average_noise_intensity:.2f} mm/s² {average_noise_intensity_text}'
     fig.text(0.50, 0.985, title_line3, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
     fig.text(0.50, 0.950, title_line4, ha='left', va='top', fontsize=11, color=KLIPPAIN_COLORS['dark_purple'])
 
@@ -371,13 +398,6 @@ def main():
     opts.add_option(
         '-l', '--length', type='float', dest='length', default=None, help='recorded length for each segment'
     )
-    opts.add_option(
-        '--current_axes_map',
-        type='string',
-        dest='c_axes_map',
-        default='x,y,z',
-        help='configured axes_map during the measurement',
-    )
     options, args = opts.parse_args()
     if len(args) < 1:
         opts.error('No CSV file(s) to analyse')
@@ -396,7 +416,7 @@ def main():
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
 
-    fig = axesmap_calibration(args, length_value, accel_value, options.c_axes_map, 'unknown')
+    fig = axesmap_calibration(args, length_value, accel_value, 'unknown')
     fig.savefig(options.output, dpi=150)
 
 

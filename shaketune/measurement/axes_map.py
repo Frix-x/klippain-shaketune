@@ -23,9 +23,13 @@ def axes_map_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
     k_accelerometer = printer.lookup_object(accel_chip, None)
     if k_accelerometer is None:
         gcmd.error('Error: multi-accelerometer configurations are not supported for this macro!')
-    accelerometer = Accelerometer(k_accelerometer)
     pconfig = printer.lookup_object('configfile')
     current_axes_map = pconfig.status_raw_config[accel_chip]['axes_map']
+    if current_axes_map.strip().replace(' ', '') != 'x,y,z':
+        gcmd.error(
+            f'Error: The parameter axes_map is already set in your {accel_chip} configuration! Please remove it (or set it to "x,y,z")!'
+        )
+    accelerometer = Accelerometer(k_accelerometer)
 
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']
@@ -83,5 +87,5 @@ def axes_map_calibration(gcmd, config, st_thread: ShakeTuneThread) -> None:
     # Run post-processing
     ConsoleOutput.print('Analysis of the movements...')
     creator = st_thread.get_graph_creator()
-    creator.configure(accel, SEGMENT_LENGTH, current_axes_map)
+    creator.configure(accel, SEGMENT_LENGTH)
     st_thread.run()
