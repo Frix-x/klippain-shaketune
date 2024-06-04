@@ -571,7 +571,7 @@ def plot_motor_config_txt(fig, motors, differences):
             for mot, lbl in motor_details
         ]
         config_blocks.append(
-            f'| TMC Autotune enabled (PWM freq target: X={motors[0].get_config("pwm_freq_target")}kHz / Y={motors[1].get_config("pwm_freq_target")}kHz)'
+            f'| TMC Autotune enabled (PWM freq target: X={int(motors[0].get_config("pwm_freq_target"))}kHz / Y={int(motors[1].get_config("pwm_freq_target"))}kHz)'
         )
     else:
         config_blocks = [

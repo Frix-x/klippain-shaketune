@@ -20,6 +20,9 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
     accel_chip = gcmd.get('ACCEL_CHIP', default=None)
 
+    if accel_chip == '':
+        accel_chip = None
+
     if (size / (max_speed / 60)) < 0.25:
         raise gcmd.error('The size of the movement is too small for the given speed! Increase SIZE or decrease MAX_SPEED!')
 
