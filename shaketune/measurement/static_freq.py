@@ -4,7 +4,7 @@ from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_process import ShakeTuneProcess
 from .accelerometer import Accelerometer
-from .resonance_test import vibrate_axis
+from .resonance_test import vibrate_axis_at_static_freq
 
 
 def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
@@ -73,11 +73,8 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     if create_graph:
         accelerometer.start_measurement()
 
-    min_freq = freq - 1
-    max_freq = freq + 1
-    hz_per_sec = 1 / (duration / 3)
     toolhead.dwell(0.5)
-    vibrate_axis(toolhead, gcode, axis_config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz)
+    vibrate_axis_at_static_freq(toolhead, gcode, axis_config['direction'], freq, duration, accel_per_hz)
     toolhead.dwell(0.5)
 
     if create_graph:
