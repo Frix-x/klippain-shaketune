@@ -153,6 +153,8 @@ def plot_compare_frequency(ax, signal1, signal2, signal1_belt, signal2_belt, max
     ax.plot(signal1.freqs, signal1.psd, label='Belt ' + signal1_belt, color=KLIPPAIN_COLORS['purple'])
     ax.plot(signal2.freqs, signal2.psd, label='Belt ' + signal2_belt, color=KLIPPAIN_COLORS['orange'])
 
+    psd_highest_max = max(signal1.psd.max(), signal2.psd.max())
+
     # Trace and annotate the peaks on the graph
     paired_peak_count = 0
     unpaired_peak_count = 0
@@ -160,9 +162,10 @@ def plot_compare_frequency(ax, signal1, signal2, signal1_belt, signal2_belt, max
 
     for _, (peak1, peak2) in enumerate(signal1.paired_peaks):
         label = ALPHABET[paired_peak_count]
-        amplitude_offset = abs(
-            ((signal2.psd[peak2[0]] - signal1.psd[peak1[0]]) / max(signal1.psd[peak1[0]], signal2.psd[peak2[0]])) * 100
-        )
+        # amplitude_offset = abs(
+        #     ((signal2.psd[peak2[0]] - signal1.psd[peak1[0]]) / max(signal1.psd[peak1[0]], signal2.psd[peak2[0]])) * 100
+        # )
+        amplitude_offset = abs(((signal2.psd[peak2[0]] - signal1.psd[peak1[0]]) / psd_highest_max) * 100)
         frequency_offset = abs(signal2.freqs[peak2[0]] - signal1.freqs[peak1[0]])
         offsets_table_data.append([f'Peaks {label}', f'{frequency_offset:.1f} Hz', f'{amplitude_offset:.1f} %'])
 
@@ -232,7 +235,6 @@ def plot_compare_frequency(ax, signal1, signal2, signal1_belt, signal2_belt, max
     ax.set_xlabel('Frequency (Hz)')
     ax.set_xlim([0, max_freq])
     ax.set_ylabel('Power spectral density')
-    psd_highest_max = max(signal1.psd.max(), signal2.psd.max())
     ax.set_ylim([0, psd_highest_max * 1.1])
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
