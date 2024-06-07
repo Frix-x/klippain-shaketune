@@ -70,6 +70,14 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     toolhead.manual_move(point, feedrate_travel)
     toolhead.dwell(0.5)
 
+    # Deactivate input shaper if it is active to get raw movements
+    input_shaper = printer.lookup_object('input_shaper', None)
+    if input_shaper is not None:
+        input_shaper.disable_shaping()
+    else:
+        input_shaper = None
+
+    # If the user want to create a graph, we start accelerometer recording
     if create_graph:
         accelerometer.start_measurement()
 
@@ -77,6 +85,11 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     vibrate_axis_at_static_freq(toolhead, gcode, axis_config['direction'], freq, duration, accel_per_hz)
     toolhead.dwell(0.5)
 
+    # Re-enable the input shaper if it was active
+    if input_shaper is not None:
+        input_shaper.enable_shaping()
+
+    # If the user wanted to create a graph, we stop the recording and generate it
     if create_graph:
         accelerometer.stop_measurement(f'staticfreq_{axis.upper()}', append_time=True)
 
