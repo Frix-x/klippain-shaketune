@@ -10,7 +10,7 @@ from .resonance_test import vibrate_axis_at_static_freq
 def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     create_graph = gcmd.get_int('CREATE_GRAPH', default=0, minval=0, maxval=1) == 1
     freq = gcmd.get_int('FREQUENCY', default=25, minval=1)
-    duration = gcmd.get_int('DURATION', default=10, minval=1)
+    duration = gcmd.get_int('DURATION', default=30, minval=1)
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     axis = gcmd.get('AXIS', default='x').lower()
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
