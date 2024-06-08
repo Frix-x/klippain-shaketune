@@ -7,7 +7,13 @@ from .helpers.console_output import ConsoleOutput
 KLIPPER_FOLDER = Path.home() / 'klipper'
 KLIPPER_LOG_FOLDER = Path.home() / 'printer_data/logs'
 RESULTS_BASE_FOLDER = Path.home() / 'printer_data/config/K-ShakeTune_results'
-RESULTS_SUBFOLDERS = {'axesmap': 'axesmap', 'belts': 'belts', 'shaper': 'inputshaper', 'vibrations': 'vibrations'}
+RESULTS_SUBFOLDERS = {
+    'axesmap': 'axes_map',
+    'belts': 'belts',
+    'shaper': 'input_shaper',
+    'vibrations': 'vibrations',
+    'staticfreq': 'static_freq',
+}
 
 
 class ShakeTuneConfig:

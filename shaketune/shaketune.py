@@ -12,7 +12,13 @@ from .measurement import (
     create_vibrations_profile,
     excitate_axis_at_freq,
 )
-from .post_processing import AxesMapFinder, BeltsGraphCreator, ShaperGraphCreator, VibrationsGraphCreator
+from .post_processing import (
+    AxesMapFinder,
+    BeltsGraphCreator,
+    ShaperGraphCreator,
+    StaticGraphCreator,
+    VibrationsGraphCreator,
+)
 from .shaketune_config import ShakeTuneConfig
 from .shaketune_process import ShakeTuneProcess
 
@@ -103,7 +109,9 @@ class ShakeTune:
 
     def cmd_EXCITATE_AXIS_AT_FREQ(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
-        excitate_axis_at_freq(gcmd, self._pconfig)
+        static_freq_graph_creator = StaticGraphCreator(self._config)
+        st_process = ShakeTuneProcess(self._config, static_freq_graph_creator, self.timeout)
+        excitate_axis_at_freq(gcmd, self._pconfig, st_process)
 
     def cmd_AXES_MAP_CALIBRATION(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')

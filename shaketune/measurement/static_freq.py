@@ -2,23 +2,38 @@
 
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
-from .resonance_test import vibrate_axis
+from ..shaketune_process import ShakeTuneProcess
+from .accelerometer import Accelerometer
+from .resonance_test import vibrate_axis_at_static_freq
 
 
-def excitate_axis_at_freq(gcmd, config) -> None:
+def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
+    create_graph = gcmd.get_int('CREATE_GRAPH', default=0, minval=0, maxval=1) == 1
     freq = gcmd.get_int('FREQUENCY', default=25, minval=1)
-    duration = gcmd.get_int('DURATION', default=10, minval=1)
+    duration = gcmd.get_int('DURATION', default=30, minval=1)
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     axis = gcmd.get('AXIS', default='x').lower()
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=None, minval=1)
+    accel_chip = gcmd.get('ACCEL_CHIP', default=None)
 
+    if accel_chip == '':
+        accel_chip = None
     if accel_per_hz == '':
         accel_per_hz = None
 
     axis_config = next((item for item in AXIS_CONFIG if item['axis'] == axis), None)
     if axis_config is None:
         raise gcmd.error('AXIS selection invalid. Should be either x, y, a or b!')
+
+    if create_graph:
+        printer = config.get_printer()
+        if accel_chip is None:
+            accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy' if axis in ['a', 'b'] else axis)
+        k_accelerometer = printer.lookup_object(accel_chip, None)
+        if k_accelerometer is None:
+            raise gcmd.error(f'Accelerometer chip [{accel_chip}] was not found!')
+        accelerometer = Accelerometer(k_accelerometer)
 
     ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq}Hz for {duration} seconds')
 
@@ -55,7 +70,29 @@ def excitate_axis_at_freq(gcmd, config) -> None:
     toolhead.manual_move(point, feedrate_travel)
     toolhead.dwell(0.5)
 
-    min_freq = freq - 1
-    max_freq = freq + 1
-    hz_per_sec = 1 / (duration / 3)
-    vibrate_axis(toolhead, gcode, axis_config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz)
+    # Deactivate input shaper if it is active to get raw movements
+    input_shaper = printer.lookup_object('input_shaper', None)
+    if input_shaper is not None:
+        input_shaper.disable_shaping()
+    else:
+        input_shaper = None
+
+    # If the user want to create a graph, we start accelerometer recording
+    if create_graph:
+        accelerometer.start_measurement()
+
+    toolhead.dwell(0.5)
+    vibrate_axis_at_static_freq(toolhead, gcode, axis_config['direction'], freq, duration, accel_per_hz)
+    toolhead.dwell(0.5)
+
+    # Re-enable the input shaper if it was active
+    if input_shaper is not None:
+        input_shaper.enable_shaping()
+
+    # If the user wanted to create a graph, we stop the recording and generate it
+    if create_graph:
+        accelerometer.stop_measurement(f'staticfreq_{axis.upper()}', append_time=True)
+
+        creator = st_process.get_graph_creator()
+        creator.configure(freq, duration, accel_per_hz)
+        st_process.run()
