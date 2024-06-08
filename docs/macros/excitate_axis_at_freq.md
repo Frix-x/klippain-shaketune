@@ -18,7 +18,7 @@ Here are the parameters available:
 
 ## Optional graphs description
 
-![](../images/sf.png)
+![](../images/excitate_at_freq_example.png)
 
 ## Analysis of the results
 
