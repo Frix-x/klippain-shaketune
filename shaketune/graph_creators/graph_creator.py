@@ -10,7 +10,7 @@ from typing import Callable, Optional
 
 from matplotlib.figure import Figure
 
-from ..measurement.motorsconfigparser import MotorsConfigParser
+from ..helpers.motors_config_parser import MotorsConfigParser
 from ..shaketune_config import ShakeTuneConfig
 from .analyze_axesmap import axesmap_calibration
 from .graph_belts import belts_calibration

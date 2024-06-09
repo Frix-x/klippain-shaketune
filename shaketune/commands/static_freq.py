@@ -2,9 +2,9 @@
 
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
+from ..helpers.resonance_test import vibrate_axis_at_static_freq
 from ..shaketune_process import ShakeTuneProcess
 from .accelerometer import Accelerometer
-from .resonance_test import vibrate_axis_at_static_freq
 
 
 def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:

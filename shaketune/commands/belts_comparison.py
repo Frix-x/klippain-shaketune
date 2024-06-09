@@ -3,10 +3,10 @@
 
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
+from ..helpers.motors_config_parser import MotorsConfigParser
+from ..helpers.resonance_test import vibrate_axis
 from ..shaketune_process import ShakeTuneProcess
 from .accelerometer import Accelerometer
-from .motorsconfigparser import MotorsConfigParser
-from .resonance_test import vibrate_axis
 
 
 def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:

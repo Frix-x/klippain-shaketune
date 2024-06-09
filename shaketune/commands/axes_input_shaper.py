@@ -3,9 +3,9 @@
 
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
+from ..helpers.resonance_test import vibrate_axis
 from ..shaketune_process import ShakeTuneProcess
 from .accelerometer import Accelerometer
-from .resonance_test import vibrate_axis
 
 
 def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
