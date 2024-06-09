@@ -13,18 +13,13 @@ Call the `CREATE_VIBRATIONS_PROFILE` macro with the speed range you want to meas
 
 | parameters | default value | description |
 |-----------:|---------------|-------------|
-|SIZE|100|maximum size in mm of the circle in which the recorded movements take place|
-|Z_HEIGHT|20|z height to put the toolhead before starting the movements. Be careful, if your accelerometer is mounted under the nozzle, increase it to avoid crashing it on the bed of the machine|
-|ACCEL|3000 (or max printer accel)|accel in mm/s^2 used for all moves. Try to keep it relatively low to avoid dynamic effects that alter the measurements, but high enough to achieve a constant speed for >~70% of the segments. 3000 is a reasonable default for most printers, unless you want to record at very high speed, in which case you will want to increase SIZE and decrease ACCEL a bit.|
+|SIZE|100|diameter in mm of the circle in which the recorded movements take place|
+|Z_HEIGHT|20|Z height to put the toolhead before starting the movements. Be careful, if your accelerometer is mounted under the nozzle, increase it to avoid crashing it on the bed of the machine|
 |MAX_SPEED|200|maximum speed of the toolhead in mm/s to record for analysis|
 |SPEED_INCREMENT|2|toolhead speed increments in mm/s between each movement|
-|TRAVEL_SPEED|200|speed in mm/s used for all the travels moves|
-|ACCEL_CHIP|"adxl345"|accelerometer chip name in the config|
-|KEEP_N_RESULTS|3|Total number of results to keep in the result folder after running the test. The older results are automatically cleaned up|
-|KEEP_CSV|0|Weither or not to keep the CSV data files alonside the PNG graphs (archived in a tarball)|
-
-
-## Graphs description
+|ACCEL|3000|accel in mm/s^2 used for all moves. Try to keep it relatively low to avoid dynamic effects that alter the measurements, but high enough to achieve a constant speed for >~70% of the segments. 3000 is a reasonable default for most printers, unless you want to record at very high speed, in which case you will want to increase SIZE and decrease ACCEL a bit.|
+|TRAVEL_SPEED|120|speed in mm/s used for all the travels moves|
+|ACCEL_CHIP|None|accelerometer chip name from your Klipper config that you want to force for the test|
 
 The `CREATE_VIBRATIONS_PROFILE` macro results are constituted of a set of 6 plots. At the top of the figure you can also see all the detected motor, current and TMC driver parameters. These notes are just for reference in case you want to tinker with them and don't forget what you changed between each run of the macro.
 

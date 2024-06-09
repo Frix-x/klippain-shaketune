@@ -1,11 +1,15 @@
-# Belt relative difference measurements
+# Measuring belts relative differences
 
-The `COMPARE_BELTS_RESPONSES` macro is dedicated for CoreXY machines where it can help you to diagnose belt path problems by measuring and plotting the differences between their behavior. It will also help you tension your belts at the same tension. Using it on Cartesian printers doesn't really make sense, as it's normal to have different responses in that case.
+The `COMPARE_BELTS_RESPONSES` macro is dedicated for CoreXY or CoreXZ machines where it can help you to diagnose belt path problems by measuring and plotting the differences between their behaviors. It will also help you tension your belts at the same tension.
+
+  > **Note**:
+  >
+  > While it might be tempting to use it on other kinds of printers, such as Cartesian printers, it's probably not the best idea. After all, it's normal to have different responses in that case due to the belts paths being not symmetric.
 
 
 ## Usage
 
-**Before starting, ensure that the belts are properly tensioned**. For example, you can follow the [Voron belt tensioning documentation](https://docs.vorondesign.com/tuning/secondary_printer_tuning.html#belt-tension). You need a good starting point before starting to iterate from it!
+**Before starting, ensure that the belts are properly tensioned**. For example, you can follow the [Voron belt tensioning documentation](https://docs.vorondesign.com/tuning/secondary_printer_tuning.html#belt-tension). You've got to have a solid foundation to build on!
 
 Then, call the `COMPARE_BELTS_RESPONSES` macro and look for the graphs in the results folder. Here are the parameters available:
 
@@ -17,9 +21,6 @@ Then, call the `COMPARE_BELTS_RESPONSES` macro and look for the graphs in the re
 |ACCEL_PER_HZ|None|accel per Hz value used for the test. If unset, it will use the value from your `[resonance_tester]` config section (75 is the default)|
 |TRAVEL_SPEED|120|speed in mm/s used for all the travel movements (to go to the start position prior to the test)|
 |Z_HEIGHT|None|Z height wanted for the test. This value can be used if needed to override the Z value of the probe_point set in your `[resonance_tester]` config section|
-
-
-## Graphs description
 
 ![](../images/belts_example.png)
 
@@ -49,7 +50,7 @@ Paired peaks of exactly the same frequency will be on the same point (labeled α
 
   > **Note**:
   >
-  > If you are using this tool to check or adjust the tension after installing new belts, you will need to measure again after a few hours of printing, as the tension can change slightly as the belts stretch and settle to their final tension. Usually 24 hours should be sufficient.
+  > If you're using this tool to check or adjust the tension after installing new belts, you'll want to measure again after a few hours of printing. This is because the tension can change slightly as the belts stretch and settle to their final tension. But don't worry, a few hours of printing should be more than enough!
 
 
 ## Advanced explanation on why 1 or 2 peaks
