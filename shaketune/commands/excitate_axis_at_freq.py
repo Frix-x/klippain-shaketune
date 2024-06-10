@@ -96,3 +96,4 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
         creator = st_process.get_graph_creator()
         creator.configure(freq, duration, accel_per_hz)
         st_process.run()
+        st_process.wait_for_completion()

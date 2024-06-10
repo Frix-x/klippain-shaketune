@@ -86,6 +86,8 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
 
     # Run post-processing
     ConsoleOutput.print('Analysis of the movements...')
+    ConsoleOutput.print('This may take some time (1-3min)')
     creator = st_process.get_graph_creator()
     creator.configure(accel, SEGMENT_LENGTH)
     st_process.run()
+    st_process.wait_for_completion()

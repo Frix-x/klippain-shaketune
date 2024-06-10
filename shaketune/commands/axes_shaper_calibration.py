@@ -100,6 +100,8 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         ConsoleOutput.print('This may take some time (1-3min)')
         st_process.run()
         st_process.wait_for_completion()
+        toolhead.dwell(1)
+        toolhead.wait_moves()
 
     # Re-enable the input shaper if it was active
     if input_shaper is not None:

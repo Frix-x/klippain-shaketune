@@ -38,7 +38,7 @@ MACHINE_AXES = ['x', 'y', 'z']
 
 class AxesMapGraphCreator(GraphCreator):
     def __init__(self, config: ShakeTuneConfig):
-        super().__init__(config, 'axes map calibration')
+        super().__init__(config, 'axes map')
         self._accel: Optional[int] = None
         self._segment_length: Optional[float] = None
 

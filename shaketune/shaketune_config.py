@@ -8,7 +8,7 @@ KLIPPER_FOLDER = Path.home() / 'klipper'
 KLIPPER_LOG_FOLDER = Path.home() / 'printer_data/logs'
 RESULTS_BASE_FOLDER = Path.home() / 'printer_data/config/K-ShakeTune_results'
 RESULTS_SUBFOLDERS = {
-    'axes map calibration': 'axes_map',
+    'axes map': 'axes_map',
     'belts comparison': 'belts',
     'input shaper': 'input_shaper',
     'vibrations profile': 'vibrations',

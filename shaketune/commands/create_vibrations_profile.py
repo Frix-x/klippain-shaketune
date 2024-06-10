@@ -135,3 +135,4 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
     creator = st_process.get_graph_creator()
     creator.configure(motors_config_parser.kinematics, accel, motors_config_parser)
     st_process.run()
+    st_process.wait_for_completion()
