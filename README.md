@@ -32,3 +32,5 @@ Follow these steps to install Shake&Tune on your printer:
      # timeout: 300
      #    The maximum time in seconds to let Shake&Tune process the CSV files and generate the graphs.
      ```
+
+Don't forget to check out **[Shake&Tune documentation here](./docs/README.md)**.

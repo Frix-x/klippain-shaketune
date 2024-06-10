@@ -12,7 +12,7 @@ from .commands import (
     excitate_axis_at_freq,
 )
 from .graph_creators import (
-    AxesMapFinder,
+    AxesMapGraphCreator,
     BeltsGraphCreator,
     ShaperGraphCreator,
     StaticGraphCreator,
@@ -115,8 +115,8 @@ class ShakeTune:
 
     def cmd_AXES_MAP_CALIBRATION(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
-        axes_map_finder = AxesMapFinder(self._config)
-        st_process = ShakeTuneProcess(self._config, axes_map_finder, self.timeout)
+        axes_map_graph_creator = AxesMapGraphCreator(self._config)
+        st_process = ShakeTuneProcess(self._config, axes_map_graph_creator, self.timeout)
         axes_map_calibration(gcmd, self._pconfig, st_process)
 
     def cmd_COMPARE_BELTS_RESPONSES(self, gcmd) -> None:

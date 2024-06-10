@@ -22,6 +22,8 @@ matplotlib.use('Agg')
 
 from ..helpers.common_func import parse_log
 from ..helpers.console_output import ConsoleOutput
+from ..shaketune_config import ShakeTuneConfig
+from .graph_creator import GraphCreator
 
 KLIPPAIN_COLORS = {
     'purple': '#70088C',
@@ -31,6 +33,46 @@ KLIPPAIN_COLORS = {
     'red_pink': '#F2055C',
 }
 MACHINE_AXES = ['x', 'y', 'z']
+
+
+class AxesMapGraphCreator(GraphCreator):
+    def __init__(self, config: ShakeTuneConfig):
+        super().__init__(config, 'axes map calibration')
+        self._accel = None
+        self._segment_length = None
+
+    def configure(self, accel: int, segment_length: float) -> None:
+        self._accel = accel
+        self._segment_length = segment_length
+
+    def create_graph(self) -> None:
+        lognames = self._move_and_prepare_files(
+            glob_pattern='shaketune-axesmap_*.csv',
+            min_files_required=3,
+            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
+        )
+        fig = axesmap_calibration(
+            lognames=[str(path) for path in lognames],
+            accel=self._accel,
+            fixed_length=self._segment_length,
+            st_version=self._version,
+        )
+        self._save_figure_and_cleanup(fig, lognames)
+
+    def clean_old_files(self, keep_results: int = 3) -> None:
+        # Get all PNG files in the directory as a list of Path objects
+        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
+
+        if len(files) <= keep_results:
+            return  # No need to delete any files
+
+        # Delete the older files
+        for old_file in files[keep_results:]:
+            file_date = '_'.join(old_file.stem.split('_')[1:3])
+            for suffix in ['X', 'Y', 'Z']:
+                csv_file = self._folder / f'axesmap_{file_date}_{suffix}.csv'
+                csv_file.unlink(missing_ok=True)
+            old_file.unlink()
 
 
 ######################################################################

@@ -21,6 +21,8 @@ matplotlib.use('Agg')
 
 from ..helpers.common_func import detect_peaks, parse_log, setup_klipper_import
 from ..helpers.console_output import ConsoleOutput
+from ..shaketune_config import ShakeTuneConfig
+from .graph_creator import GraphCreator
 
 ALPHABET = (
     'αβγδεζηθικλμνξοπρστυφχψω'  # For paired peak names (using the Greek alphabet to avoid confusion with belt names)
@@ -40,6 +42,47 @@ KLIPPAIN_COLORS = {
     'dark_orange': '#F24130',
     'red_pink': '#F2055C',
 }
+
+
+class BeltsGraphCreator(GraphCreator):
+    def __init__(self, config: ShakeTuneConfig):
+        super().__init__(config, 'belts comparison')
+        self._kinematics = None
+        self._accel_per_hz = None
+
+    def configure(self, kinematics: str = None, accel_per_hz: float = None) -> None:
+        self._kinematics = kinematics
+        self._accel_per_hz = accel_per_hz
+
+    def create_graph(self) -> None:
+        lognames = self._move_and_prepare_files(
+            glob_pattern='shaketune-belt_*.csv',
+            min_files_required=2,
+            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
+        )
+        fig = belts_calibration(
+            lognames=[str(path) for path in lognames],
+            kinematics=self._kinematics,
+            klipperdir=str(self._config.klipper_folder),
+            accel_per_hz=self._accel_per_hz,
+            st_version=self._version,
+        )
+        self._save_figure_and_cleanup(fig, lognames)
+
+    def clean_old_files(self, keep_results: int = 3) -> None:
+        # Get all PNG files in the directory as a list of Path objects
+        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
+
+        if len(files) <= keep_results:
+            return  # No need to delete any files
+
+        # Delete the older files
+        for old_file in files[keep_results:]:
+            file_date = '_'.join(old_file.stem.split('_')[1:3])
+            for suffix in ['A', 'B']:
+                csv_file = self._folder / f'belts_{file_date}_{suffix}.csv'
+                csv_file.unlink(missing_ok=True)
+            old_file.unlink()
 
 
 ######################################################################

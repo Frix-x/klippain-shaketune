@@ -9,8 +9,11 @@ import math
 import optparse
 import os
 import re
+import tarfile
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
+from typing import List
 
 import matplotlib
 import matplotlib.font_manager
@@ -29,6 +32,9 @@ from ..helpers.common_func import (
     setup_klipper_import,
 )
 from ..helpers.console_output import ConsoleOutput
+from ..helpers.motors_config_parser import MotorsConfigParser
+from ..shaketune_config import ShakeTuneConfig
+from .graph_creator import GraphCreator
 
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_RELATIVE_HEIGHT_THRESHOLD = 0.04
@@ -44,6 +50,58 @@ KLIPPAIN_COLORS = {
     'dark_orange': '#F24130',
     'red_pink': '#F2055C',
 }
+
+
+class VibrationsGraphCreator(GraphCreator):
+    def __init__(self, config: ShakeTuneConfig):
+        super().__init__(config, 'vibrations profile')
+        self._kinematics = None
+        self._accel = None
+        self._motors = None
+
+    def configure(self, kinematics: str, accel: float, motor_config_parser: MotorsConfigParser) -> None:
+        self._kinematics = kinematics
+        self._accel = accel
+        self._motors = motor_config_parser.get_motors()
+
+    def _archive_files(self, lognames: List[Path]) -> None:
+        tar_path = self._folder / f'{self._type}_{self._graph_date}.tar.gz'
+        with tarfile.open(tar_path, 'w:gz') as tar:
+            for csv_file in lognames:
+                tar.add(csv_file, arcname=csv_file.name, recursive=False)
+                csv_file.unlink()
+
+    def create_graph(self) -> None:
+        if not self._accel or not self._kinematics:
+            raise ValueError('accel, chip_name and kinematics must be set to create the vibrations profile graph!')
+
+        lognames = self._move_and_prepare_files(
+            glob_pattern='shaketune-vib_*.csv',
+            min_files_required=None,
+            custom_name_func=lambda f: re.search(r'shaketune-vib_(.*?)_\d{8}_\d{6}', f.name).group(1),
+        )
+        fig = vibrations_profile(
+            lognames=[str(path) for path in lognames],
+            klipperdir=str(self._config.klipper_folder),
+            kinematics=self._kinematics,
+            accel=self._accel,
+            st_version=self._version,
+            motors=self._motors,
+        )
+        self._save_figure_and_cleanup(fig, lognames)
+
+    def clean_old_files(self, keep_results: int = 3) -> None:
+        # Get all PNG files in the directory as a list of Path objects
+        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
+
+        if len(files) <= keep_results:
+            return  # No need to delete any files
+
+        # Delete the older files
+        for old_file in files[keep_results:]:
+            old_file.unlink()
+            tar_file = old_file.with_suffix('.tar.gz')
+            tar_file.unlink(missing_ok=True)
 
 
 ######################################################################

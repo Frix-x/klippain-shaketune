@@ -28,6 +28,8 @@ from ..helpers.common_func import (
     setup_klipper_import,
 )
 from ..helpers.console_output import ConsoleOutput
+from ..shaketune_config import ShakeTuneConfig
+from .graph_creator import GraphCreator
 
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_EFFECT_THRESHOLD = 0.12
@@ -41,6 +43,50 @@ KLIPPAIN_COLORS = {
     'dark_orange': '#F24130',
     'red_pink': '#F2055C',
 }
+
+
+class ShaperGraphCreator(GraphCreator):
+    def __init__(self, config: ShakeTuneConfig):
+        super().__init__(config, 'input shaper')
+        self._max_smoothing = None
+        self._scv = None
+
+    def configure(self, scv: float, max_smoothing: float = None, accel_per_hz: float = None) -> None:
+        self._scv = scv
+        self._max_smoothing = max_smoothing
+        self._accel_per_hz = accel_per_hz
+
+    def create_graph(self) -> None:
+        if not self._scv:
+            raise ValueError('scv must be set to create the input shaper graph!')
+
+        lognames = self._move_and_prepare_files(
+            glob_pattern='shaketune-axis_*.csv',
+            min_files_required=1,
+            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
+        )
+        fig = shaper_calibration(
+            lognames=[str(path) for path in lognames],
+            klipperdir=str(self._config.klipper_folder),
+            max_smoothing=self._max_smoothing,
+            scv=self._scv,
+            accel_per_hz=self._accel_per_hz,
+            st_version=self._version,
+        )
+        self._save_figure_and_cleanup(fig, lognames, lognames[0].stem.split('_')[-1])
+
+    def clean_old_files(self, keep_results: int = 3) -> None:
+        # Get all PNG files in the directory as a list of Path objects
+        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
+
+        if len(files) <= 2 * keep_results:
+            return  # No need to delete any files
+
+        # Delete the older files
+        for old_file in files[2 * keep_results :]:
+            csv_file = old_file.with_suffix('.csv')
+            csv_file.unlink(missing_ok=True)
+            old_file.unlink()
 
 
 ######################################################################
