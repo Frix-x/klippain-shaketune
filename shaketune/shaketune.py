@@ -29,7 +29,7 @@ class ShakeTune:
         self._printer = config.get_printer()
         gcode = self._printer.lookup_object('gcode')
 
-        res_tester = self._printer.lookup_object('resonance_tester')
+        res_tester = self._printer.lookup_object('resonance_tester', None)
         if res_tester is None:
             config.error('No [resonance_tester] config section found in printer.cfg! Please add one to use Shake&Tune.')
 
