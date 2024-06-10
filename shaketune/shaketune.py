@@ -4,21 +4,21 @@
 import os
 from pathlib import Path
 
-from .helpers.console_output import ConsoleOutput
-from .measurement import (
+from .commands import (
     axes_map_calibration,
     axes_shaper_calibration,
     compare_belts_responses,
     create_vibrations_profile,
     excitate_axis_at_freq,
 )
-from .post_processing import (
-    AxesMapFinder,
+from .graph_creators import (
+    AxesMapGraphCreator,
     BeltsGraphCreator,
     ShaperGraphCreator,
     StaticGraphCreator,
     VibrationsGraphCreator,
 )
+from .helpers.console_output import ConsoleOutput
 from .shaketune_config import ShakeTuneConfig
 from .shaketune_process import ShakeTuneProcess
 
@@ -29,7 +29,7 @@ class ShakeTune:
         self._printer = config.get_printer()
         gcode = self._printer.lookup_object('gcode')
 
-        res_tester = self._printer.lookup_object('resonance_tester')
+        res_tester = self._printer.lookup_object('resonance_tester', None)
         if res_tester is None:
             config.error('No [resonance_tester] config section found in printer.cfg! Please add one to use Shake&Tune.')
 
@@ -115,8 +115,8 @@ class ShakeTune:
 
     def cmd_AXES_MAP_CALIBRATION(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
-        axes_map_finder = AxesMapFinder(self._config)
-        st_process = ShakeTuneProcess(self._config, axes_map_finder, self.timeout)
+        axes_map_graph_creator = AxesMapGraphCreator(self._config)
+        st_process = ShakeTuneProcess(self._config, axes_map_graph_creator, self.timeout)
         axes_map_calibration(gcmd, self._pconfig, st_process)
 
     def cmd_COMPARE_BELTS_RESPONSES(self, gcmd) -> None:

@@ -3,6 +3,7 @@
 import optparse
 import os
 from datetime import datetime
+from typing import List, Optional
 
 import matplotlib
 import matplotlib.font_manager
@@ -12,11 +13,10 @@ import numpy as np
 
 matplotlib.use('Agg')
 
-from ..helpers.common_func import (
-    compute_spectrogram,
-    parse_log,
-)
+from ..helpers.common_func import compute_spectrogram, parse_log
 from ..helpers.console_output import ConsoleOutput
+from ..shaketune_config import ShakeTuneConfig
+from .graph_creator import GraphCreator
 
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_EFFECT_THRESHOLD = 0.12
@@ -32,12 +32,54 @@ KLIPPAIN_COLORS = {
 }
 
 
+class StaticGraphCreator(GraphCreator):
+    def __init__(self, config: ShakeTuneConfig):
+        super().__init__(config, 'static frequency')
+        self._freq: Optional[float] = None
+        self._duration: Optional[float] = None
+        self._accel_per_hz: Optional[float] = None
+
+    def configure(self, freq: float, duration: float, accel_per_hz: Optional[float] = None) -> None:
+        self._freq = freq
+        self._duration = duration
+        self._accel_per_hz = accel_per_hz
+
+    def create_graph(self) -> None:
+        if not self._freq or not self._duration or not self._accel_per_hz:
+            raise ValueError('freq, duration and accel_per_hz must be set to create the static frequency graph!')
+
+        lognames = self._move_and_prepare_files(
+            glob_pattern='shaketune-staticfreq_*.csv',
+            min_files_required=1,
+            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
+        )
+        fig = static_frequency_tool(
+            lognames=[str(path) for path in lognames],
+            klipperdir=str(self._config.klipper_folder),
+            freq=self._freq,
+            duration=self._duration,
+            max_freq=200.0,
+            accel_per_hz=self._accel_per_hz,
+            st_version=self._version,
+        )
+        self._save_figure_and_cleanup(fig, lognames, lognames[0].stem.split('_')[-1])
+
+    def clean_old_files(self, keep_results: int = 3) -> None:
+        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
+        if len(files) <= keep_results:
+            return  # No need to delete any files
+        for old_file in files[keep_results:]:
+            csv_file = old_file.with_suffix('.csv')
+            csv_file.unlink(missing_ok=True)
+            old_file.unlink()
+
+
 ######################################################################
 # Graphing
 ######################################################################
 
 
-def plot_spectrogram(ax, t, bins, pdata, max_freq):
+def plot_spectrogram(ax: plt.Axes, t: np.ndarray, bins: np.ndarray, pdata: np.ndarray, max_freq: float) -> None:
     ax.set_title('Time-Frequency Spectrogram', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
 
     vmin_value = np.percentile(pdata, SPECTROGRAM_LOW_PERCENTILE_FILTER)
@@ -61,7 +103,7 @@ def plot_spectrogram(ax, t, bins, pdata, max_freq):
     return
 
 
-def plot_energy_accumulation(ax, t, bins, pdata):
+def plot_energy_accumulation(ax: plt.Axes, t: np.ndarray, bins: np.ndarray, pdata: np.ndarray) -> None:
     # Integrate the energy over the frequency bins for each time step and plot this vertically
     ax.plot(np.trapz(pdata, t, axis=0), bins, color=KLIPPAIN_COLORS['orange'])
     ax.set_title('Vibrations', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
@@ -83,14 +125,14 @@ def plot_energy_accumulation(ax, t, bins, pdata):
 
 
 def static_frequency_tool(
-    lognames,
-    klipperdir='~/klipper',
-    freq=None,
-    duration=None,
-    max_freq=500.0,
-    accel_per_hz=None,
-    st_version='unknown',
-):
+    lognames: List[str],
+    klipperdir: str = '~/klipper',
+    freq: Optional[float] = None,
+    duration: Optional[float] = None,
+    max_freq: float = 500.0,
+    accel_per_hz: Optional[float] = None,
+    st_version: str = 'unknown',
+) -> plt.Figure:
     if freq is None or duration is None:
         raise ValueError('Error: missing frequency or duration parameters!')
 
@@ -127,7 +169,7 @@ def static_frequency_tool(
         title_line3 = f'| Maintained frequency: {freq}Hz for {duration}s'
         title_line4 = f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz' if accel_per_hz is not None else ''
     except Exception:
-        ConsoleOutput.print('Warning: CSV filename look to be different than expected (%s)' % (lognames[0]))
+        ConsoleOutput.print(f'Warning: CSV filename look to be different than expected ({lognames[0]})')
         title_line2 = lognames[0].split('/')[-1]
         title_line3 = ''
         title_line4 = ''

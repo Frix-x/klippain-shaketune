@@ -4,9 +4,9 @@
 import math
 
 from ..helpers.console_output import ConsoleOutput
+from ..helpers.motors_config_parser import MotorsConfigParser
 from ..shaketune_process import ShakeTuneProcess
 from .accelerometer import Accelerometer
-from .motorsconfigparser import MotorsConfigParser
 
 MIN_SPEED = 2  # mm/s
 
@@ -24,7 +24,9 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
         accel_chip = None
 
     if (size / (max_speed / 60)) < 0.25:
-        raise gcmd.error('The size of the movement is too small for the given speed! Increase SIZE or decrease MAX_SPEED!')
+        raise gcmd.error(
+            'The size of the movement is too small for the given speed! Increase SIZE or decrease MAX_SPEED!'
+        )
 
     printer = config.get_printer()
     gcode = printer.lookup_object('gcode')
@@ -133,3 +135,4 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
     creator = st_process.get_graph_creator()
     creator.configure(motors_config_parser.kinematics, accel, motors_config_parser)
     st_process.run()
+    st_process.wait_for_completion()

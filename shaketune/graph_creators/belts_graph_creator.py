@@ -7,8 +7,8 @@
 
 import optparse
 import os
-from collections import namedtuple
 from datetime import datetime
+from typing import List, NamedTuple, Optional, Tuple
 
 import matplotlib
 import matplotlib.colors
@@ -21,6 +21,8 @@ matplotlib.use('Agg')
 
 from ..helpers.common_func import detect_peaks, parse_log, setup_klipper_import
 from ..helpers.console_output import ConsoleOutput
+from ..shaketune_config import ShakeTuneConfig
+from .graph_creator import GraphCreator
 
 ALPHABET = (
     'αβγδεζηθικλμνξοπρστυφχψω'  # For paired peak names (using the Greek alphabet to avoid confusion with belt names)
@@ -29,9 +31,6 @@ ALPHABET = (
 PEAKS_DETECTION_THRESHOLD = 0.1  # Threshold to detect peaks in the PSD signal (10% of max)
 DC_MAX_PEAKS = 2  # Maximum ideal number of peaks
 DC_MAX_UNPAIRED_PEAKS_ALLOWED = 0  # No unpaired peaks are tolerated
-
-# Define the SignalData namedtuple
-SignalData = namedtuple('CalibrationData', ['freqs', 'psd', 'peaks', 'paired_peaks', 'unpaired_peaks'])
 
 KLIPPAIN_COLORS = {
     'purple': '#70088C',
@@ -42,6 +41,59 @@ KLIPPAIN_COLORS = {
 }
 
 
+# Define the SignalData type to store the data of a signal (PSD, peaks, etc.)
+class SignalData(NamedTuple):
+    freqs: np.ndarray
+    psd: np.ndarray
+    peaks: np.ndarray
+    paired_peaks: Optional[List[Tuple[Tuple[int, float, float], Tuple[int, float, float]]]] = None
+    unpaired_peaks: Optional[List[int]] = None
+
+
+# Define the PeakPairingResult type to store the result of the peak pairing function
+class PeakPairingResult(NamedTuple):
+    paired_peaks: List[Tuple[Tuple[int, float, float], Tuple[int, float, float]]]
+    unpaired_peaks1: List[int]
+    unpaired_peaks2: List[int]
+
+
+class BeltsGraphCreator(GraphCreator):
+    def __init__(self, config: ShakeTuneConfig):
+        super().__init__(config, 'belts comparison')
+        self._kinematics: Optional[str] = None
+        self._accel_per_hz: Optional[float] = None
+
+    def configure(self, kinematics: Optional[str] = None, accel_per_hz: Optional[float] = None) -> None:
+        self._kinematics = kinematics
+        self._accel_per_hz = accel_per_hz
+
+    def create_graph(self) -> None:
+        lognames = self._move_and_prepare_files(
+            glob_pattern='shaketune-belt_*.csv',
+            min_files_required=2,
+            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
+        )
+        fig = belts_calibration(
+            lognames=[str(path) for path in lognames],
+            kinematics=self._kinematics,
+            klipperdir=str(self._config.klipper_folder),
+            accel_per_hz=self._accel_per_hz,
+            st_version=self._version,
+        )
+        self._save_figure_and_cleanup(fig, lognames)
+
+    def clean_old_files(self, keep_results: int = 3) -> None:
+        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
+        if len(files) <= keep_results:
+            return  # No need to delete any files
+        for old_file in files[keep_results:]:
+            file_date = '_'.join(old_file.stem.split('_')[1:3])
+            for suffix in ['A', 'B']:
+                csv_file = self._folder / f'beltscomparison_{file_date}_{suffix}.csv'
+                csv_file.unlink(missing_ok=True)
+            old_file.unlink()
+
+
 ######################################################################
 # Computation of the PSD graph
 ######################################################################
@@ -49,7 +101,9 @@ KLIPPAIN_COLORS = {
 
 # This function create pairs of peaks that are close in frequency on two curves (that are known
 # to be resonances points and must be similar on both belts on a CoreXY kinematic)
-def pair_peaks(peaks1, freqs1, psd1, peaks2, freqs2, psd2):
+def pair_peaks(
+    peaks1: np.ndarray, freqs1: np.ndarray, psd1: np.ndarray, peaks2: np.ndarray, freqs2: np.ndarray, psd2: np.ndarray
+) -> PeakPairingResult:
     # Compute a dynamic detection threshold to filter and pair peaks efficiently
     # even if the signal is very noisy (this get clipped to a maximum of 10Hz diff)
     distances = []
@@ -88,7 +142,9 @@ def pair_peaks(peaks1, freqs1, psd1, peaks2, freqs2, psd2):
         unpaired_peaks1.remove(p1)
         unpaired_peaks2.remove(p2)
 
-    return paired_peaks, unpaired_peaks1, unpaired_peaks2
+    return PeakPairingResult(
+        paired_peaks=paired_peaks, unpaired_peaks1=unpaired_peaks1, unpaired_peaks2=unpaired_peaks2
+    )
 
 
 ######################################################################
@@ -96,7 +152,7 @@ def pair_peaks(peaks1, freqs1, psd1, peaks2, freqs2, psd2):
 ######################################################################
 
 
-def compute_mhi(similarity_factor, signal1, signal2):
+def compute_mhi(similarity_factor: float, signal1: SignalData, signal2: SignalData) -> str:
     num_unpaired_peaks = len(signal1.unpaired_peaks) + len(signal2.unpaired_peaks)
     num_paired_peaks = len(signal1.paired_peaks)
     # Combine unpaired peaks from both signals, tagging each peak with its respective signal
@@ -126,7 +182,7 @@ def compute_mhi(similarity_factor, signal1, signal2):
 
 
 # LUT to transform the MHI into a textual value easy to understand for the users of the script
-def mhi_lut(mhi):
+def mhi_lut(mhi: float) -> str:
     ranges = [
         (70, 100, 'Excellent mechanical health'),
         (55, 70, 'Good mechanical health'),
@@ -148,7 +204,9 @@ def mhi_lut(mhi):
 ######################################################################
 
 
-def plot_compare_frequency(ax, signal1, signal2, signal1_belt, signal2_belt, max_freq):
+def plot_compare_frequency(
+    ax: plt.Axes, signal1: SignalData, signal2: SignalData, signal1_belt: str, signal2_belt: str, max_freq: float
+) -> None:
     # Plot the two belts PSD signals
     ax.plot(signal1.freqs, signal1.psd, label='Belt ' + signal1_belt, color=KLIPPAIN_COLORS['purple'])
     ax.plot(signal2.freqs, signal2.psd, label='Belt ' + signal2_belt, color=KLIPPAIN_COLORS['orange'])
@@ -281,7 +339,16 @@ def plot_compare_frequency(ax, signal1, signal2, signal1_belt, signal2_belt, max
 
 
 # Compute quantile-quantile plot to compare the two belts
-def plot_versus_belts(ax, common_freqs, signal1, signal2, interp_psd1, interp_psd2, signal1_belt, signal2_belt):
+def plot_versus_belts(
+    ax: plt.Axes,
+    common_freqs: np.ndarray,
+    signal1: SignalData,
+    signal2: SignalData,
+    interp_psd1: np.ndarray,
+    interp_psd2: np.ndarray,
+    signal1_belt: str,
+    signal2_belt: str,
+) -> None:
     ax.set_title('Cross-belts comparison plot', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
 
     max_psd = max(np.max(interp_psd1), np.max(interp_psd2))
@@ -410,7 +477,7 @@ def plot_versus_belts(ax, common_freqs, signal1, signal2, interp_psd1, interp_ps
 
 
 # Original Klipper function to get the PSD data of a raw accelerometer signal
-def compute_signal_data(data, max_freq):
+def compute_signal_data(data: np.ndarray, max_freq: float) -> SignalData:
     helper = shaper_calibrate.ShaperCalibrate(printer=None)
     calibration_data = helper.process_accelerometer_data(data)
 
@@ -419,7 +486,7 @@ def compute_signal_data(data, max_freq):
 
     _, peaks, _ = detect_peaks(psd, freqs, PEAKS_DETECTION_THRESHOLD * psd.max())
 
-    return SignalData(freqs=freqs, psd=psd, peaks=peaks, paired_peaks=None, unpaired_peaks=None)
+    return SignalData(freqs=freqs, psd=psd, peaks=peaks)
 
 
 ######################################################################
@@ -428,8 +495,13 @@ def compute_signal_data(data, max_freq):
 
 
 def belts_calibration(
-    lognames, kinematics, klipperdir='~/klipper', max_freq=200.0, accel_per_hz=None, st_version='unknown'
-):
+    lognames: List[str],
+    kinematics: Optional[str],
+    klipperdir: str = '~/klipper',
+    max_freq: float = 200.0,
+    accel_per_hz: Optional[float] = None,
+    st_version: str = 'unknown',
+) -> plt.Figure:
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
@@ -451,11 +523,9 @@ def belts_calibration(
     del datas
 
     # Pair the peaks across the two datasets
-    paired_peaks, unpaired_peaks1, unpaired_peaks2 = pair_peaks(
-        signal1.peaks, signal1.freqs, signal1.psd, signal2.peaks, signal2.freqs, signal2.psd
-    )
-    signal1 = signal1._replace(paired_peaks=paired_peaks, unpaired_peaks=unpaired_peaks1)
-    signal2 = signal2._replace(paired_peaks=paired_peaks, unpaired_peaks=unpaired_peaks2)
+    pairing_result = pair_peaks(signal1.peaks, signal1.freqs, signal1.psd, signal2.peaks, signal2.freqs, signal2.psd)
+    signal1 = signal1._replace(paired_peaks=pairing_result.paired_peaks, unpaired_peaks=pairing_result.unpaired_peaks1)
+    signal2 = signal2._replace(paired_peaks=pairing_result.paired_peaks, unpaired_peaks=pairing_result.unpaired_peaks2)
 
     # Re-interpolate the PSD signals to a common frequency range to be able to plot them one against the other point by point
     common_freqs = np.linspace(0, max_freq, 500)

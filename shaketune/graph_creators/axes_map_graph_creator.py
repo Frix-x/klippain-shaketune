@@ -8,6 +8,7 @@
 import optparse
 import os
 from datetime import datetime
+from typing import List, Optional, Tuple
 
 import matplotlib
 import matplotlib.colors
@@ -22,6 +23,8 @@ matplotlib.use('Agg')
 
 from ..helpers.common_func import parse_log
 from ..helpers.console_output import ConsoleOutput
+from ..shaketune_config import ShakeTuneConfig
+from .graph_creator import GraphCreator
 
 KLIPPAIN_COLORS = {
     'purple': '#70088C',
@@ -33,12 +36,48 @@ KLIPPAIN_COLORS = {
 MACHINE_AXES = ['x', 'y', 'z']
 
 
+class AxesMapGraphCreator(GraphCreator):
+    def __init__(self, config: ShakeTuneConfig):
+        super().__init__(config, 'axes map')
+        self._accel: Optional[int] = None
+        self._segment_length: Optional[float] = None
+
+    def configure(self, accel: int, segment_length: float) -> None:
+        self._accel = accel
+        self._segment_length = segment_length
+
+    def create_graph(self) -> None:
+        lognames = self._move_and_prepare_files(
+            glob_pattern='shaketune-axesmap_*.csv',
+            min_files_required=3,
+            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
+        )
+        fig = axesmap_calibration(
+            lognames=[str(path) for path in lognames],
+            accel=self._accel,
+            fixed_length=self._segment_length,
+            st_version=self._version,
+        )
+        self._save_figure_and_cleanup(fig, lognames)
+
+    def clean_old_files(self, keep_results: int = 3) -> None:
+        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
+        if len(files) <= keep_results:
+            return  # No need to delete any files
+        for old_file in files[keep_results:]:
+            file_date = '_'.join(old_file.stem.split('_')[1:3])
+            for suffix in ['X', 'Y', 'Z']:
+                csv_file = self._folder / f'axesmap_{file_date}_{suffix}.csv'
+                csv_file.unlink(missing_ok=True)
+            old_file.unlink()
+
+
 ######################################################################
 # Computation
 ######################################################################
 
 
-def wavelet_denoise(data, wavelet='db1', level=1):
+def wavelet_denoise(data: np.ndarray, wavelet: str = 'db1', level: int = 1) -> Tuple[np.ndarray, np.ndarray]:
     coeffs = pywt.wavedec(data, wavelet, mode='smooth')
     threshold = np.median(np.abs(coeffs[-level])) / 0.6745 * np.sqrt(2 * np.log(len(data)))
     new_coeffs = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
@@ -49,11 +88,13 @@ def wavelet_denoise(data, wavelet='db1', level=1):
     return denoised_data, noise
 
 
-def integrate_trapz(accel, time):
+def integrate_trapz(accel: np.ndarray, time: np.ndarray) -> np.ndarray:
     return np.array([np.trapz(accel[:i], time[:i]) for i in range(2, len(time) + 1)])
 
 
-def process_acceleration_data(time, accel_x, accel_y, accel_z):
+def process_acceleration_data(
+    time: np.ndarray, accel_x: np.ndarray, accel_y: np.ndarray, accel_z: np.ndarray
+) -> Tuple[float, float, float, np.ndarray, np.ndarray, np.ndarray, float]:
     # Calculate the constant offset (gravity component)
     offset_x = np.mean(accel_x)
     offset_y = np.mean(accel_y)
@@ -89,7 +130,9 @@ def process_acceleration_data(time, accel_x, accel_y, accel_z):
     return offset_x, offset_y, offset_z, position_x, position_y, position_z, noise_intensity
 
 
-def scale_positions_to_fixed_length(position_x, position_y, position_z, fixed_length):
+def scale_positions_to_fixed_length(
+    position_x: np.ndarray, position_y: np.ndarray, position_z: np.ndarray, fixed_length: float
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     # Calculate the total distance traveled in 3D space
     total_distance = np.sqrt(np.diff(position_x) ** 2 + np.diff(position_y) ** 2 + np.diff(position_z) ** 2).sum()
     scale_factor = fixed_length / total_distance
@@ -102,7 +145,7 @@ def scale_positions_to_fixed_length(position_x, position_y, position_z, fixed_le
     return position_x, position_y, position_z
 
 
-def find_nearest_perfect_vector(average_direction_vector):
+def find_nearest_perfect_vector(average_direction_vector: np.ndarray) -> Tuple[np.ndarray, float]:
     # Define the perfect vectors
     perfect_vectors = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1], [-1, 0, 0], [0, -1, 0], [0, 0, -1]])
 
@@ -117,7 +160,9 @@ def find_nearest_perfect_vector(average_direction_vector):
     return nearest_vector, angle_error
 
 
-def linear_regression_direction(position_x, position_y, position_z, trim_length=0.25):
+def linear_regression_direction(
+    position_x: np.ndarray, position_y: np.ndarray, position_z: np.ndarray, trim_length: float = 0.25
+) -> np.ndarray:
     # Trim the start and end of the position data to keep only the center of the segment
     # as the start and stop positions are not always perfectly aligned and can be a bit noisy
     t = len(position_x)
@@ -145,7 +190,9 @@ def linear_regression_direction(position_x, position_y, position_z, trim_length=
 ######################################################################
 
 
-def plot_compare_frequency(ax, time, accel_x, accel_y, accel_z, offset, i):
+def plot_compare_frequency(
+    ax: plt.Axes, time: np.ndarray, accel_x: np.ndarray, accel_y: np.ndarray, accel_z: np.ndarray, offset: float, i: int
+) -> None:
     # Plot acceleration data
     ax.plot(
         time,
@@ -200,7 +247,15 @@ def plot_compare_frequency(ax, time, accel_x, accel_y, accel_z, offset, i):
         ax2.legend(loc='upper right', prop=fontP)
 
 
-def plot_3d_path(ax, i, position_x, position_y, position_z, average_direction_vector, angle_error):
+def plot_3d_path(
+    ax: plt.Axes,
+    i: int,
+    position_x: np.ndarray,
+    position_y: np.ndarray,
+    position_z: np.ndarray,
+    average_direction_vector: np.ndarray,
+    angle_error: float,
+) -> None:
     ax.plot(position_x, position_y, position_z, color=KLIPPAIN_COLORS['orange'], linestyle=':', linewidth=2)
     ax.scatter(position_x[0], position_y[0], position_z[0], color=KLIPPAIN_COLORS['red_pink'], zorder=10)
     ax.text(
@@ -251,7 +306,7 @@ def plot_3d_path(ax, i, position_x, position_y, position_z, average_direction_ve
     ax.legend(loc='upper left', prop=fontP)
 
 
-def format_direction_vector(vectors):
+def format_direction_vector(vectors: List[np.ndarray]) -> str:
     formatted_vector = []
     for vector in vectors:
         for i in range(len(vector)):
@@ -269,7 +324,9 @@ def format_direction_vector(vectors):
 ######################################################################
 
 
-def axesmap_calibration(lognames, fixed_length, accel=None, st_version='unknown'):
+def axesmap_calibration(
+    lognames: List[str], fixed_length: float, accel: Optional[float] = None, st_version: str = 'unknown'
+) -> plt.Figure:
     # Parse data from the log files while ignoring CSV in the wrong format (sorted by axis name)
     raw_datas = {}
     for logname in lognames:

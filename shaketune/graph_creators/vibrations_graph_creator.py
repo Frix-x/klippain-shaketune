@@ -9,8 +9,11 @@ import math
 import optparse
 import os
 import re
+import tarfile
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 import matplotlib
 import matplotlib.font_manager
@@ -29,6 +32,9 @@ from ..helpers.common_func import (
     setup_klipper_import,
 )
 from ..helpers.console_output import ConsoleOutput
+from ..helpers.motors_config_parser import MotorsConfigParser
+from ..shaketune_config import ShakeTuneConfig
+from .graph_creator import GraphCreator
 
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_RELATIVE_HEIGHT_THRESHOLD = 0.04
@@ -46,20 +52,74 @@ KLIPPAIN_COLORS = {
 }
 
 
+class VibrationsGraphCreator(GraphCreator):
+    def __init__(self, config: ShakeTuneConfig):
+        super().__init__(config, 'vibrations profile')
+        self._kinematics: Optional[str] = None
+        self._accel: Optional[float] = None
+        self._motors: Optional[List[MotorsConfigParser]] = None
+
+    def configure(self, kinematics: str, accel: float, motor_config_parser: MotorsConfigParser) -> None:
+        self._kinematics = kinematics
+        self._accel = accel
+        self._motors = motor_config_parser.get_motors()
+
+    def _archive_files(self, lognames: List[Path]) -> None:
+        tar_path = self._folder / f'{self._type}_{self._graph_date}.tar.gz'
+        with tarfile.open(tar_path, 'w:gz') as tar:
+            for csv_file in lognames:
+                tar.add(csv_file, arcname=csv_file.name, recursive=False)
+                csv_file.unlink()
+
+    def create_graph(self) -> None:
+        if not self._accel or not self._kinematics:
+            raise ValueError('accel and kinematics must be set to create the vibrations profile graph!')
+
+        lognames = self._move_and_prepare_files(
+            glob_pattern='shaketune-vib_*.csv',
+            min_files_required=None,
+            custom_name_func=lambda f: re.search(r'shaketune-vib_(.*?)_\d{8}_\d{6}', f.name).group(1),
+        )
+        fig = vibrations_profile(
+            lognames=[str(path) for path in lognames],
+            klipperdir=str(self._config.klipper_folder),
+            kinematics=self._kinematics,
+            accel=self._accel,
+            st_version=self._version,
+            motors=self._motors,
+        )
+        self._save_figure_and_cleanup(fig, lognames)
+
+    def clean_old_files(self, keep_results: int = 3) -> None:
+        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
+        if len(files) <= keep_results:
+            return  # No need to delete any files
+        for old_file in files[keep_results:]:
+            old_file.unlink()
+            tar_file = old_file.with_suffix('.tar.gz')
+            tar_file.unlink(missing_ok=True)
+
+
 ######################################################################
 # Computation
 ######################################################################
 
 
 # Call to the official Klipper input shaper object to do the PSD computation
-def calc_freq_response(data):
+def calc_freq_response(data) -> Tuple[np.ndarray, np.ndarray]:
     helper = shaper_calibrate.ShaperCalibrate(printer=None)
     return helper.process_accelerometer_data(data)
 
 
 # Calculate motor frequency profiles based on the measured Power Spectral Density (PSD) measurements for the machine kinematics
 # main angles and then create a global motor profile as a weighted average (from their own vibrations) of all calculated profiles
-def compute_motor_profiles(freqs, psds, all_angles_energy, measured_angles=None, energy_amplification_factor=2):
+def compute_motor_profiles(
+    freqs: np.ndarray,
+    psds: dict,
+    all_angles_energy: dict,
+    measured_angles: Optional[List[int]] = None,
+    energy_amplification_factor: int = 2,
+) -> Tuple[dict, np.ndarray]:
     if measured_angles is None:
         measured_angles = [0, 90]
 
@@ -97,7 +157,9 @@ def compute_motor_profiles(freqs, psds, all_angles_energy, measured_angles=None,
 # the effects of each speeds at each angles, this function simplify it by using only the main motors axes (X/Y for Cartesian
 # printers and A/B for CoreXY) measurements and project each points on the [0,360] degrees range using trigonometry
 # to "sum" the vibration impact of each axis at every points of the generated spectrogram. The result is very similar at the end.
-def compute_dir_speed_spectrogram(measured_speeds, data, kinematics='cartesian', measured_angles=None):
+def compute_dir_speed_spectrogram(
+    measured_speeds: List[float], data: dict, kinematics: str = 'cartesian', measured_angles: Optional[List[int]] = None
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     if measured_angles is None:
         measured_angles = [0, 90]
 
@@ -106,7 +168,7 @@ def compute_dir_speed_spectrogram(measured_speeds, data, kinematics='cartesian',
     spectrum_speeds = np.linspace(min(measured_speeds), max(measured_speeds), len(measured_speeds) * 6)
     spectrum_vibrations = np.zeros((len(spectrum_angles), len(spectrum_speeds)))
 
-    def get_interpolated_vibrations(data, speed, speeds):
+    def get_interpolated_vibrations(data: dict, speed: float, speeds: List[float]) -> float:
         idx = np.clip(np.searchsorted(speeds, speed, side='left'), 1, len(speeds) - 1)
         lower_speed = speeds[idx - 1]
         upper_speed = speeds[idx]
@@ -139,7 +201,7 @@ def compute_dir_speed_spectrogram(measured_speeds, data, kinematics='cartesian',
     return spectrum_angles, spectrum_speeds, spectrum_vibrations
 
 
-def compute_angle_powers(spectrogram_data):
+def compute_angle_powers(spectrogram_data: np.ndarray) -> np.ndarray:
     angles_powers = np.trapz(spectrogram_data, axis=1)
 
     # Since we want to plot it on a continuous polar plot later on, we need to append parts of
@@ -151,7 +213,7 @@ def compute_angle_powers(spectrogram_data):
     return convolved_extended[9:-9]
 
 
-def compute_speed_powers(spectrogram_data, smoothing_window=15):
+def compute_speed_powers(spectrogram_data: np.ndarray, smoothing_window: int = 15) -> np.ndarray:
     min_values = np.amin(spectrogram_data, axis=0)
     max_values = np.amax(spectrogram_data, axis=0)
     var_values = np.var(spectrogram_data, axis=0)
@@ -167,7 +229,7 @@ def compute_speed_powers(spectrogram_data, smoothing_window=15):
     conv_filter = np.ones(smoothing_window) / smoothing_window
     window = int(smoothing_window / 2)
 
-    def pad_and_smooth(data):
+    def pad_and_smooth(data: np.ndarray) -> np.ndarray:
         data_padded = np.pad(data, (window,), mode='edge')
         smoothed_data = np.convolve(data_padded, conv_filter, mode='valid')
         return smoothed_data
@@ -182,7 +244,9 @@ def compute_speed_powers(spectrogram_data, smoothing_window=15):
 # Function that filter and split the good_speed ranges. The goal is to remove some zones around
 # additional detected small peaks in order to suppress them if there is a peak, even if it's low,
 # that's probably due to a crossing in the motor resonance pattern that still need to be removed
-def filter_and_split_ranges(all_speeds, good_speeds, peak_speed_indices, deletion_range):
+def filter_and_split_ranges(
+    all_speeds: np.ndarray, good_speeds: List[Tuple[int, int, float]], peak_speed_indices: dict, deletion_range: int
+) -> List[Tuple[int, int, float]]:
     # Process each range to filter out and split based on peak indices
     filtered_good_speeds = []
     for start, end, energy in good_speeds:
@@ -225,7 +289,9 @@ def filter_and_split_ranges(all_speeds, good_speeds, peak_speed_indices, deletio
 
 # This function allow the computation of a symmetry score that reflect the spectrogram apparent symmetry between
 # measured axes on both the shape of the signal and the energy level consistency across both side of the signal
-def compute_symmetry_analysis(all_angles, spectrogram_data, measured_angles=None):
+def compute_symmetry_analysis(
+    all_angles: np.ndarray, spectrogram_data: np.ndarray, measured_angles: Optional[List[int]] = None
+) -> float:
     if measured_angles is None:
         measured_angles = [0, 90]
 
@@ -256,7 +322,13 @@ def compute_symmetry_analysis(all_angles, spectrogram_data, measured_angles=None
 ######################################################################
 
 
-def plot_angle_profile_polar(ax, angles, angles_powers, low_energy_zones, symmetry_factor):
+def plot_angle_profile_polar(
+    ax: plt.Axes,
+    angles: np.ndarray,
+    angles_powers: np.ndarray,
+    low_energy_zones: List[Tuple[int, int, float]],
+    symmetry_factor: float,
+) -> None:
     angles_radians = np.deg2rad(angles)
 
     ax.set_title('Polar angle energy profile', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
@@ -315,16 +387,16 @@ def plot_angle_profile_polar(ax, angles, angles_powers, low_energy_zones, symmet
 
 
 def plot_global_speed_profile(
-    ax,
-    all_speeds,
-    sp_min_energy,
-    sp_max_energy,
-    sp_variance_energy,
-    vibration_metric,
-    num_peaks,
-    peaks,
-    low_energy_zones,
-):
+    ax: plt.Axes,
+    all_speeds: np.ndarray,
+    sp_min_energy: np.ndarray,
+    sp_max_energy: np.ndarray,
+    sp_variance_energy: np.ndarray,
+    vibration_metric: np.ndarray,
+    num_peaks: int,
+    peaks: np.ndarray,
+    low_energy_zones: List[Tuple[int, int, float]],
+) -> None:
     ax.set_title('Global speed energy profile', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_xlabel('Speed (mm/s)')
     ax.set_ylabel('Energy')
@@ -389,7 +461,9 @@ def plot_global_speed_profile(
     return
 
 
-def plot_angular_speed_profiles(ax, speeds, angles, spectrogram_data, kinematics='cartesian'):
+def plot_angular_speed_profiles(
+    ax: plt.Axes, speeds: np.ndarray, angles: np.ndarray, spectrogram_data: np.ndarray, kinematics: str = 'cartesian'
+) -> None:
     ax.set_title('Angular speed energy profiles', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_xlabel('Speed (mm/s)')
     ax.set_ylabel('Energy')
@@ -423,7 +497,14 @@ def plot_angular_speed_profiles(ax, speeds, angles, spectrogram_data, kinematics
     return
 
 
-def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_profile, max_freq):
+def plot_motor_profiles(
+    ax: plt.Axes,
+    freqs: np.ndarray,
+    main_angles: List[int],
+    motor_profiles: dict,
+    global_motor_profile: np.ndarray,
+    max_freq: float,
+) -> None:
     ax.set_title('Motor frequency profile', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_ylabel('Energy')
     ax.set_xlabel('Frequency (Hz)')
@@ -501,7 +582,9 @@ def plot_motor_profiles(ax, freqs, main_angles, motor_profiles, global_motor_pro
     return
 
 
-def plot_vibration_spectrogram_polar(ax, angles, speeds, spectrogram_data):
+def plot_vibration_spectrogram_polar(
+    ax: plt.Axes, angles: np.ndarray, speeds: np.ndarray, spectrogram_data: np.ndarray
+) -> None:
     angles_radians = np.radians(angles)
 
     # Assuming speeds defines the radial distance from the center, we need to create a meshgrid
@@ -527,7 +610,9 @@ def plot_vibration_spectrogram_polar(ax, angles, speeds, spectrogram_data):
     return
 
 
-def plot_vibration_spectrogram(ax, angles, speeds, spectrogram_data, peaks):
+def plot_vibration_spectrogram(
+    ax: plt.Axes, angles: np.ndarray, speeds: np.ndarray, spectrogram_data: np.ndarray, peaks: np.ndarray
+) -> None:
     ax.set_title('Vibrations heatmap', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_xlabel('Speed (mm/s)')
     ax.set_ylabel('Angle (deg)')
@@ -560,7 +645,7 @@ def plot_vibration_spectrogram(ax, angles, speeds, spectrogram_data, peaks):
     return
 
 
-def plot_motor_config_txt(fig, motors, differences):
+def plot_motor_config_txt(fig: plt.Figure, motors: List[MotorsConfigParser], differences: Optional[str]) -> None:
     motor_details = [(motors[0], 'X motor'), (motors[1], 'Y motor')]
 
     distance = 0.12
@@ -618,7 +703,7 @@ def plot_motor_config_txt(fig, motors, differences):
 ######################################################################
 
 
-def extract_angle_and_speed(logname):
+def extract_angle_and_speed(logname: str) -> Tuple[float, float]:
     try:
         match = re.search(r'an(\d+)_\d+sp(\d+)_\d+', os.path.basename(logname))
         if match:
@@ -634,8 +719,14 @@ def extract_angle_and_speed(logname):
 
 
 def vibrations_profile(
-    lognames, klipperdir='~/klipper', kinematics='cartesian', accel=None, max_freq=1000.0, st_version=None, motors=None
-):
+    lognames: List[str],
+    klipperdir: str = '~/klipper',
+    kinematics: str = 'cartesian',
+    accel: Optional[float] = None,
+    max_freq: float = 1000.0,
+    st_version: Optional[str] = None,
+    motors: Optional[List[MotorsConfigParser]] = None,
+) -> plt.Figure:
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
