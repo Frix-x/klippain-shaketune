@@ -55,7 +55,7 @@ class GraphCreator(abc.ABC):
         else:
             self._remove_files(lognames)
 
-    def _archive_files(self, _: List[Path]) -> None:
+    def _archive_files(self, lognames: List[Path]) -> None:
         return
 
     def _remove_files(self, lognames: List[Path]) -> None:

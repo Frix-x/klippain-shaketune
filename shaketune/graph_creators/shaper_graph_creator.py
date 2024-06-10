@@ -11,6 +11,7 @@
 import optparse
 import os
 from datetime import datetime
+from typing import List, Optional
 
 import matplotlib
 import matplotlib.font_manager
@@ -48,10 +49,13 @@ KLIPPAIN_COLORS = {
 class ShaperGraphCreator(GraphCreator):
     def __init__(self, config: ShakeTuneConfig):
         super().__init__(config, 'input shaper')
-        self._max_smoothing = None
-        self._scv = None
+        self._max_smoothing: Optional[float] = None
+        self._scv: Optional[float] = None
+        self._accel_per_hz: Optional[float] = None
 
-    def configure(self, scv: float, max_smoothing: float = None, accel_per_hz: float = None) -> None:
+    def configure(
+        self, scv: float, max_smoothing: Optional[float] = None, accel_per_hz: Optional[float] = None
+    ) -> None:
         self._scv = scv
         self._max_smoothing = max_smoothing
         self._accel_per_hz = accel_per_hz
@@ -76,13 +80,9 @@ class ShaperGraphCreator(GraphCreator):
         self._save_figure_and_cleanup(fig, lognames, lognames[0].stem.split('_')[-1])
 
     def clean_old_files(self, keep_results: int = 3) -> None:
-        # Get all PNG files in the directory as a list of Path objects
         files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
-
         if len(files) <= 2 * keep_results:
             return  # No need to delete any files
-
-        # Delete the older files
         for old_file in files[2 * keep_results :]:
             csv_file = old_file.with_suffix('.csv')
             csv_file.unlink(missing_ok=True)
@@ -96,7 +96,7 @@ class ShaperGraphCreator(GraphCreator):
 
 # Find the best shaper parameters using Klipper's official algorithm selection with
 # a proper precomputed damping ratio (zeta) and using the configured printer SQV value
-def calibrate_shaper(datas, max_smoothing, scv, max_freq):
+def calibrate_shaper(datas: List[np.ndarray], max_smoothing: Optional[float], scv: float, max_freq: float):
     helper = shaper_calibrate.ShaperCalibrate(printer=None)
     calibration_data = helper.process_accelerometer_data(datas)
     calibration_data.normalize_to_frequencies()
@@ -144,8 +144,17 @@ def calibrate_shaper(datas, max_smoothing, scv, max_freq):
 
 
 def plot_freq_response(
-    ax, calibration_data, shapers, klipper_shaper_choice, peaks, peaks_freqs, peaks_threshold, fr, zeta, max_freq
-):
+    ax: plt.Axes,
+    calibration_data,
+    shapers,
+    klipper_shaper_choice: str,
+    peaks: np.ndarray,
+    peaks_freqs: np.ndarray,
+    peaks_threshold: List[float],
+    fr: float,
+    zeta: float,
+    max_freq: float,
+) -> None:
     freqs = calibration_data.freqs
     psd = calibration_data.psd_sum
     px = calibration_data.psd_x
@@ -292,7 +301,9 @@ def plot_freq_response(
 
 # Plot a time-frequency spectrogram to see how the system respond over time during the
 # resonnance test. This can highlight hidden spots from the standard PSD graph from other harmonics
-def plot_spectrogram(ax, t, bins, pdata, peaks, max_freq):
+def plot_spectrogram(
+    ax: plt.Axes, t: np.ndarray, bins: np.ndarray, pdata: np.ndarray, peaks: np.ndarray, max_freq: float
+) -> None:
     ax.set_title('Time-Frequency Spectrogram', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
 
     # We need to normalize the data to get a proper signal on the spectrogram
@@ -344,14 +355,14 @@ def plot_spectrogram(ax, t, bins, pdata, peaks, max_freq):
 
 
 def shaper_calibration(
-    lognames,
-    klipperdir='~/klipper',
-    max_smoothing=None,
-    scv=5.0,
-    max_freq=200.0,
-    accel_per_hz=None,
-    st_version='unknown',
-):
+    lognames: List[str],
+    klipperdir: str = '~/klipper',
+    max_smoothing: Optional[float] = None,
+    scv: float = 5.0,
+    max_freq: float = 200.0,
+    accel_per_hz: Optional[float] = None,
+    st_version: str = 'unknown',
+) -> plt.Figure:
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
