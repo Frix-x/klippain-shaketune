@@ -73,7 +73,7 @@ class VibrationsGraphCreator(GraphCreator):
 
     def create_graph(self) -> None:
         if not self._accel or not self._kinematics:
-            raise ValueError('accel, chip_name and kinematics must be set to create the vibrations profile graph!')
+            raise ValueError('accel and kinematics must be set to create the vibrations profile graph!')
 
         lognames = self._move_and_prepare_files(
             glob_pattern='shaketune-vib_*.csv',
