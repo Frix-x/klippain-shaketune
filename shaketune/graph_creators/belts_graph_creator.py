@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 #################################################
 ######## CoreXY BELTS CALIBRATION SCRIPT ########
 #################################################
@@ -88,7 +86,7 @@ class BeltsGraphCreator(GraphCreator):
             return  # No need to delete any files
         for old_file in files[keep_results:]:
             file_date = '_'.join(old_file.stem.split('_')[1:3])
-            for suffix in ['A', 'B']:
+            for suffix in {'A', 'B'}:
                 csv_file = self._folder / f'beltscomparison_{file_date}_{suffix}.csv'
                 csv_file.unlink(missing_ok=True)
             old_file.unlink()
@@ -192,11 +190,10 @@ def mhi_lut(mhi: float) -> str:
         (0, 15, 'Mechanical issue detected'),
     ]
     mhi = np.clip(mhi, 1, 100)
-    for lower, upper, message in ranges:
-        if lower < mhi <= upper:
-            return message
-
-    return 'Unknown mechanical health'  # Should never happen
+    return next(
+        (message for lower, upper, message in ranges if lower < mhi <= upper),
+        'Unknown mechanical health',
+    )
 
 
 ######################################################################
@@ -220,9 +217,6 @@ def plot_compare_frequency(
 
     for _, (peak1, peak2) in enumerate(signal1.paired_peaks):
         label = ALPHABET[paired_peak_count]
-        # amplitude_offset = abs(
-        #     ((signal2.psd[peak2[0]] - signal1.psd[peak1[0]]) / max(signal1.psd[peak1[0]], signal2.psd[peak2[0]])) * 100
-        # )
         amplitude_offset = abs(((signal2.psd[peak2[0]] - signal1.psd[peak1[0]]) / psd_highest_max) * 100)
         frequency_offset = abs(signal2.freqs[peak2[0]] - signal1.freqs[peak1[0]])
         offsets_table_data.append([f'Peaks {label}', f'{frequency_offset:.1f} Hz', f'{amplitude_offset:.1f} %'])
@@ -507,7 +501,7 @@ def belts_calibration(
 
     # Parse data from the log files while ignoring CSV in the wrong format
     datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
-    if len(datas) > 2:
+    if len(datas) != 2:
         raise ValueError('Incorrect number of .csv files used (this function needs exactly two files to compare them)!')
 
     # Get the belts name for the legend to avoid putting the full file name
@@ -569,15 +563,13 @@ def belts_calibration(
         if kinematics is not None:
             title_line2 += ' -- ' + kinematics.upper() + ' kinematics'
     except Exception:
-        ConsoleOutput.print(
-            'Warning: CSV filenames look to be different than expected (%s , %s)' % (lognames[0], lognames[1])
-        )
+        ConsoleOutput.print(f'Warning: Unable to parse the date from the filename ({lognames[0]}, {lognames[1]})')
         title_line2 = lognames[0].split('/')[-1] + ' / ' + lognames[1].split('/')[-1]
     fig.text(0.060, 0.939, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     # We add the estimated similarity and the MHI value to the title only if the kinematics is CoreXY
     # as it make no sense to compute these values for other kinematics that doesn't have paired belts
-    if kinematics in ['corexy', 'corexz']:
+    if kinematics in {'corexy', 'corexz'}:
         title_line3 = f'| Estimated similarity: {similarity_factor:.1f}%'
         title_line4 = f'| {mhi} (experimental)'
         fig.text(0.55, 0.985, title_line3, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])

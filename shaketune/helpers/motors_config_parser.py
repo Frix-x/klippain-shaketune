@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # Classes to retrieve a couple of motors infos and extract the relevant information
 # from the Klipper configuration and the TMC registers
 # Written by Frix_x#0161 #
@@ -41,7 +39,7 @@ class Motor:
             value_dict = new_value_dict
 
         # Then gets merged all the thresholds into the same THRS virtual register
-        if register in ['TPWMTHRS', 'TCOOLTHRS']:
+        if register in {'TPWMTHRS', 'TCOOLTHRS'}:
             existing_thrs = self._registers.get('THRS', {})
             merged_values = {**existing_thrs, **value_dict}
             self._registers['THRS'] = merged_values
@@ -97,10 +95,7 @@ class Motor:
         if not differences['registers']:
             del differences['registers']
 
-        if not differences:
-            return None
-
-        return differences
+        return None if not differences else differences
 
 
 class MotorsConfigParser:
@@ -180,10 +175,7 @@ class MotorsConfigParser:
 
     # Find and return the motor by its name
     def get_motor(self, motor_name: str) -> Optional[Motor]:
-        for motor in self._motors:
-            if motor.name == motor_name:
-                return motor
-        return None
+        return next((motor for motor in self._motors if motor.name == motor_name), None)
 
     # Get all the motor list at once
     def get_motors(self) -> List[Motor]:

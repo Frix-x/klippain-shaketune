@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # This file provides a custom and internal Shake&Tune Accelerometer helper that is
 # an interface to Klipper's own accelerometer classes. It is used to start and
 # stop accelerometer measurements and write the data to a file in a blocking manner.
@@ -18,7 +16,7 @@ class Accelerometer:
     def find_axis_accelerometer(printer, axis: str = 'xy'):
         accel_chip_names = printer.lookup_object('resonance_tester').accel_chip_names
         for chip_axis, chip_name in accel_chip_names:
-            if axis in ['x', 'y'] and chip_axis == 'xy':
+            if axis in {'x', 'y'} and chip_axis == 'xy':
                 return chip_name
             elif chip_axis == axis:
                 return chip_name
@@ -57,4 +55,4 @@ class Accelerometer:
             f.write('#time,accel_x,accel_y,accel_z\n')
             samples = bg_client.samples or bg_client.get_samples()
             for t, accel_x, accel_y, accel_z in samples:
-                f.write('%.6f,%.6f,%.6f,%.6f\n' % (t, accel_x, accel_y, accel_z))
+                f.write(f'{t:.6f},{accel_x:.6f},{accel_y:.6f},{accel_z:.6f}\n')

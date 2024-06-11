@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 ######################################
 ###### AXE_MAP DETECTION SCRIPT ######
 ######################################
@@ -66,7 +64,7 @@ class AxesMapGraphCreator(GraphCreator):
             return  # No need to delete any files
         for old_file in files[keep_results:]:
             file_date = '_'.join(old_file.stem.split('_')[1:3])
-            for suffix in ['X', 'Y', 'Z']:
+            for suffix in {'X', 'Y', 'Z'}:
                 csv_file = self._folder / f'axesmap_{file_date}_{suffix}.csv'
                 csv_file.unlink(missing_ok=True)
             old_file.unlink()
@@ -421,8 +419,7 @@ def axesmap_calibration(
             title_line2 += f' -- at {accel:0.0f} mm/s²'
     except Exception:
         ConsoleOutput.print(
-            'Warning: CSV filenames look to be different than expected (%s , %s, %s)'
-            % (lognames[0], lognames[1], lognames[2])
+            f'Warning: CSV filenames look to be different than expected ({lognames[0]}, {lognames[1]}, {lognames[2]})'
         )
         title_line2 = lognames[0].split('/')[-1] + ' ...'
     fig.text(0.060, 0.939, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])

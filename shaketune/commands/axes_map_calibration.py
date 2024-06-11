@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-
-
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_process import ShakeTuneProcess
 from .accelerometer import Accelerometer

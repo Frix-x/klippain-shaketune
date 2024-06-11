@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # The logic in this file was "extracted" from Klipper's orignal resonance_tester.py file
 # Courtesy of Dmitry Butyugin <dmbutyugin@google.com> for the original implementation
 

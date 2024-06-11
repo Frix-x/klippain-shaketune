@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..helpers.resonance_test import vibrate_axis_at_static_freq
@@ -29,7 +27,7 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     if create_graph:
         printer = config.get_printer()
         if accel_chip is None:
-            accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy' if axis in ['a', 'b'] else axis)
+            accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy' if axis in {'a', 'b'} else axis)
         k_accelerometer = printer.lookup_object(accel_chip, None)
         if k_accelerometer is None:
             raise gcmd.error(f'Accelerometer chip [{accel_chip}] was not found!')

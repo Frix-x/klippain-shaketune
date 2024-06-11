@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-
-
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..helpers.resonance_test import vibrate_axis
@@ -14,7 +11,7 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     hz_per_sec = gcmd.get_float('HZ_PER_SEC', default=1, minval=1)
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     axis_input = gcmd.get('AXIS', default='all').lower()
-    if axis_input not in ['x', 'y', 'all']:
+    if axis_input not in {'x', 'y', 'all'}:
         raise gcmd.error('AXIS selection invalid. Should be either x, y, or all!')
     scv = gcmd.get_float('SCV', default=None, minval=0)
     max_sm = gcmd.get_float('MAX_SMOOTHING', default=None, minval=0)

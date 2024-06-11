@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import optparse
 import os
 from datetime import datetime
@@ -137,6 +135,8 @@ def static_frequency_tool(
         raise ValueError('Error: missing frequency or duration parameters!')
 
     datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
+    if len(datas) == 0:
+        raise ValueError('No valid data found in the provided CSV files!')
     if len(datas) > 1:
         ConsoleOutput.print('Warning: incorrect number of .csv files detected. Only the first one will be used!')
 

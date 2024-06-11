@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 ##################################################
 #### DIRECTIONAL VIBRATIONS PLOTTING SCRIPT ######
 ##################################################
@@ -32,7 +30,7 @@ from ..helpers.common_func import (
     setup_klipper_import,
 )
 from ..helpers.console_output import ConsoleOutput
-from ..helpers.motors_config_parser import MotorsConfigParser
+from ..helpers.motors_config_parser import Motor, MotorsConfigParser
 from ..shaketune_config import ShakeTuneConfig
 from .graph_creator import GraphCreator
 
@@ -62,7 +60,7 @@ class VibrationsGraphCreator(GraphCreator):
     def configure(self, kinematics: str, accel: float, motor_config_parser: MotorsConfigParser) -> None:
         self._kinematics = kinematics
         self._accel = accel
-        self._motors = motor_config_parser.get_motors()
+        self._motors: List[Motor] = motor_config_parser.get_motors()
 
     def _archive_files(self, lognames: List[Path]) -> None:
         tar_path = self._folder / f'{self._type}_{self._graph_date}.tar.gz'
@@ -482,7 +480,7 @@ def plot_angular_speed_profiles(
         ax.plot(speeds, spectrogram_data[idx], label=label, color=KLIPPAIN_COLORS[color], zorder=zorder)
 
     ax.set_xlim([speeds.min(), speeds.max()])
-    max_value = max(spectrogram_data[angle].max() for angle in [0, 45, 90, 135])
+    max_value = max(spectrogram_data[angle].max() for angle in {0, 45, 90, 135})
     ax.set_ylim([0, max_value * 1.1])
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
@@ -542,13 +540,11 @@ def plot_motor_profiles(
         )
     if motor_zeta is not None:
         ConsoleOutput.print(
-            'Motors have a main resonant frequency at %.1fHz with an estimated damping ratio of %.3f'
-            % (motor_fr, motor_zeta)
+            f'Motors have a main resonant frequency at {motor_fr:.1f}Hz with an estimated damping ratio of {motor_zeta:.3f}'
         )
     else:
         ConsoleOutput.print(
-            'Motors have a main resonant frequency at %.1fHz but it was impossible to estimate a damping ratio.'
-            % (motor_fr)
+            f'Motors have a main resonant frequency at {motor_fr:.1f}Hz but it was impossible to estimate a damping ratio.'
         )
 
     ax.plot(freqs[motor_res_idx], global_motor_profile[motor_res_idx], 'x', color='black', markersize=10)
@@ -563,9 +559,9 @@ def plot_motor_profiles(
         weight='bold',
     )
 
-    ax2.plot([], [], ' ', label='Motor resonant frequency (ω0): %.1fHz' % (motor_fr))
+    ax2.plot([], [], ' ', label=f'Motor resonant frequency (ω0): {motor_fr:.1f}Hz')
     if motor_zeta is not None:
-        ax2.plot([], [], ' ', label='Motor damping ratio (ζ): %.3f' % (motor_zeta))
+        ax2.plot([], [], ' ', label=f'Motor damping ratio (ζ): {motor_zeta:.3f}')
     else:
         ax2.plot([], [], ' ', label='No damping ratio computed')
 
@@ -792,8 +788,7 @@ def vibrations_profile(
     )
     formated_peaks_speeds = ['{:.1f}'.format(pspeed) for pspeed in peaks_speeds]
     ConsoleOutput.print(
-        'Vibrations peaks detected: %d @ %s mm/s (avoid setting a speed near these values in your slicer print profile)'
-        % (num_peaks, ', '.join(map(str, formated_peaks_speeds)))
+        f"Vibrations peaks detected: {num_peaks} @ {', '.join(map(str, formated_peaks_speeds))} mm/s (avoid setting a speed near these values in your slicer print profile)"
     )
 
     good_speeds = identify_low_energy_zones(vibration_metric, SPEEDS_VALLEY_DETECTION_THRESHOLD)
@@ -855,7 +850,7 @@ def vibrations_profile(
         if accel is not None:
             title_line2 += ' at ' + str(accel) + ' mm/s² -- ' + kinematics.upper() + ' kinematics'
     except Exception:
-        ConsoleOutput.print('Warning: CSV filenames appear to be different than expected (%s)' % (lognames[0]))
+        ConsoleOutput.print(f'Warning: CSV filenames appear to be different than expected ({lognames[0]})')
         title_line2 = lognames[0].split('/')[-1]
     fig.text(0.060, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
@@ -923,7 +918,7 @@ def main():
         opts.error('No CSV file(s) to analyse')
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
-    if options.kinematics not in ['cartesian', 'corexy', 'corexz']:
+    if options.kinematics not in {'cartesian', 'corexy', 'corexz'}:
         opts.error('Only cartesian, corexy and corexz kinematics are supported by this tool at the moment!')
 
     fig = vibrations_profile(args, options.klipperdir, options.kinematics, options.accel, options.max_freq)

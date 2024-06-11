@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
-
-import os
 import multiprocessing
+import os
 import threading
 import traceback
 from typing import Optional

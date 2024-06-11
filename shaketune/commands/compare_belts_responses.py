@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-
-
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..helpers.motors_config_parser import MotorsConfigParser

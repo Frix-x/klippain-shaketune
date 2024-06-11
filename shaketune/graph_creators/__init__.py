@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from .axes_map_graph_creator import AxesMapGraphCreator as AxesMapGraphCreator
 from .belts_graph_creator import BeltsGraphCreator as BeltsGraphCreator
 from .graph_creator import GraphCreator as GraphCreator

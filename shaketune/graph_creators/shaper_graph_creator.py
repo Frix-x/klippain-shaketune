@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 #################################################
 ######## INPUT SHAPER CALIBRATION SCRIPT ########
 #################################################
@@ -131,8 +129,7 @@ def calibrate_shaper(datas: List[np.ndarray], max_smoothing: Optional[float], sc
         shaper, all_shapers = helper.find_best_shaper(calibration_data, max_smoothing, ConsoleOutput.print)
 
     ConsoleOutput.print(
-        '\n-> Recommended shaper is %s @ %.1f Hz (when using a square corner velocity of %.1f and a damping ratio of %.3f)'
-        % (shaper.name.upper(), shaper.freq, scv, zeta)
+        f'\n-> Recommended shaper is {shaper.name.upper()} @ {shaper.freq:.1f} Hz (when using a square corner velocity of {scv:.1f} and a damping ratio of {zeta:.3f})'
     )
 
     return shaper.name, all_shapers, calibration_data, fr, zeta, compat
@@ -190,13 +187,7 @@ def plot_freq_response(
     perf_shaper_accel = 0
     for shaper in shapers:
         shaper_max_accel = round(shaper.max_accel / 100.0) * 100.0
-        label = '%s (%.1f Hz, vibr=%.1f%%, sm~=%.2f, accel<=%.f)' % (
-            shaper.name.upper(),
-            shaper.freq,
-            shaper.vibrs * 100.0,
-            shaper.smoothing,
-            shaper_max_accel,
-        )
+        label = f'{shaper.name.upper()} ({shaper.freq:.1f} Hz, vibr={shaper.vibrs * 100.0:.1f}%, sm~={shaper.smoothing:.2f}, accel<={shaper_max_accel:.0f})'
         ax2.plot(freqs, shaper.vals, label=label, linestyle='dotted')
 
         # Get the Klipper recommended shaper (usually it's a good low vibration compromise)
@@ -226,40 +217,37 @@ def plot_freq_response(
             [],
             [],
             ' ',
-            label='Recommended performance shaper: %s @ %.1f Hz' % (perf_shaper_choice.upper(), perf_shaper_freq),
+            label=f'Recommended performance shaper: {perf_shaper_choice.upper()} @ {perf_shaper_freq:.1f} Hz',
         )
         ax.plot(
             freqs,
             psd * perf_shaper_vals,
-            label='With %s applied' % (perf_shaper_choice.upper()),
+            label=f'With {perf_shaper_choice.upper()} applied',
             color='cyan',
         )
         ax2.plot(
             [],
             [],
             ' ',
-            label='Recommended low vibrations shaper: %s @ %.1f Hz'
-            % (klipper_shaper_choice.upper(), klipper_shaper_freq),
+            label=f'Recommended low vibrations shaper: {klipper_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz',
         )
-        ax.plot(
-            freqs, psd * klipper_shaper_vals, label='With %s applied' % (klipper_shaper_choice.upper()), color='lime'
-        )
+        ax.plot(freqs, psd * klipper_shaper_vals, label=f'With {klipper_shaper_choice.upper()} applied', color='lime')
     else:
         ax2.plot(
             [],
             [],
             ' ',
-            label='Recommended best shaper: %s @ %.1f Hz' % (klipper_shaper_choice.upper(), klipper_shaper_freq),
+            label=f'Recommended performance shaper: {klipper_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz',
         )
         ax.plot(
             freqs,
             psd * klipper_shaper_vals,
-            label='With %s applied' % (klipper_shaper_choice.upper()),
+            label=f'With {klipper_shaper_choice.upper()} applied',
             color='cyan',
         )
 
     # And the estimated damping ratio is finally added at the end of the legend
-    ax2.plot([], [], ' ', label='Estimated damping ratio (ζ): %.3f' % (zeta))
+    ax2.plot([], [], ' ', label=f'Estimated damping ratio (ζ): {zeta:.3f}')
 
     # Draw the detected peaks and name them
     # This also draw the detection threshold and warning threshold (aka "effect zone")
@@ -288,7 +276,7 @@ def plot_freq_response(
 
     # Add the main resonant frequency and damping ratio of the axis to the graph title
     ax.set_title(
-        'Axis Frequency Profile (ω0=%.1fHz, ζ=%.3f)' % (fr, zeta),
+        f'Axis Frequency Profile (ω0={fr:.1f}Hz, ζ={zeta:.3f})',
         fontsize=14,
         color=KLIPPAIN_COLORS['dark_orange'],
         weight='bold',
@@ -368,6 +356,8 @@ def shaper_calibration(
 
     # Parse data from the log files while ignoring CSV in the wrong format
     datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
+    if len(datas) == 0:
+        raise ValueError('No valid data found in the provided CSV files!')
     if len(datas) > 1:
         ConsoleOutput.print('Warning: incorrect number of .csv files detected. Only the first one will be used!')
 
@@ -397,8 +387,7 @@ def shaper_calibration(
     peak_freqs_formated = ['{:.1f}'.format(f) for f in peaks_freqs]
     num_peaks_above_effect_threshold = np.sum(calibration_data.psd_sum[peaks] > peaks_threshold[1])
     ConsoleOutput.print(
-        '\nPeaks detected on the graph: %d @ %s Hz (%d above effect threshold)'
-        % (num_peaks, ', '.join(map(str, peak_freqs_formated)), num_peaks_above_effect_threshold)
+        f"\nPeaks detected on the graph: {num_peaks} @ {', '.join(map(str, peak_freqs_formated))} Hz ({num_peaks_above_effect_threshold} above effect threshold)"
     )
 
     # Create graph layout
@@ -435,7 +424,7 @@ def shaper_calibration(
             title_line4 = f'| Max allowed smoothing: {max_smoothing}'
             title_line5 = f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz' if accel_per_hz is not None else ''
     except Exception:
-        ConsoleOutput.print('Warning: CSV filename look to be different than expected (%s)' % (lognames[0]))
+        ConsoleOutput.print(f'Warning: CSV filename look to be different than expected ({lognames[0]})')
         title_line2 = lognames[0].split('/')[-1]
         title_line3 = ''
         title_line4 = ''

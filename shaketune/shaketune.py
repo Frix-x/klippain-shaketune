@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-
-
 import os
 from pathlib import Path
 
@@ -84,7 +81,7 @@ class ShakeTune:
             try:
                 dummy_macros_cfg = pconfig.read_config(filename)
             except Exception as err:
-                raise config.error("Cannot load Shake&Tune dummy macro '%s'" % (filename,)) from err
+                raise config.error(f'Cannot load Shake&Tune dummy macro {filename}') from err
 
             for gcode_macro in dummy_macros_cfg.get_prefix_sections('gcode_macro '):
                 gcode_macro_name = gcode_macro.get_name()

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from .axes_map_calibration import axes_map_calibration as axes_map_calibration
 from .axes_shaper_calibration import axes_shaper_calibration as axes_shaper_calibration
 from .compare_belts_responses import compare_belts_responses as compare_belts_responses
