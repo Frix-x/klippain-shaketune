@@ -1,11 +1,20 @@
-# The logic in this file was "extracted" from Klipper's orignal resonance_tester.py file
-# Courtesy of Dmitry Butyugin <dmbutyugin@google.com> for the original implementation
+# Shake&Tune: 3D printer analysis tools
+#
+# Adapted from Klipper's original resonance_tester.py file by Dmitry Butyugin <dmbutyugin@google.com>
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: resonance_test.py
+# Description: Contains functions to test the resonance frequency of the printer and its components
+#              by vibrating the toolhead in specific axis directions. This derive a bit from Klipper's
+#              implementation as there are two main changes:
+#                1. Original code doesn't use euclidean distance with projection for the coordinates calculation.
+#                   The new approach implemented here ensures that the vector's total length remains constant (= L),
+#                   regardless of the direction components. It's especially important when the direction vector
+#                   involves combinations of movements along multiple axes like for the diagonal belt tests.
+#                2. Original code doesn't allow Z axis movements that was added in order to test the Z axis resonance
+#                   or CoreXZ belts frequency profiles as well.
 
-# This derive a bit from Klipper's implementation as there are two main changes:
-# 1. Original code doesn't use euclidean distance for the moves calculation with projection. The new approach implemented here
-#    ensures that the vector's total length remains constant (= L), regardless of the direction components. It's especially
-#    important when the direction vector involves combinations of movements along multiple axes like for the diagonal belt tests.
-# 2. Original code doesn't allow Z axis movement that was added here for later use
 
 import math
 

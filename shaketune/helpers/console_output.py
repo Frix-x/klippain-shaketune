@@ -1,3 +1,13 @@
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: console_output.py
+# Description: Defines the ConsoleOutput class for printing output to stdout or an alternative
+#              callback function, such as the Klipper console.
+
+
 import io
 from typing import Callable, Optional
 

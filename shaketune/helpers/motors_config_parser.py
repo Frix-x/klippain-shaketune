@@ -1,6 +1,12 @@
-# Classes to retrieve a couple of motors infos and extract the relevant information
-# from the Klipper configuration and the TMC registers
-# Written by Frix_x#0161 #
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: motors_config_parser.py
+# Description: Contains classes to retrieve motor information and extract relevant data
+#              from the Klipper configuration and TMC registers.
+
 
 from typing import Any, Dict, List, Optional
 

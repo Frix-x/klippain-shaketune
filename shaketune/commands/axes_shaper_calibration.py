@@ -1,3 +1,14 @@
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: axes_shaper_calibration.py
+# Description: Provides a command for calibrating the input shaper of a 3D printer's axes using an accelerometer.
+#              The script performs resonance tests along specified axes, starts and stops measurements,
+#              and generates graphs for each axis to analyze the collected data.
+
+
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..helpers.resonance_test import vibrate_axis

@@ -1,3 +1,13 @@
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: excitate_axis_at_freq.py
+# Description: Provide a command to excites a specified axis at a given frequency for a duration
+#              and optionally creates a graph of the vibration data collected by the accelerometer.
+
+
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..helpers.resonance_test import vibrate_axis_at_static_freq

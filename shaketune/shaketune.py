@@ -1,3 +1,13 @@
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: shaketune.py
+# Description: Main class implementation for Shake&Tune, handling Klipper initialization and
+#              loading of the plugin, and the registration of the tuning commands
+
+
 import os
 from pathlib import Path
 

@@ -1,3 +1,16 @@
+# Shake&Tune: 3D printer analysis tools
+#
+# Derived from the calibrate_shaper.py official Klipper script
+# Copyright (C) 2020  Dmitry Butyugin <dmbutyugin@google.com>
+# Copyright (C) 2020  Kevin O'Connor <kevin@koconnor.net>
+# Copyright (C) 2022 - 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: shaper_graph_creator.py
+# Description: Implements the input shaper calibration script for Shake&Tune,
+#              including computation and graphing functions for 3D printer vibration analysis.
+
+
 #################################################
 ######## INPUT SHAPER CALIBRATION SCRIPT ########
 #################################################

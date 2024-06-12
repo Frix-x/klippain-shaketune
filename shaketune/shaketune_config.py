@@ -1,3 +1,13 @@
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: shaketune_config.py
+# Description: Defines the ShakeTuneConfig class for handling configuration settings
+#              and file paths related to Shake&Tune operations.
+
+
 from pathlib import Path
 
 from .helpers.console_output import ConsoleOutput

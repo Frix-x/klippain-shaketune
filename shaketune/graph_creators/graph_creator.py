@@ -1,3 +1,15 @@
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: graph_creator.py
+# Description: Abstract base class for creating various types of graphs in Shake&Tune,
+#              including methods for moving, preparing, saving, and cleaning up files.
+#              This class is inherited by the AxesMapGraphCreator, BeltsGraphCreator,
+#              ShaperGraphCreator, VibrationsGraphCreator, StaticGraphCreator
+
+
 import abc
 import shutil
 from datetime import datetime

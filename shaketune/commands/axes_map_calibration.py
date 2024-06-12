@@ -1,3 +1,14 @@
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: axes_map_calibration.py
+# Description: Provides a command for calibrating the axes map of a 3D printer using an accelerometer.
+#              The script moves the printer head along specified axes, starts and stops measurements,
+#              and performs post-processing to analyze the collected data.
+
+
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_process import ShakeTuneProcess
 from .accelerometer import Accelerometer

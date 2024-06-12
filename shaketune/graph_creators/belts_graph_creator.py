@@ -1,7 +1,12 @@
-#################################################
-######## CoreXY BELTS CALIBRATION SCRIPT ########
-#################################################
-# Written by Frix_x#0161 #
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2022 - 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: belts_graph_creator.py
+# Description: Implements the CoreXY/CoreXZ belts calibration script for Shake&Tune,
+#              including computation and graphing functions for 3D printer belt paths analysis.
+
 
 import optparse
 import os

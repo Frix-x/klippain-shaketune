@@ -1,3 +1,14 @@
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: compare_belts_responses.py
+# Description: Provides a command for comparing the frequency response of belts in CoreXY and CoreXZ kinematics 3D printers.
+#              The script performs resonance tests along specified axes, starts and stops measurements, and generates graphs
+#              for each axis to analyze the collected data.
+
+
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..helpers.motors_config_parser import MotorsConfigParser

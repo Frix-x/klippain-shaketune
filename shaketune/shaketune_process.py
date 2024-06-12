@@ -1,3 +1,13 @@
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: shaketune_process.py
+# Description: Implements the ShakeTuneProcess class for managing the execution of
+#              vibration analysis processes in separate system processes.
+
+
 import multiprocessing
 import os
 import threading

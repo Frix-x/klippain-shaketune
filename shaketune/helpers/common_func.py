@@ -1,5 +1,12 @@
-# Common functions for the Shake&Tune package
-# Written by Frix_x#0161 #
+# Shake&Tune: 3D printer analysis tools
+#
+# Copyright (C) 2024 Félix Boisselier <felix@fboisselier.fr> (Frix_x on Discord)
+# Licensed under the GNU General Public License v3.0 (GPL-3.0)
+#
+# File: common_func.py
+# Description: Contains common functions and constants used across the Shake&Tune
+#              package for 3D printer vibration analysis and diagnostics.
+
 
 import math
 import os
