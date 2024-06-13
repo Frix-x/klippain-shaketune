@@ -1,4 +1,5 @@
-GitPython==3.1.40
+GitPython==3.1.41
 matplotlib==3.8.2
 numpy==1.26.2
 scipy==1.11.4
+PyWavelets==1.6.0
