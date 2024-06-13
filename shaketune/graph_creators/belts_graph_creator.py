@@ -296,7 +296,7 @@ def plot_compare_frequency(
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
     ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-    ax.ticklabel_format(axis='x', style='scientific', scilimits=(0, 0))
+    ax.ticklabel_format(axis='y', style='scientific', scilimits=(0, 0))
     ax.grid(which='major', color='grey')
     ax.grid(which='minor', color='lightgrey')
     fontP = matplotlib.font_manager.FontProperties()
@@ -459,7 +459,7 @@ def plot_versus_belts(
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
     ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
-    ax.ticklabel_format(axis='y', style='scientific', scilimits=(0, 0))
+    ax.ticklabel_format(style='scientific', scilimits=(0, 0))
     ax.grid(which='major', color='grey')
     ax.grid(which='minor', color='lightgrey')
 
