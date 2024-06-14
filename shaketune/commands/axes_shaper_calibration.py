@@ -17,8 +17,8 @@ from .accelerometer import Accelerometer
 
 
 def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
-    min_freq = gcmd.get_float('FREQ_START', default=5, minval=1)
-    max_freq = gcmd.get_float('FREQ_END', default=133.33, minval=1)
+    min_freq = gcmd.get_float('FREQ_START', default=None, minval=1)
+    max_freq = gcmd.get_float('FREQ_END', default=None, minval=1)
     hz_per_sec = gcmd.get_float('HZ_PER_SEC', default=1, minval=1)
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     axis_input = gcmd.get('AXIS', default='all').lower()
@@ -37,6 +37,12 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     toolhead = printer.lookup_object('toolhead')
     res_tester = printer.lookup_object('resonance_tester')
     systime = printer.get_reactor().monotonic()
+
+    if min_freq is None:
+        min_freq = res_tester.test.min_freq
+
+    if max_freq is None:
+        max_freq = res_tester.test.max_freq
 
     if scv is None:
         toolhead_info = toolhead.get_status(systime)

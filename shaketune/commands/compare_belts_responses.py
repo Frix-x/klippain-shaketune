@@ -18,8 +18,8 @@ from .accelerometer import Accelerometer
 
 
 def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
-    min_freq = gcmd.get_float('FREQ_START', default=5.0, minval=1)
-    max_freq = gcmd.get_float('FREQ_END', default=133.33, minval=1)
+    min_freq = gcmd.get_float('FREQ_START', default=None, minval=1)
+    max_freq = gcmd.get_float('FREQ_END', default=None, minval=1)
     hz_per_sec = gcmd.get_float('HZ_PER_SEC', default=1.0, minval=1)
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
@@ -33,6 +33,12 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     toolhead = printer.lookup_object('toolhead')
     res_tester = printer.lookup_object('resonance_tester')
     systime = printer.get_reactor().monotonic()
+
+    if min_freq is None:
+        min_freq = res_tester.test.min_freq
+
+    if max_freq is None:
+        max_freq = res_tester.test.max_freq
 
     if accel_per_hz is None:
         accel_per_hz = res_tester.test.accel_per_hz
