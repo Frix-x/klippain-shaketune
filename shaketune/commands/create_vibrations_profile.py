@@ -90,7 +90,6 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
         k_accelerometer = printer.lookup_object(current_accel_chip, None)
         if k_accelerometer is None:
             raise gcmd.error(f'Accelerometer [{current_accel_chip}] not found!')
-        accelerometer = Accelerometer(k_accelerometer)
         ConsoleOutput.print(f'Accelerometer chip used for this angle: [{current_accel_chip}]')
 
         # Sweep the speed range to record the vibrations at different speeds
@@ -121,12 +120,14 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
                 movements = 2
 
             # Back and forth movements to record the vibrations at constant speed in both direction
+            accelerometer = Accelerometer(k_accelerometer)
             accelerometer.start_measurement()
             for _ in range(movements):
                 toolhead.move([mid_x + dX, mid_y + dY, z_height, E], curr_speed)
                 toolhead.move([mid_x - dX, mid_y - dY, z_height, E], curr_speed)
             name = f'vib_an{curr_angle:.2f}sp{curr_speed:.2f}'.replace('.', '_')
             accelerometer.stop_measurement(name)
+            del accelerometer
 
             toolhead.dwell(0.3)
             toolhead.wait_moves()
