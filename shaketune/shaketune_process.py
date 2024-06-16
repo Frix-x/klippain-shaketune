@@ -8,10 +8,10 @@
 #              vibration analysis processes in separate system processes.
 
 
-import multiprocessing
 import os
 import threading
 import traceback
+from multiprocessing import Process
 from typing import Optional
 
 from .helpers.console_output import ConsoleOutput
@@ -31,9 +31,7 @@ class ShakeTuneProcess:
 
     def run(self) -> None:
         # Start the target function in a new process (a thread is known to cause issues with Klipper and CANbus due to the GIL)
-        self._process = multiprocessing.Process(
-            target=self._shaketune_process_wrapper, args=(self.graph_creator, self._timeout)
-        )
+        self._process = Process(target=self._shaketune_process_wrapper, args=(self.graph_creator, self._timeout))
         self._process.start()
 
     def wait_for_completion(self) -> None:

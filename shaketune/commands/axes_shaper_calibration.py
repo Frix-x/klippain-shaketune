@@ -103,7 +103,7 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         vibrate_axis(toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz)
         accelerometer.stop_measurement(config['label'], append_time=True)
 
-        del accelerometer
+        accelerometer.wait_for_file_writes()
 
         # And finally generate the graph for each measured axis
         ConsoleOutput.print(f'{config["axis"].upper()} axis frequency profile generation...')
