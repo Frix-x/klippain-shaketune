@@ -36,9 +36,9 @@ axes_map: -z,y,x
 
 This plot shows the acceleration data over time for the X, Y, and Z axes after removing the gravity offset. Look for patterns in the acceleration data for each axis: you should have exactly 2 spikes for each subplot (for the start and stop of the motion) that break away from the global noise. This can help identify any anomalies or inconsistencies in your accelerometer behavior.
 
-The detected gravity offset is printed in the legend to give some context to the readings and their scale: if it's too far from the standard 9.8-10 m/s², this means that your accelerometer is not working properly and should be fixed or calibrated.
+The dynamic noise and background vibrations measured by the accelerometer are extracted from the signal (using wavelet transform decomposition) and printed in the legend. **Usually values below about 500mm/s² are ok**, but Shake&Tune will automatically add a note if too much noise is recorded. **Be careful because this value is very different from Klipper's `MEASURE_AXES_NOISE` command, as Shake&Tune measures everything during the motion**, such as accelerometer noise, but also vibrations and motor noise, axis and toolhead oscillations, etc. If you want to record your axes_map correctly, you may need to use about 10 times this value in the `ACCEL` parameter to get a good signal-to-noise ratio and allow Shake&Tune to correctly detect the toolhead acceleration and deceleration phases.
 
-The average noise in the accelerometer measurement is calculated (using wavelet transform decomposition) and displayed at the top of the image. Usually values <500mm/s² are ok, but a note is automatically added by Shake&Tune in case your accelerometer has too much noise.
+The detected gravity offset is printed in the legend to give some context to the readings and their scale: if it's too far from the standard 9.8-10 m/s², this means that your accelerometer is not working properly and should be fixed or calibrated.
 
 ### Estimated 3D movement path
 

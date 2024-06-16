@@ -7,7 +7,6 @@
 # Description: Implements the axes map detection script for Shake&Tune, including
 #              calibration tools and graph creation for 3D printer vibration analysis.
 
-
 import optparse
 import os
 from datetime import datetime
@@ -194,35 +193,39 @@ def linear_regression_direction(
 
 
 def plot_compare_frequency(
-    ax: plt.Axes, time: np.ndarray, accel_x: np.ndarray, accel_y: np.ndarray, accel_z: np.ndarray, offset: float, i: int
+    ax: plt.Axes,
+    time_data: List[np.ndarray],
+    accel_data: List[Tuple[np.ndarray, np.ndarray, np.ndarray]],
+    offset: float,
+    noise_level: str,
 ) -> None:
     # Plot acceleration data
-    ax.plot(
-        time,
-        accel_x,
-        label='X' if i == 0 else '',
-        color=KLIPPAIN_COLORS['purple'],
-        linewidth=0.5,
-        zorder=50 if i == 0 else 10,
-    )
-    ax.plot(
-        time,
-        accel_y,
-        label='Y' if i == 0 else '',
-        color=KLIPPAIN_COLORS['orange'],
-        linewidth=0.5,
-        zorder=50 if i == 1 else 10,
-    )
-    ax.plot(
-        time,
-        accel_z,
-        label='Z' if i == 0 else '',
-        color=KLIPPAIN_COLORS['red_pink'],
-        linewidth=0.5,
-        zorder=50 if i == 2 else 10,
-    )
+    for i, (time, (accel_x, accel_y, accel_z)) in enumerate(zip(time_data, accel_data)):
+        ax.plot(
+            time,
+            accel_x,
+            label='X' if i == 0 else '',
+            color=KLIPPAIN_COLORS['purple'],
+            linewidth=0.5,
+            zorder=50 if i == 0 else 10,
+        )
+        ax.plot(
+            time,
+            accel_y,
+            label='Y' if i == 0 else '',
+            color=KLIPPAIN_COLORS['orange'],
+            linewidth=0.5,
+            zorder=50 if i == 1 else 10,
+        )
+        ax.plot(
+            time,
+            accel_z,
+            label='Z' if i == 0 else '',
+            color=KLIPPAIN_COLORS['red_pink'],
+            linewidth=0.5,
+            zorder=50 if i == 2 else 10,
+        )
 
-    # Setting axis parameters, grid and graph title
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Acceleration (mm/s²)')
 
@@ -242,53 +245,52 @@ def plot_compare_frequency(
 
     ax.legend(loc='upper left', prop=fontP)
 
-    # Add gravity offset to the graph
-    if i == 0:
-        ax2 = ax.twinx()  # To split the legends in two box
-        ax2.yaxis.set_visible(False)
-        ax2.plot([], [], ' ', label=f'Measured gravity: {offset / 1000:0.3f} m/s²')
-        ax2.legend(loc='upper right', prop=fontP)
+    # Add the gravity and noise level to the graph legend
+    ax2 = ax.twinx()
+    ax2.yaxis.set_visible(False)
+    ax2.plot([], [], ' ', label=noise_level)
+    ax2.plot([], [], ' ', label=f'Measured gravity: {offset / 1000:0.3f} m/s²')
+    ax2.legend(loc='upper right', prop=fontP)
 
 
 def plot_3d_path(
     ax: plt.Axes,
-    i: int,
-    position_x: np.ndarray,
-    position_y: np.ndarray,
-    position_z: np.ndarray,
-    average_direction_vector: np.ndarray,
-    angle_error: float,
+    position_data: List[Tuple[np.ndarray, np.ndarray, np.ndarray]],
+    direction_vectors: List[np.ndarray],
+    angle_errors: List[float],
 ) -> None:
-    ax.plot(position_x, position_y, position_z, color=KLIPPAIN_COLORS['orange'], linestyle=':', linewidth=2)
-    ax.scatter(position_x[0], position_y[0], position_z[0], color=KLIPPAIN_COLORS['red_pink'], zorder=10)
-    ax.text(
-        position_x[0] + 1,
-        position_y[0],
-        position_z[0],
-        str(i + 1),
-        color='black',
-        fontsize=16,
-        fontweight='bold',
-        zorder=20,
-    )
+    # Plot the 3D path of the movement
+    for i, ((position_x, position_y, position_z), average_direction_vector, angle_error) in enumerate(
+        zip(position_data, direction_vectors, angle_errors)
+    ):
+        ax.plot(position_x, position_y, position_z, color=KLIPPAIN_COLORS['orange'], linestyle=':', linewidth=2)
+        ax.scatter(position_x[0], position_y[0], position_z[0], color=KLIPPAIN_COLORS['red_pink'], zorder=10)
+        ax.text(
+            position_x[0] + 1,
+            position_y[0],
+            position_z[0],
+            str(i + 1),
+            color='black',
+            fontsize=16,
+            fontweight='bold',
+            zorder=20,
+        )
 
-    # Plot the average direction vector
-    start_position = np.array([position_x[0], position_y[0], position_z[0]])
-    end_position = start_position + average_direction_vector * np.linalg.norm(
-        [position_x[-1] - position_x[0], position_y[-1] - position_y[0], position_z[-1] - position_z[0]]
-    )
-    axes = ['X', 'Y', 'Z']
-    ax.plot(
-        [start_position[0], end_position[0]],
-        [start_position[1], end_position[1]],
-        [start_position[2], end_position[2]],
-        label=f'{axes[i]} angle: {angle_error:0.2f}°',
-        color=KLIPPAIN_COLORS['purple'],
-        linestyle='-',
-        linewidth=2,
-    )
+        # Plot the average direction vector
+        start_position = np.array([position_x[0], position_y[0], position_z[0]])
+        end_position = start_position + average_direction_vector * np.linalg.norm(
+            [position_x[-1] - position_x[0], position_y[-1] - position_y[0], position_z[-1] - position_z[0]]
+        )
+        ax.plot(
+            [start_position[0], end_position[0]],
+            [start_position[1], end_position[1]],
+            [start_position[2], end_position[2]],
+            label=f'{["X", "Y", "Z"][i]} angle: {angle_error:0.2f}°',
+            color=KLIPPAIN_COLORS['purple'],
+            linestyle='-',
+            linewidth=2,
+        )
 
-    # Setting axis parameters, grid and graph title
     ax.set_xlabel('X Position (mm)')
     ax.set_ylabel('Y Position (mm)')
     ax.set_zlabel('Z Position (mm)')
@@ -311,14 +313,24 @@ def plot_3d_path(
 
 def format_direction_vector(vectors: List[np.ndarray]) -> str:
     formatted_vector = []
+    axes_count = {'x': 0, 'y': 0, 'z': 0}
+
     for vector in vectors:
         for i in range(len(vector)):
             if vector[i] > 0:
                 formatted_vector.append(MACHINE_AXES[i])
+                axes_count[MACHINE_AXES[i]] += 1
                 break
             elif vector[i] < 0:
                 formatted_vector.append(f'-{MACHINE_AXES[i]}')
+                axes_count[MACHINE_AXES[i]] += 1
                 break
+
+    # Check if all axes are present in the axes_map and return an error message if not
+    for _, count in axes_count.items():
+        if count != 1:
+            return 'unable to determine it correctly!'
+
     return ', '.join(formatted_vector)
 
 
@@ -360,8 +372,12 @@ def axesmap_calibration(
 
     cumulative_start_position = np.array([0, 0, 0])
     direction_vectors = []
+    angle_errors = []
     total_noise_intensity = 0.0
-    for i, machine_axis in enumerate(MACHINE_AXES):
+    acceleration_data = []
+    position_data = []
+    gravities = []
+    for _, machine_axis in enumerate(MACHINE_AXES):
         if machine_axis not in raw_datas:
             raise ValueError(f'Missing CSV file for axis {machine_axis}')
 
@@ -388,14 +404,18 @@ def axesmap_calibration(
             f'Machine axis {machine_axis.upper()} -> nearest accelerometer direction vector: {direction_vector} (angle error: {angle_error:.2f}°)'
         )
         direction_vectors.append(direction_vector)
+        angle_errors.append(angle_error)
 
         total_noise_intensity += noise_intensity
 
-        plot_compare_frequency(ax1, time, accel_x, accel_y, accel_z, gravity, i)
-        plot_3d_path(ax2, i, position_x, position_y, position_z, average_direction_vector, angle_error)
+        acceleration_data.append((time, (accel_x, accel_y, accel_z)))
+        position_data.append((position_x, position_y, position_z))
+        gravities.append(gravity)
 
         # Update the cumulative start position for the next segment
         cumulative_start_position = np.array([position_x[-1], position_y[-1], position_z[-1]])
+
+    gravity = np.mean(gravities)
 
     average_noise_intensity = total_noise_intensity / len(raw_datas)
     if average_noise_intensity <= 350:
@@ -405,11 +425,25 @@ def axesmap_calibration(
     else:
         average_noise_intensity_text = '-> ERROR: accelerometer noise is too high!'
 
+    average_noise_intensity_label = (
+        f'Dynamic noise level: {average_noise_intensity:.2f} mm/s² {average_noise_intensity_text}'
+    )
+    ConsoleOutput.print(average_noise_intensity_label)
+
+    ConsoleOutput.print(f'--> Detected gravity: {gravity / 1000 :.2f} m/s²')
+
     formatted_direction_vector = format_direction_vector(direction_vectors)
     ConsoleOutput.print(f'--> Detected axes_map: {formatted_direction_vector}')
-    ConsoleOutput.print(
-        f'Average accelerometer noise level: {average_noise_intensity:.2f} mm/s² {average_noise_intensity_text}'
+
+    # Plot the differents graphs
+    plot_compare_frequency(
+        ax1,
+        [d[0] for d in acceleration_data],
+        [d[1] for d in acceleration_data],
+        gravity,
+        average_noise_intensity_label,
     )
+    plot_3d_path(ax2, position_data, direction_vectors, angle_errors)
 
     # Add title
     title_line1 = 'AXES MAP CALIBRATION TOOL'
@@ -430,9 +464,7 @@ def axesmap_calibration(
     fig.text(0.060, 0.939, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     title_line3 = f'| Detected axes_map: {formatted_direction_vector}'
-    title_line4 = f'| Accelerometer noise level: {average_noise_intensity:.2f} mm/s² {average_noise_intensity_text}'
-    fig.text(0.50, 0.985, title_line3, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
-    fig.text(0.50, 0.950, title_line4, ha='left', va='top', fontsize=11, color=KLIPPAIN_COLORS['dark_purple'])
+    fig.text(0.50, 0.985, title_line3, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     # Adding a small Klippain logo to the top left corner of the figure
     ax_logo = fig.add_axes([0.001, 0.894, 0.105, 0.105], anchor='NW')
