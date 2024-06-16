@@ -58,10 +58,12 @@ class ShakeTuneProcess:
         os._exit(1)  # Forcefully exit the process
 
     def _shaketune_process(self, graph_creator) -> None:
-        # Trying to reduce Shake&Tune process priority to avoid slowing down the main Klipper process
-        # as this could lead to random "Timer too close" errors when already running CANbus, etc...
+        # Reducing Shake&Tune process priority by putting the scheduler into batch mode with low priority. This in order to avoid
+        # slowing down the main Klipper process as this can lead to random "Timer too close" or "Move queue overflow" errors
+        # when also already running CANbus, neopixels and other consumming stuff in Klipper's main process.
         try:
-            os.nice(19)
+            param = os.sched_param(os.sched_get_priority_min(os.SCHED_BATCH))
+            os.sched_setscheduler(0, os.SCHED_BATCH, param)
         except Exception:
             ConsoleOutput.print('Warning: failed reducing Shake&Tune process priority, continuing...')
 
