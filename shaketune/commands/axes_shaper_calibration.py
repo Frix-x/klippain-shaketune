@@ -17,14 +17,20 @@ from .accelerometer import Accelerometer
 
 
 def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
-    min_freq = gcmd.get_float('FREQ_START', default=5, minval=1)
-    max_freq = gcmd.get_float('FREQ_END', default=133.33, minval=1)
+    printer = config.get_printer()
+    toolhead = printer.lookup_object('toolhead')
+    res_tester = printer.lookup_object('resonance_tester')
+    systime = printer.get_reactor().monotonic()
+    toolhead_info = toolhead.get_status(systime)
+
+    min_freq = gcmd.get_float('FREQ_START', default=res_tester.test.min_freq, minval=1)
+    max_freq = gcmd.get_float('FREQ_END', default=res_tester.test.max_freq, minval=1)
     hz_per_sec = gcmd.get_float('HZ_PER_SEC', default=1, minval=1)
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     axis_input = gcmd.get('AXIS', default='all').lower()
     if axis_input not in {'x', 'y', 'all'}:
         raise gcmd.error('AXIS selection invalid. Should be either x, y, or all!')
-    scv = gcmd.get_float('SCV', default=None, minval=0)
+    scv = gcmd.get_float('SCV', default=toolhead_info['square_corner_velocity'], minval=0)
     max_sm = gcmd.get_float('MAX_SMOOTHING', default=None, minval=0)
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=None, minval=1)
@@ -32,18 +38,11 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     if accel_per_hz == '':
         accel_per_hz = None
 
-    printer = config.get_printer()
-    gcode = printer.lookup_object('gcode')
-    toolhead = printer.lookup_object('toolhead')
-    res_tester = printer.lookup_object('resonance_tester')
-    systime = printer.get_reactor().monotonic()
-
-    if scv is None:
-        toolhead_info = toolhead.get_status(systime)
-        scv = toolhead_info['square_corner_velocity']
-
     if accel_per_hz is None:
         accel_per_hz = res_tester.test.accel_per_hz
+
+    gcode = printer.lookup_object('gcode')
+
     max_accel = max_freq * accel_per_hz
 
     # Move to the starting point
