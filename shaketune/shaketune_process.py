@@ -19,11 +19,11 @@ from .shaketune_config import ShakeTuneConfig
 
 
 class ShakeTuneProcess:
-    def __init__(self, config: ShakeTuneConfig, graph_creator, timeout: Optional[float] = None) -> None:
-        self._config = config
+    def __init__(self, st_config: ShakeTuneConfig, reactor, graph_creator, timeout: Optional[float] = None) -> None:
+        self._config = st_config
+        self._reactor = reactor
         self.graph_creator = graph_creator
         self._timeout = timeout
-
         self._process = None
 
     def get_graph_creator(self):
@@ -35,16 +35,25 @@ class ShakeTuneProcess:
         self._process.start()
 
     def wait_for_completion(self) -> None:
-        if self._process is not None:
-            self._process.join()
+        if self._process is None:
+            return  # Nothing to wait for
+        eventtime = self._reactor.monotonic()
+        endtime = eventtime + self._timeout
+        complete = False
+        while eventtime < endtime:
+            eventtime = self._reactor.pause(eventtime + 0.05)
+            if not self._process.is_alive():
+                complete = True
+                break
+        if not complete:
+            self._handle_timeout()
 
     # This function is a simple wrapper to start the Shake&Tune process. It's needed in order to get the timeout
     # as a Timer in a thread INSIDE the Shake&Tune child process to not interfere with the main Klipper process
     def _shaketune_process_wrapper(self, graph_creator, timeout) -> None:
         if timeout is not None:
-            timer = threading.Timer(timeout, self._handle_timeout)
+            timer = threading.Timer(timeout + 5, self._handle_timeout)  # Add 5 seconds to the timeout for safety
             timer.start()
-
         try:
             self._shaketune_process(graph_creator)
         finally:
