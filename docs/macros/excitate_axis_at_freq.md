@@ -12,7 +12,7 @@ Here are the parameters available:
 |CREATE_GRAPH|0|whether or not to record the accelerometer data and create an associated graph during the excitation|
 |FREQUENCY|25|excitation frequency (in Hz) that you want to maintain. Usually, it's the frequency of a peak on one of the graphs|
 |DURATION|30|duration in second to maintain this excitation|
-|ACCEL_PER_HZ|None|accel per Hz value used for the test. If unset, it will use the value from your `[resonance_tester]` config section (75 is the default)|
+|ACCEL_PER_HZ|None (default to `[resonance_tester]` value)|accel per Hz value used for the test|
 |AXIS|x|axis you want to excitate. Can be set to either "x", "y", "a", "b"|
 |TRAVEL_SPEED|120|speed in mm/s used for all the travel movements (to go to the start position prior to the test)|
 |Z_HEIGHT|None|Z height wanted for the test. This value can be used if needed to override the Z value of the probe_point set in your `[resonance_tester]` config section|

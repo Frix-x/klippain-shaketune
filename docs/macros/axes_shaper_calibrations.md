@@ -11,10 +11,10 @@ Then, call the `AXES_SHAPER_CALIBRATION` macro and look for the graphs in the re
 
 | parameters | default value | description |
 |-----------:|---------------|-------------|
-|FREQ_START|5|starting excitation frequency|
-|FREQ_END|133|maximum excitation frequency|
+|FREQ_START|None (default to `[resonance_tester]` value)|starting excitation frequency|
+|FREQ_END|None (default to `[resonance_tester]` value)|maximum excitation frequency|
 |HZ_PER_SEC|1|number of Hz per seconds for the test|
-|ACCEL_PER_HZ|None|accel per Hz value used for the test. If unset, it will use the value from your `[resonance_tester]` config section (75 is the default)|
+|ACCEL_PER_HZ|None (default to `[resonance_tester]` value)|accel per Hz value used for the test|
 |AXIS|"all"|axis you want to test in the list of "all", "X" or "Y"|
 |SCV|printer square corner velocity|square corner velocity you want to use to calculate shaper recommendations. Using higher SCV values usually results in more smoothing and lower maximum accelerations|
 |MAX_SMOOTHING|None|max smoothing allowed when calculating shaper recommendations|

@@ -15,10 +15,10 @@ Then, call the `COMPARE_BELTS_RESPONSES` macro and look for the graphs in the re
 
 | parameters | default value | description |
 |-----------:|---------------|-------------|
-|FREQ_START|5|starting excitation frequency|
-|FREQ_END|133|maximum excitation frequency|
+|FREQ_START|None (default to `[resonance_tester]` value)|starting excitation frequency|
+|FREQ_END|None (default to `[resonance_tester]` value)|maximum excitation frequency|
 |HZ_PER_SEC|1|number of Hz per seconds for the test|
-|ACCEL_PER_HZ|None|accel per Hz value used for the test. If unset, it will use the value from your `[resonance_tester]` config section (75 is the default)|
+|ACCEL_PER_HZ|None (default to `[resonance_tester]` value)|accel per Hz value used for the test|
 |TRAVEL_SPEED|120|speed in mm/s used for all the travel movements (to go to the start position prior to the test)|
 |Z_HEIGHT|None|Z height wanted for the test. This value can be used if needed to override the Z value of the probe_point set in your `[resonance_tester]` config section|
 
