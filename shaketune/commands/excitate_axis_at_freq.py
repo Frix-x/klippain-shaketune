@@ -100,6 +100,7 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # If the user wanted to create a graph, we stop the recording and generate it
     if create_graph:
         accelerometer.stop_measurement(f'staticfreq_{axis.upper()}', append_time=True)
+        accelerometer.wait_for_file_writes()
 
         creator = st_process.get_graph_creator()
         creator.configure(freq, duration, accel_per_hz)

@@ -82,6 +82,8 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     toolhead.dwell(0.5)
     accelerometer.stop_measurement('axesmap_Z', append_time=True)
 
+    accelerometer.wait_for_file_writes()
+
     # Re-enable the input shaper if it was active
     if input_shaper is not None:
         input_shaper.enable_shaping()

@@ -8,10 +8,10 @@
 #              vibration analysis processes in separate system processes.
 
 
-import multiprocessing
 import os
 import threading
 import traceback
+from multiprocessing import Process
 from typing import Optional
 
 from .helpers.console_output import ConsoleOutput
@@ -19,11 +19,11 @@ from .shaketune_config import ShakeTuneConfig
 
 
 class ShakeTuneProcess:
-    def __init__(self, config: ShakeTuneConfig, graph_creator, timeout: Optional[float] = None) -> None:
-        self._config = config
+    def __init__(self, st_config: ShakeTuneConfig, reactor, graph_creator, timeout: Optional[float] = None) -> None:
+        self._config = st_config
+        self._reactor = reactor
         self.graph_creator = graph_creator
         self._timeout = timeout
-
         self._process = None
 
     def get_graph_creator(self):
@@ -31,22 +31,32 @@ class ShakeTuneProcess:
 
     def run(self) -> None:
         # Start the target function in a new process (a thread is known to cause issues with Klipper and CANbus due to the GIL)
-        self._process = multiprocessing.Process(
-            target=self._shaketune_process_wrapper, args=(self.graph_creator, self._timeout)
-        )
+        self._process = Process(target=self._shaketune_process_wrapper, args=(self.graph_creator, self._timeout))
         self._process.start()
 
     def wait_for_completion(self) -> None:
-        if self._process is not None:
-            self._process.join()
+        if self._process is None:
+            return  # Nothing to wait for
+        eventtime = self._reactor.monotonic()
+        endtime = eventtime + self._timeout
+        complete = False
+        while eventtime < endtime:
+            eventtime = self._reactor.pause(eventtime + 0.05)
+            if not self._process.is_alive():
+                complete = True
+                break
+        if not complete:
+            self._handle_timeout()
 
     # This function is a simple wrapper to start the Shake&Tune process. It's needed in order to get the timeout
     # as a Timer in a thread INSIDE the Shake&Tune child process to not interfere with the main Klipper process
     def _shaketune_process_wrapper(self, graph_creator, timeout) -> None:
         if timeout is not None:
+            # Add 5 seconds to the timeout for safety. The goal is to avoid the Timer to finish before the
+            # Shake&Tune process is done in case we call the wait_for_completion() function that uses Klipper's reactor.
+            timeout += 5
             timer = threading.Timer(timeout, self._handle_timeout)
             timer.start()
-
         try:
             self._shaketune_process(graph_creator)
         finally:
@@ -58,10 +68,12 @@ class ShakeTuneProcess:
         os._exit(1)  # Forcefully exit the process
 
     def _shaketune_process(self, graph_creator) -> None:
-        # Trying to reduce Shake&Tune process priority to avoid slowing down the main Klipper process
-        # as this could lead to random "Timer too close" errors when already running CANbus, etc...
+        # Reducing Shake&Tune process priority by putting the scheduler into batch mode with low priority. This in order to avoid
+        # slowing down the main Klipper process as this can lead to random "Timer too close" or "Move queue overflow" errors
+        # when also already running CANbus, neopixels and other consumming stuff in Klipper's main process.
         try:
-            os.nice(19)
+            param = os.sched_param(os.sched_get_priority_min(os.SCHED_BATCH))
+            os.sched_setscheduler(0, os.SCHED_BATCH, param)
         except Exception:
             ConsoleOutput.print('Warning: failed reducing Shake&Tune process priority, continuing...')
 
