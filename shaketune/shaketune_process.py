@@ -52,7 +52,10 @@ class ShakeTuneProcess:
     # as a Timer in a thread INSIDE the Shake&Tune child process to not interfere with the main Klipper process
     def _shaketune_process_wrapper(self, graph_creator, timeout) -> None:
         if timeout is not None:
-            timer = threading.Timer(timeout + 5, self._handle_timeout)  # Add 5 seconds to the timeout for safety
+            # Add 5 seconds to the timeout for safety. The goal is to avoid the Timer to finish before the
+            # Shake&Tune process is done in case we call the wait_for_completion() function that uses Klipper's reactor.
+            timeout += 5
+            timer = threading.Timer(timeout, self._handle_timeout)
             timer.start()
         try:
             self._shaketune_process(graph_creator)
