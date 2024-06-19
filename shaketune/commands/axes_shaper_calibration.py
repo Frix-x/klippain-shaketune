@@ -76,8 +76,12 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # set the needed acceleration values for the test
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']
-    old_mcr = toolhead_info['minimum_cruise_ratio']
-    gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={max_accel} MINIMUM_CRUISE_RATIO=0')
+    if 'minimum_cruise_ratio' in toolhead_info: # minimum_cruise_ratio found: Klipper >= v0.12.0-239
+        old_mcr = toolhead_info['minimum_cruise_ratio']
+        gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={max_accel} MINIMUM_CRUISE_RATIO=0')
+    else: # minimum_cruise_ratio not found: Klipper < v0.12.0-239
+        old_mcr = None
+        gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={max_accel}')
 
     # Deactivate input shaper if it is active to get raw movements
     input_shaper = printer.lookup_object('input_shaper', None)
@@ -115,6 +119,9 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # Re-enable the input shaper if it was active
     if input_shaper is not None:
         input_shaper.enable_shaping()
-
+    
     # Restore the previous acceleration values
-    gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel} MINIMUM_CRUISE_RATIO={old_mcr}')
+    if old_mcr is not None: # minimum_cruise_ratio found: Klipper >= v0.12.0-239
+        gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel} MINIMUM_CRUISE_RATIO={old_mcr}')
+    else: # minimum_cruise_ratio not found: Klipper < v0.12.0-239
+        gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel}')
