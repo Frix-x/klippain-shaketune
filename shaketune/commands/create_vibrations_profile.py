@@ -137,11 +137,11 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
 
         accelerometer.wait_for_file_writes()
 
-    # Restore the previous acceleration values
+        # Restore the previous acceleration values
     if old_mcr is not None: # minimum_cruise_ratio found: Klipper >= v0.12.0-239
-        gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel} MINIMUM_CRUISE_RATIO={old_mcr}')
+        gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel} MINIMUM_CRUISE_RATIO={old_mcr} SQUARE_CORNER_VELOCITY={old_sqv}')
     else: # minimum_cruise_ratio not found: Klipper < v0.12.0-239
-        gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel}')
+        gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel} SQUARE_CORNER_VELOCITY={old_sqv}')
     toolhead.wait_moves()
 
     # Run post-processing
