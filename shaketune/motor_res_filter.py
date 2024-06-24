@@ -26,7 +26,7 @@ class MotorResonanceFilter:
 
         self._original_shapers = {}
 
-    # Convolve two Klipper shapers into a new composite shaper
+    # Convolve two Klipper shapers into a new custom composite input shaping filter
     @staticmethod
     def convolve_shapers(L, R):
         As = [a * b for a in L[0] for b in R[0]]
@@ -36,6 +36,11 @@ class MotorResonanceFilter:
 
     def apply_filters(self) -> None:
         input_shaper = self._printer.lookup_object('input_shaper', None)
+        if input_shaper is None:
+            raise ValueError(
+                'Unable to apply Shake&Tune motor resonance filters: no [input_shaper] config section found!'
+            )
+
         shapers = input_shaper.get_shapers()
         for shaper in shapers:
             axis = shaper.axis
@@ -71,7 +76,7 @@ class MotorResonanceFilter:
                 ConsoleOutput.print(
                     (
                         f'Error: the {axis} axis is not a ZV type shaper. Shake&Tune motor resonance filters '
-                        'will be ignored for this axis... Thi is due to the size of the pulse train being too '
+                        'will be ignored for this axis... This is due to the size of the pulse train being too '
                         'small and not allowing the convolved shapers to be applied... unless this PR is '
                         'merged: https://github.com/Klipper3d/klipper/pull/6460'
                     )
@@ -109,6 +114,11 @@ class MotorResonanceFilter:
 
     def remove_filters(self) -> None:
         input_shaper = self._printer.lookup_object('input_shaper', None)
+        if input_shaper is None:
+            raise ValueError(
+                'Unable to deactivate Shake&Tune motor resonance filters: no [input_shaper] config section found!'
+            )
+
         shapers = input_shaper.get_shapers()
         for shaper in shapers:
             axis = shaper.axis
