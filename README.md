@@ -31,6 +31,27 @@ Follow these steps to install Shake&Tune on your printer:
      #    printer.cfg file. If you want to see the macros in the webui, set this to True.
      # timeout: 300
      #    The maximum time in seconds to let Shake&Tune process the CSV files and generate the graphs.
+
+     # motor_freq:
+     #    /!\ This option is only available in DangerKlipper /!\
+     #    Frequencies of X and Y motor resonances to filter them using
+     #    composite shapers. This require the `[input_shaper]` config
+     #    section to be defined in your printer.cfg file to work.
+     # motor_freq_x:
+     # motor_freq_y:
+     #   /!\ This option is only available in DangerKlipper /!\
+     #   If motor_freq is not set, these two parameters can be used
+     #   to configure different filters for X and Y motors. The same
+     #   values are supported as for motor_freq parameter.
+     # motor_damping_ratio: 0.05
+     #   /!\ This option is only available in DangerKlipper /!\
+     #   Damping ratios of X and Y motor resonances. 
+     # motor_damping_ratio_x:
+     # motor_damping_ratio_y:
+     #   /!\ This option is only available in DangerKlipper /!\
+     #   If motor_damping_ratio is not set, these two parameters can be used
+     #   to configure different filters for X and Y motors. The same values
+     #   are supported as for motor_damping_ratio parameter.
      ```
 
 Don't forget to check out **[Shake&Tune documentation here](./docs/README.md)**.
