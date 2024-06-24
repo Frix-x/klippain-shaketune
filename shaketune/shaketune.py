@@ -58,33 +58,20 @@ class ShakeTune:
     def __init__(self, config) -> None:
         self._config = config
         self._printer = config.get_printer()
+        self.printer.register_event_handler('klippy:connect', self._on_klippy_connect)
 
-        self._initialize_danger_klipper()
-        self._initialize_console_output()
-        self._validate_resonance_tester()
-        self._initialize_config(config)
-        self._register_commands()
-        self._initialize_motor_resonance_filter()
-
-    # Check if Shake&Tune is running in DangerKlipper
-    def _initialize_danger_klipper(self) -> None:
+        # Check if Shake&Tune is running in DangerKlipper
         global IN_DANGER
         if importlib.util.find_spec('extras.danger_options') is not None:
             IN_DANGER = True
 
-    # Register the console print output callback to the corresponding Klipper function
-    def _initialize_console_output(self) -> None:
+        # Register the console print output callback to the corresponding Klipper function
         gcode = self._printer.lookup_object('gcode')
         ConsoleOutput.register_output_callback(gcode.respond_info)
 
-    # Check if the resonance_tester object is available in the printer
-    # configuration as it is required for Shake&Tune to work properly
-    def _validate_resonance_tester(self) -> None:
-        res_tester = self._printer.lookup_object('resonance_tester', None)
-        if res_tester is None:
-            raise self._config.error(
-                'No [resonance_tester] config section found in printer.cfg! Please add one to use Shake&Tune.'
-            )
+        self._initialize_config(config)
+        self._register_commands()
+        self._initialize_motor_resonance_filter()
 
     # Initialize the ShakeTune object and its configuration
     def _initialize_config(self, config) -> None:
@@ -155,30 +142,23 @@ class ShakeTune:
                 self._printer.load_object(self._config, gcode_macro_name.lower())
 
     # Register the motor resonance filters if they are defined in the config
-    # DangerKlipper is required for now or a degraded system forcing the ZV filter for
-    # both input shaping and motor resonance filter will be used instead. But this will
+    # DangerKlipper is required for the full feature but a degraded system forcing the ZV filter for
+    # both input shaping and motor resonance filter will be used instead in stock Klipper. But this might
     # be improved in the future if https://github.com/Klipper3d/klipper/pull/6460 get merged
-    # TODO: To mitigate this issue, add a automated patch to klippy/chelper/kin_shaper.c
+    # TODO: To mitigate this issue, add an automated patch to klippy/chelper/kin_shaper.c
     #       (using a .diff file) to enable the motor filters in stock Klipper as well.
     #       But this will make the Klipper repo dirty to moonraker update manager, so I'm not
     #       sure how to handle this. Maybe with also a command to revert the patch? Or a
     #       manual command to apply the patch with a required user action?
     def _initialize_motor_resonance_filter(self) -> None:
         if self._motor_freq_x is not None and self._motor_freq_y is not None:
-            input_shaper = self._printer.lookup_object('input_shaper', None)
-            if input_shaper is None:
-                raise self._config.error(
-                    (
-                        'Error: motor resonance filters cannot be enabled because the standard '
-                        '[input_shaper] Klipper config section is not configured!'
-                    )
-                )
-
+            self._printer.register_event_handler('klippy:ready', self._on_klippy_ready)
             gcode = self._printer.lookup_object('gcode')
             gcode.register_command(
-                'MOTOR_RESONANCE_FILTER', self.cmd_MOTOR_RESONANCE_FILTER, desc='Enable/disable motor resonance filters'
+                'MOTOR_RESONANCE_FILTER',
+                self.cmd_MOTOR_RESONANCE_FILTER,
+                desc='Enable/disable the motor resonance filters',
             )
-
             self.motor_resonance_filter = MotorResonanceFilter(
                 self._printer,
                 self._motor_freq_x,
@@ -188,10 +168,36 @@ class ShakeTune:
                 IN_DANGER,
             )
 
-            self._printer.register_event_handler('klippy:ready', self.handle_ready)
+    def _on_klippy_connect(self) -> None:
+        # Check if the resonance_tester object is available in the printer
+        # configuration as it is required for Shake&Tune to work properly
+        res_tester = self._printer.lookup_object('resonance_tester', None)
+        if res_tester is None:
+            raise self._config.error(
+                'No [resonance_tester] config section found in printer.cfg! Please add one to use Shake&Tune!'
+            )
 
-    def handle_ready(self) -> None:
+        # In case the user has configured a motor resonance filter, we need to make sure
+        # that the input shaper is configured as well in order to use them. This is because
+        # the input shaper object is the one used to actually applies the additional filters
+        if self._motor_freq_x is not None and self._motor_freq_y is not None:
+            input_shaper = self._printer.lookup_object('input_shaper', None)
+            if input_shaper is None:
+                raise self._config.error(
+                    (
+                        'No [input_shaper] config section found in printer.cfg! Please add one to use Shake&Tune '
+                        'motor resonance filters!'
+                    )
+                )
+
+    def _on_klippy_ready(self) -> None:
         self.motor_resonance_filter.apply_filters()
+
+    # ------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------
+    # Following are all the Shake&Tune commands that are registered to the Klipper console
+    # ------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------
 
     def cmd_EXCITATE_AXIS_AT_FREQ(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
