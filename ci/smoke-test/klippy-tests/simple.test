@@ -1,0 +1,4 @@
+DICTIONARY linux_basic.dict
+CONFIG simple.cfg
+
+G4 P1000

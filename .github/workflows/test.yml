@@ -1,0 +1,55 @@
+name: Smoke Tests
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  klippy_testing:
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Checkout shaketune
+        uses: actions/checkout@v4
+        with:
+          path: shaketune
+      - name: Checkout Klipper
+        uses: actions/checkout@v4
+        with:
+          path: klipper
+          repository: klipper3d/klipper
+          ref: master
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install build-essential
+      - name: Build klipper dict
+        run: |
+          pushd klipper
+          cp ../shaketune/ci/smoke-test/klipper-smoketest.kconfig .config
+          make olddefconfig
+          make out/compile_time_request.o
+          popd
+      - name: Upload dict
+        uses: actions/upload-artifact@v4
+        with:
+          name: dict
+          path: out/klipper.dict
+          overwrite: true
+      - name: Setup klippy env
+        run: |
+          python3 -m venv --prompt klippy klippy-env
+          ./klippy-env/bin/python -m pip install -r klipper/scripts/klippy-requirements.txt
+          ./klippy-env/bin/python -m pip install -r shaketune/requirements.txt
+      - name: Install shaketune
+        run: |
+          ln -s $PWD/shaketune/shaketune $PWD/klipper/klippy/extras/shaketune
+      - name: Klipper import test
+        run: |
+          ./klippy-env/bin/python klipper/klippy/klippy.py --import-test
+        if: false
+      - name: Klipper integrated test
+        run: |
+          pushd klipper
+          mkdir ../dicts
+          cp ../klipper/out/klipper.dict ../dicts/linux_basic.dict
+          ../klippy-env/bin/python scripts/test_klippy.py -d ../dicts ../shaketune/ci/smoke-test/klippy-tests/simple.test
+      
