@@ -5,7 +5,14 @@ on:
 
 jobs:
   klippy_testing:
+    name: Klippy Tests
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        klipper_repo:
+          - klipper3d/klipper
+          - DangerKlippers/danger-klipper
     steps: 
       - name: Checkout shaketune
         uses: actions/checkout@v4
@@ -15,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: klipper
-          repository: klipper3d/klipper
+          repository: ${{ matrix.klipper_repo }}
           ref: master
       - name: Install build dependencies
         run: |
@@ -28,12 +35,6 @@ jobs:
           make olddefconfig
           make out/compile_time_request.o
           popd
-      - name: Upload dict
-        uses: actions/upload-artifact@v4
-        with:
-          name: dict
-          path: out/klipper.dict
-          overwrite: true
       - name: Setup klippy env
         run: |
           python3 -m venv --prompt klippy klippy-env
@@ -45,7 +46,6 @@ jobs:
       - name: Klipper import test
         run: |
           ./klippy-env/bin/python klipper/klippy/klippy.py --import-test
-        if: false
       - name: Klipper integrated test
         run: |
           pushd klipper
