@@ -37,7 +37,7 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         raise gcmd.error(
             f'The parameter axes_map is already set in your {accel_chip} configuration! Please remove it (or set it to "x,y,z")!'
         )
-    accelerometer = Accelerometer(k_accelerometer)
+    accelerometer = Accelerometer(printer.get_reactor(), k_accelerometer)
 
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']
@@ -45,9 +45,11 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
 
     # set the wanted acceleration values
     if 'minimum_cruise_ratio' in toolhead_info:
-        old_mcr = toolhead_info['minimum_cruise_ratio'] # minimum_cruise_ratio found: Klipper >= v0.12.0-239
-        gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={accel} MINIMUM_CRUISE_RATIO=0 SQUARE_CORNER_VELOCITY=5.0')
-    else: # minimum_cruise_ratio not found: Klipper < v0.12.0-239
+        old_mcr = toolhead_info['minimum_cruise_ratio']  # minimum_cruise_ratio found: Klipper >= v0.12.0-239
+        gcode.run_script_from_command(
+            f'SET_VELOCITY_LIMIT ACCEL={accel} MINIMUM_CRUISE_RATIO=0 SQUARE_CORNER_VELOCITY=5.0'
+        )
+    else:  # minimum_cruise_ratio not found: Klipper < v0.12.0-239
         old_mcr = None
         gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={accel} SQUARE_CORNER_VELOCITY=5.0')
 
@@ -93,11 +95,13 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         input_shaper.enable_shaping()
 
     # Restore the previous acceleration values
-    if old_mcr is not None: # minimum_cruise_ratio found: Klipper >= v0.12.0-239
-        gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel} MINIMUM_CRUISE_RATIO={old_mcr} SQUARE_CORNER_VELOCITY={old_sqv}')
-    else: # minimum_cruise_ratio not found: Klipper < v0.12.0-239
+    if old_mcr is not None:  # minimum_cruise_ratio found: Klipper >= v0.12.0-239
+        gcode.run_script_from_command(
+            f'SET_VELOCITY_LIMIT ACCEL={old_accel} MINIMUM_CRUISE_RATIO={old_mcr} SQUARE_CORNER_VELOCITY={old_sqv}'
+        )
+    else:  # minimum_cruise_ratio not found: Klipper < v0.12.0-239
         gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel} SQUARE_CORNER_VELOCITY={old_sqv}')
-        
+
     toolhead.wait_moves()
 
     # Run post-processing

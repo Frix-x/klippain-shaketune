@@ -29,6 +29,8 @@ from .helpers.console_output import ConsoleOutput
 from .shaketune_config import ShakeTuneConfig
 from .shaketune_process import ShakeTuneProcess
 
+IN_DANGER = False
+
 
 class ShakeTune:
     def __init__(self, config) -> None:
@@ -51,21 +53,31 @@ class ShakeTune:
         self._config = ShakeTuneConfig(result_folder_path, keep_n_results, keep_csv, dpi)
         ConsoleOutput.register_output_callback(gcode.respond_info)
 
-        commands = [
+        # Register Shake&Tune's measurement commands
+        measurement_commands = [
             (
                 'EXCITATE_AXIS_AT_FREQ',
                 self.cmd_EXCITATE_AXIS_AT_FREQ,
-                'Maintain a specified excitation frequency for a period of time to diagnose and locate a source of vibration',
+                (
+                    'Maintain a specified excitation frequency for a period '
+                    'of time to diagnose and locate a source of vibrations'
+                ),
             ),
             (
                 'AXES_MAP_CALIBRATION',
                 self.cmd_AXES_MAP_CALIBRATION,
-                'Perform a set of movements to measure the orientation of the accelerometer and help you set the best axes_map configuration for your printer',
+                (
+                    'Perform a set of movements to measure the orientation of the accelerometer '
+                    'and help you set the best axes_map configuration for your printer'
+                ),
             ),
             (
                 'COMPARE_BELTS_RESPONSES',
                 self.cmd_COMPARE_BELTS_RESPONSES,
-                'Perform a custom half-axis test to analyze and compare the frequency profiles of individual belts on CoreXY printers',
+                (
+                    'Perform a custom half-axis test to analyze and compare the '
+                    'frequency profiles of individual belts on CoreXY or CoreXZ printers'
+                ),
             ),
             (
                 'AXES_SHAPER_CALIBRATION',
@@ -75,12 +87,14 @@ class ShakeTune:
             (
                 'CREATE_VIBRATIONS_PROFILE',
                 self.cmd_CREATE_VIBRATIONS_PROFILE,
-                'Perform a set of movements to measure the orientation of the accelerometer and help you set the best axes_map configuration for your printer',
+                (
+                    'Run a series of motions to find speed/angle ranges where the printer could be '
+                    'exposed to VFAs to optimize your slicer speed profiles and TMC driver parameters'
+                ),
             ),
         ]
-        command_descriptions = {name: desc for name, _, desc in commands}
-
-        for name, command, description in commands:
+        command_descriptions = {name: desc for name, _, desc in measurement_commands}
+        for name, command, description in measurement_commands:
             gcode.register_command(f'_{name}' if show_macros else name, command, desc=description)
 
         # Load the dummy macros with their description in order to show them in the web interfaces

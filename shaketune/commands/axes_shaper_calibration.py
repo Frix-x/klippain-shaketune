@@ -76,10 +76,10 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # set the needed acceleration values for the test
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']
-    if 'minimum_cruise_ratio' in toolhead_info: # minimum_cruise_ratio found: Klipper >= v0.12.0-239
+    if 'minimum_cruise_ratio' in toolhead_info:  # minimum_cruise_ratio found: Klipper >= v0.12.0-239
         old_mcr = toolhead_info['minimum_cruise_ratio']
         gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={max_accel} MINIMUM_CRUISE_RATIO=0')
-    else: # minimum_cruise_ratio not found: Klipper < v0.12.0-239
+    else:  # minimum_cruise_ratio not found: Klipper < v0.12.0-239
         old_mcr = None
         gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={max_accel}')
 
@@ -99,7 +99,7 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         accel_chip = Accelerometer.find_axis_accelerometer(printer, config['axis'])
         if accel_chip is None:
             raise gcmd.error('No suitable accelerometer found for measurement!')
-        accelerometer = Accelerometer(printer.lookup_object(accel_chip))
+        accelerometer = Accelerometer(printer.get_reactor(), printer.lookup_object(accel_chip))
 
         # Then do the actual measurements
         accelerometer.start_measurement()
@@ -119,9 +119,9 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # Re-enable the input shaper if it was active
     if input_shaper is not None:
         input_shaper.enable_shaping()
-    
+
     # Restore the previous acceleration values
-    if old_mcr is not None: # minimum_cruise_ratio found: Klipper >= v0.12.0-239
+    if old_mcr is not None:  # minimum_cruise_ratio found: Klipper >= v0.12.0-239
         gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel} MINIMUM_CRUISE_RATIO={old_mcr}')
-    else: # minimum_cruise_ratio not found: Klipper < v0.12.0-239
+    else:  # minimum_cruise_ratio not found: Klipper < v0.12.0-239
         gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel}')

@@ -60,7 +60,7 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
         raise gcmd.error(
             'No suitable accelerometer found for measurement! Multi-accelerometer configurations are not supported for this macro.'
         )
-    accelerometer = Accelerometer(printer.lookup_object(accel_chip))
+    accelerometer = Accelerometer(printer.get_reactor(), printer.lookup_object(accel_chip))
 
     # Move to the starting point
     test_points = res_tester.test.get_start_test_points()
@@ -88,11 +88,11 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
 
     # set the needed acceleration values for the test
     toolhead_info = toolhead.get_status(systime)
-    old_accel = toolhead_info['max_accel']    
-    if 'minimum_cruise_ratio' in toolhead_info: # minimum_cruise_ratio found: Klipper >= v0.12.0-239
+    old_accel = toolhead_info['max_accel']
+    if 'minimum_cruise_ratio' in toolhead_info:  # minimum_cruise_ratio found: Klipper >= v0.12.0-239
         old_mcr = toolhead_info['minimum_cruise_ratio']
         gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={max_accel} MINIMUM_CRUISE_RATIO=0')
-    else: # minimum_cruise_ratio not found: Klipper < v0.12.0-239
+    else:  # minimum_cruise_ratio not found: Klipper < v0.12.0-239
         old_mcr = None
         gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={max_accel}')
 
@@ -116,9 +116,9 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
         input_shaper.enable_shaping()
 
     # Restore the previous acceleration values
-    if old_mcr is not None: # minimum_cruise_ratio found: Klipper >= v0.12.0-239
+    if old_mcr is not None:  # minimum_cruise_ratio found: Klipper >= v0.12.0-239
         gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel} MINIMUM_CRUISE_RATIO={old_mcr}')
-    else: # minimum_cruise_ratio not found: Klipper < v0.12.0-239
+    else:  # minimum_cruise_ratio not found: Klipper < v0.12.0-239
         gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_accel}')
 
     # Run post-processing
