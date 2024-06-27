@@ -34,13 +34,6 @@ IN_DANGER = False
 
 class ShakeTune:
     def __init__(self, config) -> None:
-        try:
-            from extras.danger_options import get_danger_options
-
-            IN_DANGER = True  # check if Shake&Tune is running in DangerKlipper
-        except ImportError:
-            continue
-
         self._pconfig = config
         self._printer = config.get_printer()
         gcode = self._printer.lookup_object('gcode')
