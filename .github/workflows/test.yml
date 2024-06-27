@@ -52,4 +52,18 @@ jobs:
           mkdir ../dicts
           cp ../klipper/out/klipper.dict ../dicts/linux_basic.dict
           ../klippy-env/bin/python scripts/test_klippy.py -d ../dicts ../shaketune/ci/smoke-test/klippy-tests/simple.test
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
+      - name: install ruff
+        run: |
+          pip install ruff
+      - name: run ruff tests
+        run: |
+          ruff check
+
       
