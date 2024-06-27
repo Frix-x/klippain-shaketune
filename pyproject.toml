@@ -1,5 +1,5 @@
 [project]
-name = "Shake&Tune"
+name = "shake_n_tune"
 description = "Klipper streamlined input shaper workflow and calibration tools"
 readme = "README.md"
 requires-python = ">= 3.9"
