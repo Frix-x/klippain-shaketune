@@ -27,7 +27,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install build-essential
+          sudo apt-get install -y build-essential
       - name: Build klipper dict
         run: |
           pushd klipper
@@ -38,8 +38,7 @@ jobs:
       - name: Setup klippy env
         run: |
           python3 -m venv --prompt klippy klippy-env
-          ./klippy-env/bin/python -m pip install -r klipper/scripts/klippy-requirements.txt
-          ./klippy-env/bin/python -m pip install -r shaketune/requirements.txt
+          ./klippy-env/bin/python -m pip install -r klipper/scripts/klippy-requirements.txt -r shaketune/requirements.txt
       - name: Install shaketune
         run: |
           ln -s $PWD/shaketune/shaketune $PWD/klipper/klippy/extras/shaketune
