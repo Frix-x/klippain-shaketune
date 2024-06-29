@@ -614,7 +614,7 @@ def plot_vibration_spectrogram(
 def plot_motor_config_txt(fig: plt.Figure, motors: List[MotorsConfigParser], differences: Optional[str]) -> None:
     motor_details = [(motors[0], 'X motor'), (motors[1], 'Y motor')]
 
-    distance = 0.12
+    distance = 0.15
     if motors[0].get_config('autotune_enabled'):
         distance = 0.27
         config_blocks = [
