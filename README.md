@@ -34,7 +34,7 @@ Follow these steps to install Shake&Tune on your printer:
 
      # motor_freq:
      #    /!\ This option has limitations in stock Klipper and is best used with DangerKlipper /!\
-     #    Frequencies of X and Y motor resonances to filter them using
+     #    Frequencies of X and Y motor resonances to filter them by using
      #    composite shapers. This requires the `[input_shaper]` config
      #    section to be defined in your printer.cfg file to work.
      # motor_freq_x:

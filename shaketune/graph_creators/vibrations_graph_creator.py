@@ -39,6 +39,7 @@ from ..helpers.motors_config_parser import Motor, MotorsConfigParser
 from ..shaketune_config import ShakeTuneConfig
 from .graph_creator import GraphCreator
 
+DEFAULT_LOW_FREQ_MAX = 30
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_RELATIVE_HEIGHT_THRESHOLD = 0.04
 CURVE_SIMILARITY_SIGMOID_K = 0.5
@@ -115,7 +116,7 @@ def calc_freq_response(data) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def find_motor_characteristics(motor: str, freqs: np.ndarray, psd: np.ndarray) -> Tuple[float, float, int]:
-    motor_fr, motor_zeta, motor_res_idx, lowfreq_max = compute_mechanical_parameters(psd, freqs, 30)
+    motor_fr, motor_zeta, motor_res_idx, lowfreq_max = compute_mechanical_parameters(psd, freqs, DEFAULT_LOW_FREQ_MAX)
 
     if lowfreq_max:
         ConsoleOutput.print(
@@ -151,7 +152,7 @@ def compute_motor_profiles(freqs: np.ndarray, psds: dict, measured_angles: Optio
     motor_profiles = {}
     conv_filter = np.ones(20) / 20
 
-    # Creating the PSD motor profiles for each angles by summing the PSDs for each speeds
+    # Creating the PSD motor profiles for each angle by summing the PSDs for each speed
     for angle in measured_angles:
         sum_curve = np.sum(np.array([psds[angle][speed] for speed in psds[angle]]), axis=0)
         motor_profiles[angle] = np.convolve(sum_curve / len(psds[angle]), conv_filter, mode='same')

@@ -99,11 +99,6 @@ class MotorResonanceFilter:
                     a3 = a1 * K * K
                     motor_filter_A = [a1, a2, a3]
                     motor_filter_T = [0.0, 0.375 * t_d, 0.75 * t_d]
-
-                    combined_filter_A, combined_filter_T = MotorResonanceFilter.convolve_shapers(
-                        (axis_shaper_A, axis_shaper_T),
-                        (motor_filter_A, motor_filter_T),
-                    )
                 else:
                     # In stock Klipper, the pulse train is too small for most shapers
                     # to be convolved. So we need to use the ZV shaper instead for the
@@ -114,10 +109,10 @@ class MotorResonanceFilter:
                     motor_filter_A = [1.0, K]
                     motor_filter_T = [0.0, 0.5 * t_d]
 
-                    combined_filter_A, combined_filter_T = MotorResonanceFilter.convolve_shapers(
-                        (axis_shaper_A, axis_shaper_T),
-                        (motor_filter_A, motor_filter_T),
-                    )
+                combined_filter_A, combined_filter_T = MotorResonanceFilter.convolve_shapers(
+                    (axis_shaper_A, axis_shaper_T),
+                    (motor_filter_A, motor_filter_T),
+                )
 
                 shaper.A = combined_filter_A
                 shaper.T = combined_filter_T
