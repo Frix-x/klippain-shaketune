@@ -8,11 +8,9 @@
 #              into the input shaper initial Klipper object. This is done by convolving a motor resonance targeted
 #              input shaper filter with the current configured axis input shapers.
 
-from importlib import import_module
+import math
 
 from .helpers.console_output import ConsoleOutput
-
-shaper_defs = import_module('.shaper_defs', 'extras')
 
 
 class MotorResonanceFilter:
@@ -84,30 +82,46 @@ class MotorResonanceFilter:
                 continue
 
             # Get the current shaper parameters and store them for later restoration
-            _, A, T = shaper.get_shaper()
-            self._original_shapers[axis] = (A, T)
+            _, axis_shaper_A, axis_shaper_T = shaper.get_shaper()
+            self._original_shapers[axis] = (axis_shaper_A, axis_shaper_T)
 
             # Creating the new combined shapers that contains the motor resonance filters
             if axis in {'x', 'y'}:
                 if self._in_danger:
                     # In DangerKlipper, the pulse train is large enough to allow the
                     # convolution of any shapers in order to craft the new combined shapers
-                    new_A, new_T = MotorResonanceFilter.convolve_shapers(
-                        (A, T),
-                        shaper_defs.get_mzv_shaper(self.freq_x, self.damping_x),
+                    # so we can use the MZV shaper (that looks to be the best for this purpose)
+                    df = math.sqrt(1.0 - self.damping_x**2)
+                    K = math.exp(-0.75 * self.damping_x * math.pi / df)
+                    t_d = 1.0 / (self.freq_x * df)
+                    a1 = 1.0 - 1.0 / math.sqrt(2.0)
+                    a2 = (math.sqrt(2.0) - 1.0) * K
+                    a3 = a1 * K * K
+                    motor_filter_A = [a1, a2, a3]
+                    motor_filter_T = [0.0, 0.375 * t_d, 0.75 * t_d]
+
+                    combined_filter_A, combined_filter_T = MotorResonanceFilter.convolve_shapers(
+                        (axis_shaper_A, axis_shaper_T),
+                        (motor_filter_A, motor_filter_T),
                     )
                 else:
                     # In stock Klipper, the pulse train is too small for most shapers
                     # to be convolved. So we need to use the ZV shaper instead for the
                     # motor resonance filters... even if it's not the best for this purpose
-                    new_A, new_T = MotorResonanceFilter.convolve_shapers(
-                        (A, T),
-                        shaper_defs.get_zv_shaper(self.freq_x, self.damping_x),
+                    df = math.sqrt(1.0 - self.damping_x**2)
+                    K = math.exp(-self.damping_x * math.pi / df)
+                    t_d = 1.0 / (self.freq_x * df)
+                    motor_filter_A = [1.0, K]
+                    motor_filter_T = [0.0, 0.5 * t_d]
+
+                    combined_filter_A, combined_filter_T = MotorResonanceFilter.convolve_shapers(
+                        (axis_shaper_A, axis_shaper_T),
+                        (motor_filter_A, motor_filter_T),
                     )
 
-                shaper.A = new_A
-                shaper.T = new_T
-                shaper.n = len(new_A)
+                shaper.A = combined_filter_A
+                shaper.T = combined_filter_T
+                shaper.n = len(combined_filter_A)
 
         # Update the running input shaper filter with the new parameters
         input_shaper._update_input_shaping()

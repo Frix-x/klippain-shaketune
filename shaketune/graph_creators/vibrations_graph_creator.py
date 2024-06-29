@@ -114,58 +114,61 @@ def calc_freq_response(data) -> Tuple[np.ndarray, np.ndarray]:
     return helper.process_accelerometer_data(data)
 
 
-# Calculate motor frequency profiles based on the measured Power Spectral Density (PSD) measurements for the machine kinematics
-# main angles and then create a global motor profile as a weighted average (from their own vibrations) of all calculated profiles
-def compute_motor_profiles(
-    freqs: np.ndarray,
-    psds: dict,
-    all_angles_energy: dict,
-    measured_angles: Optional[List[int]] = None,
-    energy_amplification_factor: int = 2,
-) -> Tuple[dict, np.ndarray]:
-    if measured_angles is None:
-        measured_angles = [0, 90]
+def find_motor_characteristics(motor: str, freqs: np.ndarray, psd: np.ndarray) -> Tuple[float, float, int]:
+    motor_fr, motor_zeta, motor_res_idx, lowfreq_max = compute_mechanical_parameters(psd, freqs, 30)
 
+    if lowfreq_max:
+        ConsoleOutput.print(
+            (
+                f'[WARNING] {motor} motor has a lot of low frequency vibrations. This is '
+                'probably due to the test being performed at too high an acceleration!\n'
+                'Try lowering ACCEL and/or increasing SIZE before restarting the macro '
+                'to ensure that only constant speeds are being recorded and that the '
+                'dynamic behavior of the machine is not affecting the measurements.'
+            )
+        )
+    if motor_zeta is not None:
+        ConsoleOutput.print(
+            (
+                f'Motor {motor} have a main resonant frequency at {motor_fr:.1f}Hz '
+                f'with an estimated damping ratio of {motor_zeta:.3f}'
+            )
+        )
+    else:
+        ConsoleOutput.print(
+            (
+                f'Motor {motor} have a main resonant frequency at {motor_fr:.1f}Hz '
+                'but it was impossible to estimate its damping ratio.'
+            )
+        )
+
+    return motor_fr, motor_zeta, motor_res_idx
+
+
+# Calculate motor frequency profiles based on the measured Power Spectral Density (PSD) measurements
+# for the machine kinematics main angles
+def compute_motor_profiles(freqs: np.ndarray, psds: dict, measured_angles: Optional[List[int]] = (0, 90)) -> dict:
     motor_profiles = {}
-    weighted_sum_profiles = np.zeros_like(freqs)
-    total_weight = 0
     conv_filter = np.ones(20) / 20
 
-    # Creating the PSD motor profiles for each angles
+    # Creating the PSD motor profiles for each angles by summing the PSDs for each speeds
     for angle in measured_angles:
-        # Calculate the sum of PSDs for the current angle and then convolve
         sum_curve = np.sum(np.array([psds[angle][speed] for speed in psds[angle]]), axis=0)
         motor_profiles[angle] = np.convolve(sum_curve / len(psds[angle]), conv_filter, mode='same')
 
-        # Calculate weights
-        angle_energy = (
-            all_angles_energy[angle] ** energy_amplification_factor
-        )  # First weighting factor is based on the total vibrations of the machine at the specified angle
-        curve_area = (
-            np.trapz(motor_profiles[angle], freqs) ** energy_amplification_factor
-        )  # Additional weighting factor is based on the area under the current motor profile at this specified angle
-        total_angle_weight = angle_energy * curve_area
-
-        # Update weighted sum profiles to get the global motor profile
-        weighted_sum_profiles += motor_profiles[angle] * total_angle_weight
-        total_weight += total_angle_weight
-
-    # Creating a global average motor profile that is the weighted average of all the PSD motor profiles
-    global_motor_profile = weighted_sum_profiles / total_weight if total_weight != 0 else weighted_sum_profiles
-
-    return motor_profiles, global_motor_profile
+    return motor_profiles
 
 
 # Since it was discovered that there is no non-linear mixing in the stepper "steps" vibrations, instead of measuring
 # the effects of each speeds at each angles, this function simplify it by using only the main motors axes (X/Y for Cartesian
-# printers and A/B for CoreXY) measurements and project each points on the [0,360] degrees range using trigonometry
+# printers and A/B for CoreXY) measurements and project each points on the [0, 360] degrees range using trigonometry
 # to "sum" the vibration impact of each axis at every points of the generated spectrogram. The result is very similar at the end.
 def compute_dir_speed_spectrogram(
-    measured_speeds: List[float], data: dict, kinematics: str = 'cartesian', measured_angles: Optional[List[int]] = None
+    measured_speeds: List[float],
+    data: dict,
+    kinematics: str = 'cartesian',
+    measured_angles: Optional[List[int]] = (0, 90),
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    if measured_angles is None:
-        measured_angles = [0, 90]
-
     # We want to project the motor vibrations measured on their own axes on the [0, 360] range
     spectrum_angles = np.linspace(0, 360, 720)  # One point every 0.5 degrees
     spectrum_speeds = np.linspace(min(measured_speeds), max(measured_speeds), len(measured_speeds) * 6)
@@ -293,11 +296,8 @@ def filter_and_split_ranges(
 # This function allow the computation of a symmetry score that reflect the spectrogram apparent symmetry between
 # measured axes on both the shape of the signal and the energy level consistency across both side of the signal
 def compute_symmetry_analysis(
-    all_angles: np.ndarray, spectrogram_data: np.ndarray, measured_angles: Optional[List[int]] = None
+    all_angles: np.ndarray, spectrogram_data: np.ndarray, measured_angles: Optional[List[int]] = (0, 90)
 ) -> float:
-    if measured_angles is None:
-        measured_angles = [0, 90]
-
     total_spectrogram_angles = len(all_angles)
     half_spectrogram_angles = total_spectrogram_angles // 2
 
@@ -501,74 +501,39 @@ def plot_angular_speed_profiles(
 
 
 def plot_motor_profiles(
-    ax: plt.Axes,
-    freqs: np.ndarray,
-    main_angles: List[int],
-    motor_profiles: dict,
-    global_motor_profile: np.ndarray,
-    max_freq: float,
+    ax: plt.Axes, freqs: np.ndarray, main_angles: List[int], motor_profiles: dict, max_freq: float
 ) -> None:
-    ax.set_title('Motor frequency profile', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
+    ax.set_title('Motors frequency profiles', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
     ax.set_ylabel('Energy')
     ax.set_xlabel('Frequency (Hz)')
 
     ax2 = ax.twinx()
     ax2.yaxis.set_visible(False)
 
-    # Global weighted average motor profile
-    ax.plot(freqs, global_motor_profile, label='Combined', color=KLIPPAIN_COLORS['purple'], zorder=5)
-    max_value = global_motor_profile.max()
-
     # Mapping of angles to axis names
     angle_settings = {0: 'X', 90: 'Y', 45: 'A', 135: 'B'}
 
-    # And then plot the motor profiles at each measured angles
+    # And then plot the motor profiles at each measured angles with their characteristics
+    max_value = 0
     for angle in main_angles:
         profile_max = motor_profiles[angle].max()
         if profile_max > max_value:
             max_value = profile_max
         label = f'{angle_settings[angle]} ({angle} deg)' if angle in angle_settings else f'{angle} deg'
-        ax.plot(freqs, motor_profiles[angle], linestyle='--', label=label, zorder=2)
+        ax.plot(freqs, motor_profiles[angle], label=label, zorder=2)
+
+        motor_fr, motor_zeta, motor_res_idx = find_motor_characteristics(
+            angle_settings[angle], freqs, motor_profiles[angle]
+        )
+        ax2.plot([], [], ' ', label=f'{angle_settings[angle]} resonant frequency (ω0): {motor_fr:.1f}Hz')
+        if motor_zeta is not None:
+            ax2.plot([], [], ' ', label=f'{angle_settings[angle]} damping ratio (ζ): {motor_zeta:.3f}')
+        else:
+            ax2.plot([], [], ' ', label=f'{angle_settings[angle]} damping ratio (ζ): unknown')
 
     ax.set_xlim([0, max_freq])
     ax.set_ylim([0, max_value * 1.1])
     ax.ticklabel_format(axis='y', style='scientific', scilimits=(0, 0))
-
-    # Then add the motor resonance peak to the graph and print some infos about it
-    motor_fr, motor_zeta, motor_res_idx, lowfreq_max = compute_mechanical_parameters(global_motor_profile, freqs, 30)
-    if lowfreq_max:
-        ConsoleOutput.print(
-            '[WARNING] There are a lot of low frequency vibrations that can alter the readings. This is probably due to the test being performed at too high an acceleration!'
-        )
-        ConsoleOutput.print(
-            'Try lowering the ACCEL value and/or increasing the SIZE value before restarting the macro to ensure that only constant speeds are being recorded and that the dynamic behavior of the machine is not affecting the measurements'
-        )
-    if motor_zeta is not None:
-        ConsoleOutput.print(
-            f'Motors have a main resonant frequency at {motor_fr:.1f}Hz with an estimated damping ratio of {motor_zeta:.3f}'
-        )
-    else:
-        ConsoleOutput.print(
-            f'Motors have a main resonant frequency at {motor_fr:.1f}Hz but it was impossible to estimate a damping ratio.'
-        )
-
-    ax.plot(freqs[motor_res_idx], global_motor_profile[motor_res_idx], 'x', color='black', markersize=10)
-    ax.annotate(
-        'R',
-        (freqs[motor_res_idx], global_motor_profile[motor_res_idx]),
-        textcoords='offset points',
-        xytext=(15, 5),
-        ha='right',
-        fontsize=14,
-        color=KLIPPAIN_COLORS['red_pink'],
-        weight='bold',
-    )
-
-    ax2.plot([], [], ' ', label=f'Motor resonant frequency (ω0): {motor_fr:.1f}Hz')
-    if motor_zeta is not None:
-        ax2.plot([], [], ' ', label=f'Motor damping ratio (ζ): {motor_zeta:.3f}')
-    else:
-        ax2.plot([], [], ' ', label='No damping ratio computed')
 
     ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
     ax.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
@@ -732,9 +697,9 @@ def vibrations_profile(
     shaper_calibrate = setup_klipper_import(klipperdir)
 
     if kinematics == 'cartesian' or kinematics == 'corexz':
-        main_angles = [0, 90]
+        main_angles = (0, 90)
     elif kinematics == 'corexy':
-        main_angles = [45, 135]
+        main_angles = (45, 135)
     else:
         raise ValueError('Only Cartesian, CoreXY and CoreXZ kinematics are supported by this tool at the moment!')
 
@@ -775,7 +740,7 @@ def vibrations_profile(
     )
     all_angles_energy = compute_angle_powers(spectrogram_data)
     sp_min_energy, sp_max_energy, sp_variance_energy, vibration_metric = compute_speed_powers(spectrogram_data)
-    motor_profiles, global_motor_profile = compute_motor_profiles(target_freqs, psds, all_angles_energy, main_angles)
+    motor_profiles = compute_motor_profiles(target_freqs, psds, main_angles)
 
     # symmetry_factor = compute_symmetry_analysis(all_angles, all_angles_energy)
     symmetry_factor = compute_symmetry_analysis(all_angles, spectrogram_data, main_angles)
@@ -884,7 +849,7 @@ def vibrations_profile(
     plot_angular_speed_profiles(ax3, all_speeds, all_angles, spectrogram_data, kinematics)
     plot_vibration_spectrogram(ax5, all_angles, all_speeds, spectrogram_data, vibration_peaks)
 
-    plot_motor_profiles(ax6, target_freqs, main_angles, motor_profiles, global_motor_profile, max_freq)
+    plot_motor_profiles(ax6, target_freqs, main_angles, motor_profiles, max_freq)
 
     # Adding a small Klippain logo to the top left corner of the figure
     ax_logo = fig.add_axes([0.001, 0.924, 0.075, 0.075], anchor='NW')
