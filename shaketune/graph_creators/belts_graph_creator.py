@@ -19,6 +19,7 @@ import matplotlib.font_manager
 import matplotlib.pyplot as plt
 import matplotlib.ticker
 import numpy as np
+from scipy.stats import pearsonr
 
 matplotlib.use('Agg')
 
@@ -343,14 +344,12 @@ def plot_versus_belts(
     common_freqs: np.ndarray,
     signal1: SignalData,
     signal2: SignalData,
-    interp_psd1: np.ndarray,
-    interp_psd2: np.ndarray,
     signal1_belt: str,
     signal2_belt: str,
 ) -> None:
     ax.set_title('Cross-belts comparison plot', fontsize=14, color=KLIPPAIN_COLORS['dark_orange'], weight='bold')
 
-    max_psd = max(np.max(interp_psd1), np.max(interp_psd2))
+    max_psd = max(np.max(signal1.psd), np.max(signal2.psd))
     ideal_line = np.linspace(0, max_psd * 1.1, 500)
     green_boundary = ideal_line + (0.35 * max_psd * np.exp(-ideal_line / (0.6 * max_psd)))
     ax.fill_betweenx(ideal_line, ideal_line, green_boundary, color='green', alpha=0.15)
@@ -364,8 +363,8 @@ def plot_versus_belts(
         linewidth=2,
     )
 
-    ax.plot(interp_psd1, interp_psd2, color='dimgrey', marker='o', markersize=1.5)
-    ax.fill_betweenx(interp_psd2, interp_psd1, color=KLIPPAIN_COLORS['red_pink'], alpha=0.1)
+    ax.plot(signal1.psd, signal2.psd, color='dimgrey', marker='o', markersize=1.5)
+    ax.fill_betweenx(signal2.psd, signal1.psd, color=KLIPPAIN_COLORS['red_pink'], alpha=0.1)
 
     paired_peak_count = 0
     unpaired_peak_count = 0
@@ -374,31 +373,27 @@ def plot_versus_belts(
         label = ALPHABET[paired_peak_count]
         freq1 = signal1.freqs[peak1[0]]
         freq2 = signal2.freqs[peak2[0]]
-        nearest_idx1 = np.argmin(np.abs(common_freqs - freq1))
-        nearest_idx2 = np.argmin(np.abs(common_freqs - freq2))
 
-        if nearest_idx1 == nearest_idx2:
-            psd1_peak_value = interp_psd1[nearest_idx1]
-            psd2_peak_value = interp_psd2[nearest_idx1]
-            ax.plot(psd1_peak_value, psd2_peak_value, marker='o', color='black', markersize=7)
+        if abs(freq1 - freq2) < 1:
+            ax.plot(signal1.psd[peak1[0]], signal2.psd[peak2[0]], marker='o', color='black', markersize=7)
             ax.annotate(
                 f'{label}1/{label}2',
-                (psd1_peak_value, psd2_peak_value),
+                (signal1.psd[peak1[0]], signal2.psd[peak2[0]]),
                 textcoords='offset points',
                 xytext=(-7, 7),
                 fontsize=13,
                 color='black',
             )
         else:
-            psd1_peak_value = interp_psd1[nearest_idx1]
-            psd1_on_peak = interp_psd1[nearest_idx2]
-            psd2_peak_value = interp_psd2[nearest_idx2]
-            psd2_on_peak = interp_psd2[nearest_idx1]
-            ax.plot(psd1_on_peak, psd2_peak_value, marker='o', color=KLIPPAIN_COLORS['orange'], markersize=7)
-            ax.plot(psd1_peak_value, psd2_on_peak, marker='o', color=KLIPPAIN_COLORS['purple'], markersize=7)
+            ax.plot(
+                signal1.psd[peak2[0]], signal2.psd[peak2[0]], marker='o', color=KLIPPAIN_COLORS['orange'], markersize=7
+            )
+            ax.plot(
+                signal1.psd[peak1[0]], signal2.psd[peak1[0]], marker='o', color=KLIPPAIN_COLORS['purple'], markersize=7
+            )
             ax.annotate(
                 f'{label}1',
-                (psd1_peak_value, psd2_on_peak),
+                (signal1.psd[peak1[0]], signal2.psd[peak1[0]]),
                 textcoords='offset points',
                 xytext=(0, 7),
                 fontsize=13,
@@ -406,7 +401,7 @@ def plot_versus_belts(
             )
             ax.annotate(
                 f'{label}2',
-                (psd1_on_peak, psd2_peak_value),
+                (signal1.psd[peak2[0]], signal2.psd[peak2[0]]),
                 textcoords='offset points',
                 xytext=(0, 7),
                 fontsize=13,
@@ -415,16 +410,12 @@ def plot_versus_belts(
         paired_peak_count += 1
 
     for _, peak_index in enumerate(signal1.unpaired_peaks):
-        freq1 = signal1.freqs[peak_index]
-        freq2 = signal2.freqs[peak_index]
-        nearest_idx1 = np.argmin(np.abs(common_freqs - freq1))
-        nearest_idx2 = np.argmin(np.abs(common_freqs - freq2))
-        psd1_peak_value = interp_psd1[nearest_idx1]
-        psd2_peak_value = interp_psd2[nearest_idx1]
-        ax.plot(psd1_peak_value, psd2_peak_value, marker='o', color=KLIPPAIN_COLORS['purple'], markersize=7)
+        ax.plot(
+            signal1.psd[peak_index], signal2.psd[peak_index], marker='o', color=KLIPPAIN_COLORS['purple'], markersize=7
+        )
         ax.annotate(
             str(unpaired_peak_count + 1),
-            (psd1_peak_value, psd2_peak_value),
+            (signal1.psd[peak_index], signal2.psd[peak_index]),
             textcoords='offset points',
             fontsize=13,
             weight='bold',
@@ -434,16 +425,12 @@ def plot_versus_belts(
         unpaired_peak_count += 1
 
     for _, peak_index in enumerate(signal2.unpaired_peaks):
-        freq1 = signal1.freqs[peak_index]
-        freq2 = signal2.freqs[peak_index]
-        nearest_idx1 = np.argmin(np.abs(common_freqs - freq1))
-        nearest_idx2 = np.argmin(np.abs(common_freqs - freq2))
-        psd1_peak_value = interp_psd1[nearest_idx1]
-        psd2_peak_value = interp_psd2[nearest_idx1]
-        ax.plot(psd1_peak_value, psd2_peak_value, marker='o', color=KLIPPAIN_COLORS['orange'], markersize=7)
+        ax.plot(
+            signal1.psd[peak_index], signal2.psd[peak_index], marker='o', color=KLIPPAIN_COLORS['orange'], markersize=7
+        )
         ax.annotate(
             str(unpaired_peak_count + 1),
-            (psd1_peak_value, psd2_peak_value),
+            (signal1.psd[peak_index], signal2.psd[peak_index]),
             textcoords='offset points',
             fontsize=13,
             weight='bold',
@@ -476,16 +463,21 @@ def plot_versus_belts(
 
 
 # Original Klipper function to get the PSD data of a raw accelerometer signal
-def compute_signal_data(data: np.ndarray, max_freq: float) -> SignalData:
+def compute_signal_data(data: np.ndarray, common_freqs: np.ndarray, max_freq: float) -> SignalData:
     helper = shaper_calibrate.ShaperCalibrate(printer=None)
     calibration_data = helper.process_accelerometer_data(data)
 
     freqs = calibration_data.freq_bins[calibration_data.freq_bins <= max_freq]
     psd = calibration_data.get_psd('all')[calibration_data.freq_bins <= max_freq]
 
-    _, peaks, _ = detect_peaks(psd, freqs, PEAKS_DETECTION_THRESHOLD * psd.max())
+    # Re-interpolate the PSD signal to a common frequency range to be able to plot them one against the other
+    interp_psd = np.interp(common_freqs, freqs, psd)
 
-    return SignalData(freqs=freqs, psd=psd, peaks=peaks)
+    _, peaks, _ = detect_peaks(
+        interp_psd, common_freqs, PEAKS_DETECTION_THRESHOLD * interp_psd.max(), window_size=20, vicinity=15
+    )
+
+    return SignalData(freqs=common_freqs, psd=interp_psd, peaks=peaks)
 
 
 ######################################################################
@@ -517,8 +509,9 @@ def belts_calibration(
     signal2_belt += belt_info.get(signal2_belt, '')
 
     # Compute calibration data for the two datasets with automatic peaks detection
-    signal1 = compute_signal_data(datas[0], max_freq)
-    signal2 = compute_signal_data(datas[1], max_freq)
+    common_freqs = np.linspace(0, max_freq, 500)
+    signal1 = compute_signal_data(datas[0], common_freqs, max_freq)
+    signal2 = compute_signal_data(datas[1], common_freqs, max_freq)
     del datas
 
     # Pair the peaks across the two datasets
@@ -526,18 +519,13 @@ def belts_calibration(
     signal1 = signal1._replace(paired_peaks=pairing_result.paired_peaks, unpaired_peaks=pairing_result.unpaired_peaks1)
     signal2 = signal2._replace(paired_peaks=pairing_result.paired_peaks, unpaired_peaks=pairing_result.unpaired_peaks2)
 
-    # Re-interpolate the PSD signals to a common frequency range to be able to plot them one against the other point by point
-    common_freqs = np.linspace(0, max_freq, 500)
-    interp_psd1 = np.interp(common_freqs, signal1.freqs, signal1.psd)
-    interp_psd2 = np.interp(common_freqs, signal2.freqs, signal2.psd)
-
-    # Calculating R^2 to y=x line to compute the similarity between the two belts
-    ss_res = np.sum((interp_psd2 - interp_psd1) ** 2)
-    ss_tot = np.sum((interp_psd2 - np.mean(interp_psd2)) ** 2)
-    similarity_factor = (1 - (ss_res / ss_tot)) * 100
+    # R² proved to be pretty instable to compute the similarity between the two belts
+    # So now, we use the Pearson correlation coefficient to compute the similarity
+    correlation, _ = pearsonr(signal1.psd, signal2.psd)
+    similarity_factor = correlation * 100
+    similarity_factor = np.clip(similarity_factor, 0, 100)
     ConsoleOutput.print(f'Belts estimated similarity: {similarity_factor:.1f}%')
 
-    # mhi = compute_mhi(similarity_factor, num_peaks, num_unpaired_peaks)
     mhi = compute_mhi(similarity_factor, signal1, signal2)
     ConsoleOutput.print(f'[experimental] Mechanical health: {mhi}')
 
@@ -582,11 +570,11 @@ def belts_calibration(
 
     # Add the accel_per_hz value to the title
     title_line5 = f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz'
-    fig.text(0.55, 0.915, title_line5, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
+    fig.text(0.551, 0.915, title_line5, ha='left', va='top', fontsize=10, color=KLIPPAIN_COLORS['dark_purple'])
 
     # Plot the graphs
     plot_compare_frequency(ax1, signal1, signal2, signal1_belt, signal2_belt, max_freq)
-    plot_versus_belts(ax3, common_freqs, signal1, signal2, interp_psd1, interp_psd2, signal1_belt, signal2_belt)
+    plot_versus_belts(ax3, common_freqs, signal1, signal2, signal1_belt, signal2_belt)
 
     # Adding a small Klippain logo to the top left corner of the figure
     ax_logo = fig.add_axes([0.001, 0.894, 0.105, 0.105], anchor='NW')
