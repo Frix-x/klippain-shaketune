@@ -374,7 +374,7 @@ def plot_versus_belts(
         freq1 = signal1.freqs[peak1[0]]
         freq2 = signal2.freqs[peak2[0]]
 
-        if freq1 == freq2:
+        if abs(freq1 - freq2) < 1:
             ax.plot(signal1.psd[peak1[0]], signal2.psd[peak2[0]], marker='o', color='black', markersize=7)
             ax.annotate(
                 f'{label}1/{label}2',
