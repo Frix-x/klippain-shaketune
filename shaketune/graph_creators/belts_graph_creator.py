@@ -210,8 +210,8 @@ def plot_compare_frequency(
     ax: plt.Axes, signal1: SignalData, signal2: SignalData, signal1_belt: str, signal2_belt: str, max_freq: float
 ) -> None:
     # Plot the two belts PSD signals
-    ax.plot(signal1.freqs, signal1.psd, label='Belt ' + signal1_belt, color=KLIPPAIN_COLORS['purple'])
-    ax.plot(signal2.freqs, signal2.psd, label='Belt ' + signal2_belt, color=KLIPPAIN_COLORS['orange'])
+    ax.plot(signal1.freqs, signal1.psd, label='Belt ' + signal1_belt, color=KLIPPAIN_COLORS['orange'])
+    ax.plot(signal2.freqs, signal2.psd, label='Belt ' + signal2_belt, color=KLIPPAIN_COLORS['purple'])
 
     psd_highest_max = max(signal1.psd.max(), signal2.psd.max())
 
