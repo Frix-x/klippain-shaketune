@@ -39,9 +39,9 @@ Aside from the actual belt tension, the resonant frequency/amplitude of the curv
 
 The Cross-Belts plot is an innovative cool way to compare the frequency profiles of the belts at every frequency point. In this plot, each point marks the amplitude response of each belt at different frequencies, connected point by point to trace the frequency spectrum. Ideally, these points should align on the diagonal center line, indicating that both belts have matching energy response values at each frequency. 
 
-The good zone, wider at the bottom (low-amplitude regions where the deviation doesn't matter much) and narrower at the top right (high-energy region where the main peaks lie), represents acceptable deviations. So **you want all points to be close to the ideal center line and as many as possible within the green zone**, as this means that the bands are well tuned and behave similarly.
+The good zone, wider at the bottom (low-amplitude regions where the deviation doesn't matter much) and narrower at the top right (high-energy region where the main peaks lie), represents acceptable deviations. So **you want all points to be close to the ideal center line and as many as possible within the green zone**, as this means that the belts are well tuned and behave similarly.
 
-Paired peaks of exactly the same frequency will be on the same point (labeled α1/α2, β1/β2, ...) and the distance from the center line will show the difference in energy. For paired peaks that also have a frequency delta between them, they are displayed as two points (labeled α1 and α2, ...) and the additional distance between them along the plotted line represents their frequency delta.
+Paired peaks at the same frequency will be on the same point (labeled α1/α2, β1/β2, ...) and the distance from the center line will show the difference in energy. For paired peaks that also have a frequency delta between them, they are displayed as two points (labeled α1 and α2, ...) and the additional distance between them along the plotted line represents their frequency delta.
 
 ### Estimated similarity and mechanical issues indicator
 
