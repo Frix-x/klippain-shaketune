@@ -29,6 +29,7 @@ import matplotlib.font_manager
 import matplotlib.pyplot as plt
 import matplotlib.ticker
 import numpy as np
+from scipy.interpolate import interp1d
 
 matplotlib.use('Agg')
 
@@ -47,8 +48,9 @@ PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_EFFECT_THRESHOLD = 0.12
 SPECTROGRAM_LOW_PERCENTILE_FILTER = 5
 MAX_VIBRATIONS = 5.0
-SMOOTHING_LIST = [0.1]
-# SMOOTHING_LIST = np.arange(0.001, 0.80, 0.05)
+MAX_VIBRATIONS_PLOTTED = 80.0
+MAX_VIBRATIONS_PLOTTED_ZOOM = 1.25  # 1.25x max vibs values from the standard filters selection
+SMOOTHING_TESTS = 10  # Number of smoothing values to test (it will significantly increase the computation time)
 KLIPPAIN_COLORS = {
     'purple': '#70088C',
     'orange': '#FF8D32',
@@ -178,7 +180,7 @@ def calibrate_shaper(datas: List[np.ndarray], max_smoothing: Optional[float], sc
                 max_smoothing = shaper.smoothing
 
     # Then we create a list of smoothing values to test (no need to test the max smoothing value as it was already tested)
-    smoothing_test_list = np.linspace(0.001, max_smoothing, 10)[:-1]
+    smoothing_test_list = np.linspace(0.001, max_smoothing, SMOOTHING_TESTS)[:-1]
     additional_all_shapers = {}
     for smoothing in smoothing_test_list:
         if compat:
@@ -294,9 +296,9 @@ def plot_freq_response(
         and perf_shaper_choice != klipper_shaper_choice
         and perf_shaper_accel >= klipper_shaper_accel
     ):
-        perf_shaper_string = f'Recommended performance shaper: {perf_shaper_choice.upper()} @ {perf_shaper_freq:.1f} Hz'
+        perf_shaper_string = f'Recommended for performance: {perf_shaper_choice.upper()} @ {perf_shaper_freq:.1f} Hz'
         lowvibr_shaper_string = (
-            f'Recommended low vibrations shaper: {klipper_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz'
+            f'Recommended for low vibrations: {klipper_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz'
         )
         shaper_table_data['recommendations'].append(perf_shaper_string)
         shaper_table_data['recommendations'].append(lowvibr_shaper_string)
@@ -436,47 +438,93 @@ def plot_smoothing_vs_accel(
                 shaper_data[shaper_type] = []
             shaper_data[shaper_type].append(
                 {
-                    'smoothing': shaper.smoothing,
                     'max_accel': shaper.max_accel,
                     'vibrs': shaper.vibrs * 100.0,
                 }
             )
 
     # Extract data from shaper_table_data and insert into shaper_data
+    max_shaper_vibrations = 0
     for shaper in shaper_table_data['shapers']:
         shaper_type = shaper['type']
         if shaper_type not in shaper_data:
             shaper_data[shaper_type] = []
+        max_shaper_vibrations = max(max_shaper_vibrations, float(shaper['vibrations']) * 100.0)
         shaper_data[shaper_type].append(
             {
-                'smoothing': float(shaper['smoothing']),
                 'max_accel': float(shaper['max_accel']),
                 'vibrs': float(shaper['vibrations']) * 100.0,
             }
         )
 
-    # Plot each shaper type and add colorbar for vibrations
-    for _, (shaper_type, data) in enumerate(shaper_data.items()):
-        smoothing_values = [d['smoothing'] for d in data]
-        max_accel_values = [d['max_accel'] for d in data]
-        vibrs_values = [d['vibrs'] for d in data]
-        ax.plot(max_accel_values, smoothing_values, linestyle=':', label=f'{shaper_type}', zorder=10)
-        scatter = ax.scatter(
-            max_accel_values, smoothing_values, c=vibrs_values, cmap='plasma', s=100, edgecolors='w', zorder=15
+    # Calculate the maximum `max_accel` for points below the thresholds to get a good plot with
+    # continuous lines and a zoom on the graph to show details at low vibrations
+    min_accel_limit = 99999
+    max_accel_limit = 0
+    max_accel_limit_zoom = 0
+    for data in shaper_data.values():
+        min_accel_limit = min(min_accel_limit, min(d['max_accel'] for d in data))
+        max_accel_limit = max(
+            max_accel_limit, max(d['max_accel'] for d in data if d['vibrs'] <= MAX_VIBRATIONS_PLOTTED)
+        )
+        max_accel_limit_zoom = max(
+            max_accel_limit_zoom,
+            max(d['max_accel'] for d in data if d['vibrs'] <= max_shaper_vibrations * MAX_VIBRATIONS_PLOTTED_ZOOM),
         )
 
-    # Add colorbar for vibrations
-    cbar = plt.colorbar(scatter, ax=ax)
-    cbar.set_label('Remaining Vibrations (%)')
+    # Add a zoom axes on the graph to show details at low vibrations
+    zoomed_window = np.clip(max_shaper_vibrations * MAX_VIBRATIONS_PLOTTED_ZOOM, 0, 20)
+    axins = ax.inset_axes(
+        [0.575, 0.125, 0.40, 0.45],
+        xlim=(min_accel_limit * 0.95, max_accel_limit_zoom * 1.1),
+        ylim=(-0.5, zoomed_window),
+    )
+    ax.indicate_inset_zoom(axins, edgecolor=KLIPPAIN_COLORS['purple'], linewidth=3)
+    axins.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(500))
+    axins.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+    axins.grid(which='major', color='grey')
+    axins.grid(which='minor', color='lightgrey')
+
+    # Draw the green zone on both axes to highlight the low vibrations zone
+    number_of_interpolated_points = 100
+    x_fill = np.linspace(min_accel_limit * 0.95, max_accel_limit * 1.1, number_of_interpolated_points)
+    y_fill = np.full_like(x_fill, 5.0)
+    ax.axhline(y=5.0, color='black', linestyle='--', linewidth=0.5)
+    ax.fill_between(x_fill, -0.5, y_fill, color='green', alpha=0.15)
+    if zoomed_window > 5.0:
+        axins.axhline(y=5.0, color='black', linestyle='--', linewidth=0.5)
+        axins.fill_between(x_fill, -0.5, y_fill, color='green', alpha=0.15)
+
+    # Plot each shaper remaining vibrations response over acceleration
+    max_vibrations = 0
+    for _, (shaper_type, data) in enumerate(shaper_data.items()):
+        max_accel_values = np.array([d['max_accel'] for d in data])
+        vibrs_values = np.array([d['vibrs'] for d in data])
+
+        # remove duplicate values in max_accel_values and delete the corresponding vibrs_values
+        # and interpolate the curves to get them smoother with more datapoints
+        unique_max_accel_values, unique_indices = np.unique(max_accel_values, return_index=True)
+        max_accel_values = unique_max_accel_values
+        vibrs_values = vibrs_values[unique_indices]
+        interp_func = interp1d(max_accel_values, vibrs_values, kind='cubic')
+        max_accel_fine = np.linspace(max_accel_values.min(), max_accel_values.max(), number_of_interpolated_points)
+        vibrs_fine = interp_func(max_accel_fine)
+
+        ax.plot(max_accel_fine, vibrs_fine, label=f'{shaper_type}', zorder=10)
+        axins.plot(max_accel_fine, vibrs_fine, label=f'{shaper_type}', zorder=15)
+        max_vibrations = max(max_vibrations, max(vibrs_fine))
+
     ax.set_xlabel('Max Acceleration')
-    ax.set_ylabel('Smoothing')
+    ax.set_ylabel('Remaining Vibrations (%)')
+    ax.set_xlim([min_accel_limit * 0.95, max_accel_limit * 1.1])
+    ax.set_ylim([-0.5, np.clip(max_vibrations * 1.05, 50, MAX_VIBRATIONS_PLOTTED)])
     ax.set_title(
-        'Smoothing vs Max Acceleration',
+        'Filters performances over acceleration',
         fontsize=14,
         color=KLIPPAIN_COLORS['dark_orange'],
         weight='bold',
     )
-    ax.legend(loc='upper right', prop=fontP)
+    ax.legend(loc='best', prop=fontP)
 
 
 def print_shaper_table(fig: plt.Figure, shaper_table_data: Dict[str, List[Dict[str, str]]]) -> None:
@@ -492,15 +540,43 @@ def print_shaper_table(fig: plt.Figure, shaper_table_data: Dict[str, List[Dict[s
             f'{round(shaper_info["max_accel"] / 10) * 10:.0f}',
         ]
         table_data.append(row)
-    table = plt.table(cellText=table_data, colLabels=columns, bbox=[1.12, -0.4, 0.75, 0.25], cellLoc='center')
+    table = plt.table(cellText=table_data, colLabels=columns, bbox=[1.130, -0.4, 0.803, 0.25], cellLoc='center')
     table.auto_set_font_size(False)
     table.set_fontsize(10)
     table.auto_set_column_width([0, 1, 2, 3, 4])
     table.set_zorder(100)
 
     # Add the recommendations and damping ratio using fig.text
-    fig.text(0.58, 0.235, f'Estimated damping ratio (ζ): {shaper_table_data["damping_ratio"]:.3f}', fontsize=14)
-    fig.text(0.58, 0.210, '\n'.join(shaper_table_data['recommendations']), fontsize=14)
+    fig.text(
+        0.585,
+        0.235,
+        f'Estimated damping ratio (ζ): {shaper_table_data["damping_ratio"]:.3f}',
+        fontsize=14,
+        color=KLIPPAIN_COLORS['purple'],
+    )
+    if len(shaper_table_data['recommendations']) == 1:
+        fig.text(
+            0.585,
+            0.200,
+            shaper_table_data['recommendations'][0],
+            fontsize=14,
+            color=KLIPPAIN_COLORS['red_pink'],
+        )
+    elif len(shaper_table_data['recommendations']) == 2:
+        fig.text(
+            0.585,
+            0.200,
+            shaper_table_data['recommendations'][0],
+            fontsize=14,
+            color=KLIPPAIN_COLORS['red_pink'],
+        )
+        fig.text(
+            0.585,
+            0.175,
+            shaper_table_data['recommendations'][1],
+            fontsize=14,
+            color=KLIPPAIN_COLORS['red_pink'],
+        )
 
 
 ######################################################################
