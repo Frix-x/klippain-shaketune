@@ -27,7 +27,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential
+          sudo apt-get install -y build-essential gcc-avr avr-libc
       - name: Build klipper dict
         run: |
           pushd klipper
@@ -50,7 +50,7 @@ jobs:
         run: |
           pushd klipper
           mkdir ../dicts
-          cp ../klipper/out/klipper.dict ../dicts/linux_basic.dict
+          cp ../klipper/out/klipper.dict ../dicts/atmega2560.dict
           ../klippy-env/bin/python scripts/test_klippy.py -d ../dicts ../shaketune/ci/smoke-test/klippy-tests/simple.test
   lint:
     runs-on: ubuntu-latest
