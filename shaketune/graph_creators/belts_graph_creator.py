@@ -386,10 +386,10 @@ def plot_versus_belts(
             )
         else:
             ax.plot(
-                signal1.psd[peak2[0]], signal2.psd[peak2[0]], marker='o', color=KLIPPAIN_COLORS['orange'], markersize=7
+                signal1.psd[peak2[0]], signal2.psd[peak2[0]], marker='o', color=KLIPPAIN_COLORS['purple'], markersize=7
             )
             ax.plot(
-                signal1.psd[peak1[0]], signal2.psd[peak1[0]], marker='o', color=KLIPPAIN_COLORS['purple'], markersize=7
+                signal1.psd[peak1[0]], signal2.psd[peak1[0]], marker='o', color=KLIPPAIN_COLORS['orange'], markersize=7
             )
             ax.annotate(
                 f'{label}1',
@@ -411,7 +411,7 @@ def plot_versus_belts(
 
     for _, peak_index in enumerate(signal1.unpaired_peaks):
         ax.plot(
-            signal1.psd[peak_index], signal2.psd[peak_index], marker='o', color=KLIPPAIN_COLORS['purple'], markersize=7
+            signal1.psd[peak_index], signal2.psd[peak_index], marker='o', color=KLIPPAIN_COLORS['orange'], markersize=7
         )
         ax.annotate(
             str(unpaired_peak_count + 1),
@@ -426,7 +426,7 @@ def plot_versus_belts(
 
     for _, peak_index in enumerate(signal2.unpaired_peaks):
         ax.plot(
-            signal1.psd[peak_index], signal2.psd[peak_index], marker='o', color=KLIPPAIN_COLORS['orange'], markersize=7
+            signal1.psd[peak_index], signal2.psd[peak_index], marker='o', color=KLIPPAIN_COLORS['purple'], markersize=7
         )
         ax.annotate(
             str(unpaired_peak_count + 1),
