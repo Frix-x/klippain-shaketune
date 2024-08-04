@@ -34,7 +34,7 @@ DEFAULT_FOLDER = '~/printer_data/config/ShakeTune_results'
 DEFAULT_NUMBER_OF_RESULTS = 3
 DEFAULT_KEEP_RAW_CSV = False
 DEFAULT_DPI = 150
-DEFAULT_TIMEOUT = 300
+DEFAULT_TIMEOUT = 600
 DEFAULT_SHOW_MACROS = True
 ST_COMMANDS = {
     'EXCITATE_AXIS_AT_FREQ': (
@@ -82,8 +82,8 @@ class ShakeTune:
         dpi = config.getint('dpi', default=DEFAULT_DPI, minval=100, maxval=500)
         self._st_config = ShakeTuneConfig(result_folder_path, keep_n_results, keep_csv, dpi)
 
-        self.timeout = config.getfloat('timeout', 300, above=0.0)
-        self._show_macros = config.getboolean('show_macros_in_webui', default=True)
+        self.timeout = config.getfloat('timeout', DEFAULT_TIMEOUT, above=0.0)
+        self._show_macros = config.getboolean('show_macros_in_webui', default=DEFAULT_SHOW_MACROS)
 
     # Create the Klipper commands to allow the user to run Shake&Tune's tools
     def _register_commands(self) -> None:
