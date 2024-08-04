@@ -76,18 +76,20 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     toolhead.dwell(0.5)
     accelerometer.stop_measurement('axesmap_X', append_time=True)
     toolhead.dwell(0.5)
+    accelerometer.wait_for_file_writes()
     accelerometer.start_measurement()
     toolhead.dwell(0.5)
     toolhead.move([mid_x + SEGMENT_LENGTH / 2, mid_y + SEGMENT_LENGTH / 2, z_height, E], speed)
     toolhead.dwell(0.5)
     accelerometer.stop_measurement('axesmap_Y', append_time=True)
     toolhead.dwell(0.5)
+    accelerometer.wait_for_file_writes()
     accelerometer.start_measurement()
     toolhead.dwell(0.5)
     toolhead.move([mid_x + SEGMENT_LENGTH / 2, mid_y + SEGMENT_LENGTH / 2, z_height + SEGMENT_LENGTH, E], speed)
     toolhead.dwell(0.5)
     accelerometer.stop_measurement('axesmap_Z', append_time=True)
-
+    toolhead.dwell(0.5)
     accelerometer.wait_for_file_writes()
 
     # Re-enable the input shaper if it was active

@@ -108,8 +108,9 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
         accelerometer.start_measurement()
         vibrate_axis(toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz)
         accelerometer.stop_measurement(config['label'], append_time=True)
-
-    accelerometer.wait_for_file_writes()
+        toolhead.dwell(0.5)
+        toolhead.wait_moves()
+        accelerometer.wait_for_file_writes()
 
     # Re-enable the input shaper if it was active
     if input_shaper is not None:

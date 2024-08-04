@@ -105,7 +105,8 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         accelerometer.start_measurement()
         vibrate_axis(toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz)
         accelerometer.stop_measurement(config['label'], append_time=True)
-
+        toolhead.dwell(0.5)
+        toolhead.wait_moves()
         accelerometer.wait_for_file_writes()
 
         # And finally generate the graph for each measured axis
@@ -114,7 +115,6 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         st_process.run()
         st_process.wait_for_completion()
         toolhead.dwell(1)
-        toolhead.wait_moves()
 
     # Re-enable the input shaper if it was active
     if input_shaper is not None:

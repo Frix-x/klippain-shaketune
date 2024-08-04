@@ -13,7 +13,7 @@ import os
 import time
 from multiprocessing import Process, Queue
 
-FILE_WRITE_TIMEOUT = 10  # seconds
+FILE_WRITE_TIMEOUT = 20  # seconds max to write a whole CSV file
 
 
 class Accelerometer:
@@ -70,13 +70,14 @@ class Accelerometer:
 
     def _write_to_file(self, bg_client, filename):
         try:
-            os.nice(20)
+            os.nice(19)
         except Exception:
             pass
 
+        samples = bg_client.samples or bg_client.get_samples()
+
         with open(filename, 'w') as f:
             f.write('#time,accel_x,accel_y,accel_z\n')
-            samples = bg_client.samples or bg_client.get_samples()
             for t, accel_x, accel_y, accel_z in samples:
                 f.write(f'{t:.6f},{accel_x:.6f},{accel_y:.6f},{accel_z:.6f}\n')
 
