@@ -9,12 +9,12 @@
 #              for each axis to analyze the collected data.
 
 
+from ..helpers.accelerometer import Accelerometer, MeasurementsManager
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..helpers.motors_config_parser import MotorsConfigParser
 from ..helpers.resonance_test import vibrate_axis
 from ..shaketune_process import ShakeTuneProcess
-from .accelerometer import Accelerometer
 
 
 def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
@@ -60,7 +60,7 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
         raise gcmd.error(
             'No suitable accelerometer found for measurement! Multi-accelerometer configurations are not supported for this macro.'
         )
-    accelerometer = Accelerometer(printer.get_reactor(), printer.lookup_object(accel_chip))
+    accelerometer = Accelerometer(printer.lookup_object(accel_chip))
 
     # Move to the starting point
     test_points = res_tester.test.get_start_test_points()
@@ -103,14 +103,16 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     else:
         input_shaper = None
 
+    measurements_manager = MeasurementsManager()
+
     # Run the test for each axis
     for config in filtered_config:
-        accelerometer.start_measurement()
+        ConsoleOutput.print(f'Measuring {config["label"]}...')
+        accelerometer.start_recording(measurements_manager, name=config['label'], append_time=True)
         vibrate_axis(toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz)
-        accelerometer.stop_measurement(config['label'], append_time=True)
+        accelerometer.stop_recording()
         toolhead.dwell(0.5)
         toolhead.wait_moves()
-        accelerometer.wait_for_file_writes()
 
     # Re-enable the input shaper if it was active
     if input_shaper is not None:
@@ -125,5 +127,5 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # Run post-processing
     ConsoleOutput.print('Belts comparative frequency profile generation...')
     ConsoleOutput.print('This may take some time (1-3min)')
-    st_process.run()
+    st_process.run(measurements_manager)
     st_process.wait_for_completion()

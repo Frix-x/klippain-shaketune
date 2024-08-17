@@ -9,11 +9,11 @@
 #              and generates graphs for each axis to analyze the collected data.
 
 
+from ..helpers.accelerometer import Accelerometer, MeasurementsManager
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..helpers.resonance_test import vibrate_axis
 from ..shaketune_process import ShakeTuneProcess
-from .accelerometer import Accelerometer
 
 
 def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
@@ -90,29 +90,33 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     else:
         input_shaper = None
 
+    measurements_manager = MeasurementsManager()
+
     # Filter axis configurations based on user input, assuming 'axis_input' can be 'x', 'y', 'all' (that means 'x' and 'y')
     filtered_config = [
         a for a in AXIS_CONFIG if a['axis'] == axis_input or (axis_input == 'all' and a['axis'] in ('x', 'y'))
     ]
     for config in filtered_config:
+        measurements_manager.clear_measurements()  # Clear the measurements in each iteration of the loop
+
         # First we need to find the accelerometer chip suited for the axis
         accel_chip = Accelerometer.find_axis_accelerometer(printer, config['axis'])
         if accel_chip is None:
             raise gcmd.error('No suitable accelerometer found for measurement!')
-        accelerometer = Accelerometer(printer.get_reactor(), printer.lookup_object(accel_chip))
+        accelerometer = Accelerometer(printer.lookup_object(accel_chip))
 
         # Then do the actual measurements
-        accelerometer.start_measurement()
+        ConsoleOutput.print(f'Measuring {config["label"]}...')
+        accelerometer.start_recording(measurements_manager, name=config['label'], append_time=True)
         vibrate_axis(toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz)
-        accelerometer.stop_measurement(config['label'], append_time=True)
+        accelerometer.stop_recording()
         toolhead.dwell(0.5)
         toolhead.wait_moves()
-        accelerometer.wait_for_file_writes()
 
         # And finally generate the graph for each measured axis
         ConsoleOutput.print(f'{config["axis"].upper()} axis frequency profile generation...')
         ConsoleOutput.print('This may take some time (1-3min)')
-        st_process.run()
+        st_process.run(measurements_manager)
         st_process.wait_for_completion()
         toolhead.dwell(1)
 

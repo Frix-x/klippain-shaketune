@@ -33,11 +33,11 @@ from scipy.interpolate import interp1d
 
 matplotlib.use('Agg')
 
+from ..helpers.accelerometer import Measurement, MeasurementsManager
 from ..helpers.common_func import (
     compute_mechanical_parameters,
     compute_spectrogram,
     detect_peaks,
-    parse_log,
     setup_klipper_import,
 )
 from ..helpers.console_output import ConsoleOutput
@@ -74,33 +74,29 @@ class ShaperGraphCreator(GraphCreator):
         self._max_smoothing = max_smoothing
         self._accel_per_hz = accel_per_hz
 
-    def create_graph(self) -> None:
+    def create_graph(self, measurements_manager: MeasurementsManager) -> None:
         if not self._scv:
             raise ValueError('scv must be set to create the input shaper graph!')
 
-        lognames = self._move_and_prepare_files(
-            glob_pattern='shaketune-axis_*.csv',
-            min_files_required=1,
-            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
-        )
         fig = shaper_calibration(
-            lognames=[str(path) for path in lognames],
+            measurements=measurements_manager.get_measurements(),
             klipperdir=str(self._config.klipper_folder),
             max_smoothing=self._max_smoothing,
             scv=self._scv,
             accel_per_hz=self._accel_per_hz,
             st_version=self._version,
         )
-        self._save_figure_and_cleanup(fig, lognames, lognames[0].stem.split('_')[-1])
+        axis_label = (measurements_manager.get_measurements())[0]['name'].split('_')[1]
+        self._save_figure(fig, measurements_manager, axis_label)
 
     def clean_old_files(self, keep_results: int = 3) -> None:
         files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
         if len(files) <= 2 * keep_results:
             return  # No need to delete any files
-        for old_file in files[2 * keep_results :]:
-            csv_file = old_file.with_suffix('.csv')
-            csv_file.unlink(missing_ok=True)
-            old_file.unlink()
+        for old_png_file in files[2 * keep_results :]:
+            stdata_file = old_png_file.with_suffix('.stdata')
+            stdata_file.unlink(missing_ok=True)
+            old_png_file.unlink()
 
 
 ######################################################################
@@ -585,7 +581,7 @@ def print_shaper_table(fig: plt.Figure, shaper_table_data: Dict[str, List[Dict[s
 
 
 def shaper_calibration(
-    lognames: List[str],
+    measurements: List[Measurement],
     klipperdir: str = '~/klipper',
     max_smoothing: Optional[float] = None,
     scv: float = 5.0,
@@ -593,15 +589,15 @@ def shaper_calibration(
     accel_per_hz: Optional[float] = None,
     st_version: str = 'unknown',
 ) -> plt.Figure:
+    if len(measurements) == 0:
+        raise ValueError('No valid data found in the provided measurements!')
+    if len(measurements) > 1:
+        ConsoleOutput.print('Warning: incorrect number of measurements detected. Only the first one will be used!')
+
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
-    # Parse data from the log files while ignoring CSV in the wrong format
-    datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
-    if len(datas) == 0:
-        raise ValueError('No valid data found in the provided CSV files!')
-    if len(datas) > 1:
-        ConsoleOutput.print('Warning: incorrect number of .csv files detected. Only the first one will be used!')
+    datas = [np.array(m['samples']) for m in measurements if m['samples'] is not None]
 
     # Compute shapers, PSD outputs and spectrogram
     klipper_shaper_choice, shapers, additional_shapers, calibration_data, fr, zeta, max_smoothing_computed, compat = (
@@ -656,9 +652,9 @@ def shaper_calibration(
         0.065, 0.965, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold'
     )
     try:
-        filename_parts = (lognames[0].split('/')[-1]).split('_')
-        dt = datetime.strptime(f'{filename_parts[1]} {filename_parts[2]}', '%Y%m%d %H%M%S')
-        title_line2 = dt.strftime('%x %X') + ' -- ' + filename_parts[3].upper().split('.')[0] + ' axis'
+        filename_parts = measurements[0]['name'].split('_')
+        dt = datetime.strptime(f'{filename_parts[2]} {filename_parts[3]}', '%Y%m%d %H%M%S')
+        title_line2 = dt.strftime('%x %X') + ' -- ' + filename_parts[1].upper() + ' axis'
         if compat:
             title_line3 = '| Older Klipper version detected, damping ratio'
             title_line4 = '| and SCV are not used for filter recommendations!'
@@ -671,8 +667,10 @@ def shaper_calibration(
             title_line4 = f'| Allowed smoothing: {max_smoothing_string}'
             title_line5 = f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz' if accel_per_hz is not None else ''
     except Exception:
-        ConsoleOutput.print(f'Warning: CSV filename look to be different than expected ({lognames[0]})')
-        title_line2 = lognames[0].split('/')[-1]
+        ConsoleOutput.print(
+            f'Warning: measurement names look to be different than expected ({measurements[0]["name"]})'
+        )
+        title_line2 = measurements[0]['name']
         title_line3 = ''
         title_line4 = ''
         title_line5 = ''
@@ -724,8 +722,22 @@ def main():
     if options.max_smoothing is not None and options.max_smoothing < 0.05:
         opts.error('Too small max_smoothing specified (must be at least 0.05)')
 
+    measurements_manager = MeasurementsManager()
+    if args[0].endswith('.csv'):
+        measurements_manager.load_from_csvs(args)
+    elif args[0].endswith('.stdata'):
+        measurements_manager.load_from_stdata(args[0])
+    else:
+        raise ValueError('Only .stdata or legacy Klipper raw accelerometer CSV files are supported!')
+
     fig = shaper_calibration(
-        args, options.klipperdir, options.max_smoothing, options.scv, options.max_freq, options.accel_per_hz, 'unknown'
+        measurements_manager.get_measurements(),
+        options.klipperdir,
+        options.max_smoothing,
+        options.scv,
+        options.max_freq,
+        options.accel_per_hz,
+        'unknown',
     )
     fig.savefig(options.output, dpi=150)
 

@@ -21,7 +21,8 @@ import numpy as np
 
 matplotlib.use('Agg')
 
-from ..helpers.common_func import compute_spectrogram, parse_log
+from ..helpers.accelerometer import Measurement, MeasurementsManager
+from ..helpers.common_func import compute_spectrogram
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_config import ShakeTuneConfig
 from .graph_creator import GraphCreator
@@ -52,17 +53,12 @@ class StaticGraphCreator(GraphCreator):
         self._duration = duration
         self._accel_per_hz = accel_per_hz
 
-    def create_graph(self) -> None:
+    def create_graph(self, measurements_manager: MeasurementsManager) -> None:
         if not self._freq or not self._duration or not self._accel_per_hz:
             raise ValueError('freq, duration and accel_per_hz must be set to create the static frequency graph!')
 
-        lognames = self._move_and_prepare_files(
-            glob_pattern='shaketune-staticfreq_*.csv',
-            min_files_required=1,
-            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
-        )
         fig = static_frequency_tool(
-            lognames=[str(path) for path in lognames],
+            measurements=measurements_manager.get_measurements(),
             klipperdir=str(self._config.klipper_folder),
             freq=self._freq,
             duration=self._duration,
@@ -70,16 +66,8 @@ class StaticGraphCreator(GraphCreator):
             accel_per_hz=self._accel_per_hz,
             st_version=self._version,
         )
-        self._save_figure_and_cleanup(fig, lognames, lognames[0].stem.split('_')[-1])
-
-    def clean_old_files(self, keep_results: int = 3) -> None:
-        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
-        if len(files) <= keep_results:
-            return  # No need to delete any files
-        for old_file in files[keep_results:]:
-            csv_file = old_file.with_suffix('.csv')
-            csv_file.unlink(missing_ok=True)
-            old_file.unlink()
+        axis_label = (measurements_manager.get_measurements())[0]['name'].split('_')[1]
+        self._save_figure(fig, measurements_manager, axis_label)
 
 
 ######################################################################
@@ -133,7 +121,7 @@ def plot_energy_accumulation(ax: plt.Axes, t: np.ndarray, bins: np.ndarray, pdat
 
 
 def static_frequency_tool(
-    lognames: List[str],
+    measurements: List[Measurement],
     klipperdir: str = '~/klipper',
     freq: Optional[float] = None,
     duration: Optional[float] = None,
@@ -144,11 +132,12 @@ def static_frequency_tool(
     if freq is None or duration is None:
         raise ValueError('Error: missing frequency or duration parameters!')
 
-    datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
-    if len(datas) == 0:
-        raise ValueError('No valid data found in the provided CSV files!')
-    if len(datas) > 1:
-        ConsoleOutput.print('Warning: incorrect number of .csv files detected. Only the first one will be used!')
+    if len(measurements) == 0:
+        raise ValueError('No valid data found in the provided measurements!')
+    if len(measurements) > 1:
+        ConsoleOutput.print('Warning: incorrect number of measurements detected. Only the first one will be used!')
+
+    datas = [np.array(m['samples']) for m in measurements if m['samples'] is not None]
 
     pdata, bins, t = compute_spectrogram(datas[0])
     del datas
@@ -173,14 +162,16 @@ def static_frequency_tool(
         0.060, 0.947, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold'
     )
     try:
-        filename_parts = (lognames[0].split('/')[-1]).split('_')
-        dt = datetime.strptime(f'{filename_parts[1]} {filename_parts[2]}', '%Y%m%d %H%M%S')
-        title_line2 = dt.strftime('%x %X') + ' -- ' + filename_parts[3].upper().split('.')[0] + ' axis'
+        filename_parts = measurements[0]['name'].split('_')
+        dt = datetime.strptime(f'{filename_parts[2]} {filename_parts[3]}', '%Y%m%d %H%M%S')
+        title_line2 = dt.strftime('%x %X') + ' -- ' + filename_parts[1].upper() + ' axis'
         title_line3 = f'| Maintained frequency: {freq}Hz for {duration}s'
         title_line4 = f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz' if accel_per_hz is not None else ''
     except Exception:
-        ConsoleOutput.print(f'Warning: CSV filename look to be different than expected ({lognames[0]})')
-        title_line2 = lognames[0].split('/')[-1]
+        ConsoleOutput.print(
+            f'Warning: measurement names look to be different than expected ({measurements[0]["name"]})'
+        )
+        title_line2 = measurements[0]['name']
         title_line3 = ''
         title_line4 = ''
     fig.text(0.060, 0.939, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
@@ -217,8 +208,22 @@ def main():
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
 
+    measurements_manager = MeasurementsManager()
+    if args[0].endswith('.csv'):
+        measurements_manager.load_from_csvs(args)
+    elif args[0].endswith('.stdata'):
+        measurements_manager.load_from_stdata(args[0])
+    else:
+        raise ValueError('Only .stdata or legacy Klipper raw accelerometer CSV files are supported!')
+
     fig = static_frequency_tool(
-        args, options.klipperdir, options.freq, options.duration, options.max_freq, options.accel_per_hz, 'unknown'
+        measurements_manager.get_measurements(),
+        options.klipperdir,
+        options.freq,
+        options.duration,
+        options.max_freq,
+        options.accel_per_hz,
+        'unknown',
     )
     fig.savefig(options.output, dpi=150)
 

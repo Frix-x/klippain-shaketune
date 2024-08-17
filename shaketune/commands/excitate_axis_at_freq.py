@@ -8,11 +8,11 @@
 #              and optionally creates a graph of the vibration data collected by the accelerometer.
 
 
+from ..helpers.accelerometer import Accelerometer, MeasurementsManager
 from ..helpers.common_func import AXIS_CONFIG
 from ..helpers.console_output import ConsoleOutput
 from ..helpers.resonance_test import vibrate_axis_at_static_freq
 from ..shaketune_process import ShakeTuneProcess
-from .accelerometer import Accelerometer
 
 
 def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
@@ -41,7 +41,8 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
         k_accelerometer = printer.lookup_object(accel_chip, None)
         if k_accelerometer is None:
             raise gcmd.error(f'Accelerometer chip [{accel_chip}] was not found!')
-        accelerometer = Accelerometer(printer.get_reactor(), k_accelerometer)
+        accelerometer = Accelerometer(k_accelerometer)
+        measurements_manager = MeasurementsManager()
 
     ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq}Hz for {duration} seconds')
 
@@ -87,7 +88,7 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
 
     # If the user want to create a graph, we start accelerometer recording
     if create_graph:
-        accelerometer.start_measurement()
+        accelerometer.start_recording(measurements_manager, name=f'staticfreq_{axis.upper()}', append_time=True)
 
     toolhead.dwell(0.5)
     vibrate_axis_at_static_freq(toolhead, gcode, axis_config['direction'], freq, duration, accel_per_hz)
@@ -99,11 +100,10 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
 
     # If the user wanted to create a graph, we stop the recording and generate it
     if create_graph:
-        accelerometer.stop_measurement(f'staticfreq_{axis.upper()}', append_time=True)
+        accelerometer.stop_recording()
         toolhead.dwell(0.5)
-        accelerometer.wait_for_file_writes()
 
         creator = st_process.get_graph_creator()
         creator.configure(freq, duration, accel_per_hz)
-        st_process.run()
+        st_process.run(measurements_manager)
         st_process.wait_for_completion()

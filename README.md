@@ -21,16 +21,17 @@ Follow these steps to install Shake&Tune on your printer:
      # result_folder: ~/printer_data/config/ShakeTune_results
      #    The folder where the results will be stored. It will be created if it doesn't exist.
      # number_of_results_to_keep: 3
-     #    The number of results to keep in the result_folder. The oldest results will
+     #    The number of results to keep in the result folder. The oldest results will
      #    be automatically deleted after each runs.
-     # keep_raw_csv: False
-     #    If True, the raw CSV files will be kept in the result_folder alongside the
-     #    PNG graphs. If False, they will be deleted and only the graphs will be kept.
+     # keep_raw_data: False
+     #    If True, the raw data files will be kept in the result folder alongside the
+     #    PNG graphs for archive and debbuging purposes. Please attach them on GitHub when
+     #    reporting any issue to help understand and solve them.
      # show_macros_in_webui: True
      #    Mainsail and Fluidd doesn't create buttons for "system" macros that are not in the
      #    printer.cfg file. If you want to see the macros in the webui, set this to True.
      # timeout: 600
-     #    The maximum time in seconds to let Shake&Tune process the CSV files and generate the graphs.
+     #    The maximum time in seconds to let Shake&Tune process the data and generate the graphs.
      ```
 
 Don't forget to check out **[Shake&Tune documentation here](./docs/README.md)**.

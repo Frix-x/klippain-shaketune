@@ -12,10 +12,7 @@ import math
 import optparse
 import os
 import re
-import tarfile
-from collections import defaultdict
 from datetime import datetime
-from pathlib import Path
 from typing import List, Optional, Tuple
 
 import matplotlib
@@ -27,11 +24,11 @@ import numpy as np
 
 matplotlib.use('Agg')
 
+from ..helpers.accelerometer import Measurement, MeasurementsManager
 from ..helpers.common_func import (
     compute_mechanical_parameters,
     detect_peaks,
     identify_low_energy_zones,
-    parse_log,
     setup_klipper_import,
 )
 from ..helpers.console_output import ConsoleOutput
@@ -67,40 +64,19 @@ class VibrationsGraphCreator(GraphCreator):
         self._accel = accel
         self._motors: List[Motor] = motor_config_parser.get_motors()
 
-    def _archive_files(self, lognames: List[Path]) -> None:
-        tar_path = self._folder / f'{self._type}_{self._graph_date}.tar.gz'
-        with tarfile.open(tar_path, 'w:gz') as tar:
-            for csv_file in lognames:
-                tar.add(csv_file, arcname=csv_file.name, recursive=False)
-                csv_file.unlink()
-
-    def create_graph(self) -> None:
+    def create_graph(self, measurements_manager: MeasurementsManager) -> None:
         if not self._accel or not self._kinematics:
             raise ValueError('accel and kinematics must be set to create the vibrations profile graph!')
 
-        lognames = self._move_and_prepare_files(
-            glob_pattern='shaketune-vib_*.csv',
-            min_files_required=None,
-            custom_name_func=lambda f: re.search(r'shaketune-vib_(.*?)_\d{8}_\d{6}', f.name).group(1),
-        )
         fig = vibrations_profile(
-            lognames=[str(path) for path in lognames],
+            measurements=measurements_manager.get_measurements(),
             klipperdir=str(self._config.klipper_folder),
             kinematics=self._kinematics,
             accel=self._accel,
             st_version=self._version,
             motors=self._motors,
         )
-        self._save_figure_and_cleanup(fig, lognames)
-
-    def clean_old_files(self, keep_results: int = 3) -> None:
-        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
-        if len(files) <= keep_results:
-            return  # No need to delete any files
-        for old_file in files[keep_results:]:
-            old_file.unlink()
-            tar_file = old_file.with_suffix('.tar.gz')
-            tar_file.unlink(missing_ok=True)
+        self._save_figure(fig, measurements_manager)
 
 
 ######################################################################
@@ -720,7 +696,7 @@ def extract_angle_and_speed(logname: str) -> Tuple[float, float]:
 
 
 def vibrations_profile(
-    lognames: List[str],
+    measurements: List[Measurement],
     klipperdir: str = '~/klipper',
     kinematics: str = 'cartesian',
     accel: Optional[float] = None,
@@ -738,15 +714,17 @@ def vibrations_profile(
     else:
         raise ValueError('Only Cartesian, CoreXY and CoreXZ kinematics are supported by this tool at the moment!')
 
-    psds = defaultdict(lambda: defaultdict(list))
-    psds_sum = defaultdict(lambda: defaultdict(list))
+    psds = {}
+    psds_sum = {}
     target_freqs_initialized = False
+    target_freqs = None
 
-    for logname in lognames:
-        data = parse_log(logname)
+    for measurement in measurements:
+        data = np.array(measurement['samples'])
         if data is None:
-            continue  # File is not in the expected format, skip it
-        angle, speed = extract_angle_and_speed(logname)
+            continue  # Measurement data is not in the expected format or is empty, skip it
+
+        angle, speed = extract_angle_and_speed(measurement['name'])
         freq_response = calc_freq_response(data)
         first_freqs = freq_response.freq_bins
         psd_sum = freq_response.psd_sum
@@ -757,6 +735,11 @@ def vibrations_profile(
 
         psd_sum = psd_sum[first_freqs <= max_freq]
         first_freqs = first_freqs[first_freqs <= max_freq]
+
+        # Initialize the angle dictionary if it doesn't exist
+        if angle not in psds:
+            psds[angle] = {}
+            psds_sum[angle] = {}
 
         # Store the interpolated PSD and integral values
         psds[angle][speed] = np.interp(target_freqs, first_freqs, psd_sum)
@@ -849,14 +832,16 @@ def vibrations_profile(
         0.060, 0.965, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold'
     )
     try:
-        filename_parts = (lognames[0].split('/')[-1]).split('_')
-        dt = datetime.strptime(f"{filename_parts[1]} {filename_parts[2].split('-')[0]}", '%Y%m%d %H%M%S')
+        filename_parts = measurements[0]['name'].split('_')
+        dt = datetime.strptime(f"{filename_parts[4]} {filename_parts[5].split('-')[0]}", '%Y%m%d %H%M%S')
         title_line2 = dt.strftime('%x %X')
         if accel is not None:
             title_line2 += ' at ' + str(accel) + ' mm/s² -- ' + kinematics.upper() + ' kinematics'
     except Exception:
-        ConsoleOutput.print(f'Warning: CSV filenames appear to be different than expected ({lognames[0]})')
-        title_line2 = lognames[0].split('/')[-1]
+        ConsoleOutput.print(
+            f'Warning: measurement names look to be different than expected ({measurements[0]["name"]})'
+        )
+        title_line2 = measurements[0]['name']
     fig.text(0.060, 0.957, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     # Add the motors infos to the top of the graph
@@ -920,13 +905,27 @@ def main():
     )
     options, args = opts.parse_args()
     if len(args) < 1:
-        opts.error('No CSV file(s) to analyse')
+        opts.error('No measurements to analyse')
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
     if options.kinematics not in {'cartesian', 'corexy', 'corexz'}:
         opts.error('Only cartesian, corexy and corexz kinematics are supported by this tool at the moment!')
 
-    fig = vibrations_profile(args, options.klipperdir, options.kinematics, options.accel, options.max_freq)
+    measurements_manager = MeasurementsManager()
+    if args[0].endswith('.csv'):
+        measurements_manager.load_from_csvs(args)
+    elif args[0].endswith('.stdata'):
+        measurements_manager.load_from_stdata(args[0])
+    else:
+        raise ValueError('Only .stdata or legacy Klipper raw accelerometer CSV files are supported!')
+
+    fig = vibrations_profile(
+        measurements_manager.get_measurements(),
+        options.klipperdir,
+        options.kinematics,
+        options.accel,
+        options.max_freq,
+    )
     fig.savefig(options.output, dpi=150)
 
 

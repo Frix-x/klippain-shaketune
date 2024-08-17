@@ -23,7 +23,8 @@ from scipy.stats import pearsonr
 
 matplotlib.use('Agg')
 
-from ..helpers.common_func import detect_peaks, parse_log, setup_klipper_import
+from ..helpers.accelerometer import Measurement, MeasurementsManager
+from ..helpers.common_func import detect_peaks, setup_klipper_import
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_config import ShakeTuneConfig
 from .graph_creator import GraphCreator
@@ -71,31 +72,15 @@ class BeltsGraphCreator(GraphCreator):
         self._kinematics = kinematics
         self._accel_per_hz = accel_per_hz
 
-    def create_graph(self) -> None:
-        lognames = self._move_and_prepare_files(
-            glob_pattern='shaketune-belt_*.csv',
-            min_files_required=2,
-            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
-        )
+    def create_graph(self, measurements_manager: MeasurementsManager) -> None:
         fig = belts_calibration(
-            lognames=[str(path) for path in lognames],
+            measurements=measurements_manager.get_measurements(),
             kinematics=self._kinematics,
             klipperdir=str(self._config.klipper_folder),
             accel_per_hz=self._accel_per_hz,
             st_version=self._version,
         )
-        self._save_figure_and_cleanup(fig, lognames)
-
-    def clean_old_files(self, keep_results: int = 3) -> None:
-        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
-        if len(files) <= keep_results:
-            return  # No need to delete any files
-        for old_file in files[keep_results:]:
-            file_date = '_'.join(old_file.stem.split('_')[1:3])
-            for suffix in {'A', 'B'}:
-                csv_file = self._folder / f'beltscomparison_{file_date}_{suffix}.csv'
-                csv_file.unlink(missing_ok=True)
-            old_file.unlink()
+        self._save_figure(fig, measurements_manager)
 
 
 ######################################################################
@@ -486,25 +471,25 @@ def compute_signal_data(data: np.ndarray, common_freqs: np.ndarray, max_freq: fl
 
 
 def belts_calibration(
-    lognames: List[str],
+    measurements: List[Measurement],
     kinematics: Optional[str],
     klipperdir: str = '~/klipper',
     max_freq: float = 200.0,
     accel_per_hz: Optional[float] = None,
     st_version: str = 'unknown',
 ) -> plt.Figure:
+    if len(measurements) != 2:
+        raise ValueError('This tool needs 2 measurements to work with (one for each belt)!')
+
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
-    # Parse data from the log files while ignoring CSV in the wrong format
-    datas = [data for data in (parse_log(fn) for fn in lognames) if data is not None]
-    if len(datas) != 2:
-        raise ValueError('Incorrect number of .csv files used (this function needs exactly two files to compare them)!')
+    datas = [np.array(m['samples']) for m in measurements if m['samples'] is not None]
 
     # Get the belts name for the legend to avoid putting the full file name
     belt_info = {'A': ' (axis 1,-1)', 'B': ' (axis 1, 1)'}
-    signal1_belt = (lognames[0].split('/')[-1]).split('_')[-1][0]
-    signal2_belt = (lognames[1].split('/')[-1]).split('_')[-1][0]
+    signal1_belt = measurements[0]['name'].split('_')[1]
+    signal2_belt = measurements[1]['name'].split('_')[1]
     signal1_belt += belt_info.get(signal1_belt, '')
     signal2_belt += belt_info.get(signal2_belt, '')
 
@@ -550,14 +535,17 @@ def belts_calibration(
         0.060, 0.947, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold'
     )
     try:
-        filename = lognames[0].split('/')[-1]
-        dt = datetime.strptime(f"{filename.split('_')[1]} {filename.split('_')[2]}", '%Y%m%d %H%M%S')
+        filename = measurements[0]['name']
+        dt = datetime.strptime(f"{filename.split('_')[2]} {filename.split('_')[3]}", '%Y%m%d %H%M%S')
         title_line2 = dt.strftime('%x %X')
         if kinematics is not None:
             title_line2 += ' -- ' + kinematics.upper() + ' kinematics'
     except Exception:
-        ConsoleOutput.print(f'Warning: Unable to parse the date from the filename ({lognames[0]}, {lognames[1]})')
-        title_line2 = lognames[0].split('/')[-1] + ' / ' + lognames[1].split('/')[-1]
+        ConsoleOutput.print(
+            f'Warning: Unable to parse the date from the measurements names '
+            f"({measurements[0]['name']}, {measurements[1]['name']})"
+        )
+        title_line2 = measurements[0]['name'] + ' / ' + measurements[1]['name']
     fig.text(0.060, 0.939, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     # We add the estimated similarity and the MHI value to the title only if the kinematics is CoreXY
@@ -611,8 +599,21 @@ def main():
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
 
+    measurements_manager = MeasurementsManager()
+    if args[0].endswith('.csv'):
+        measurements_manager.load_from_csvs(args)
+    elif args[0].endswith('.stdata'):
+        measurements_manager.load_from_stdata(args[0])
+    else:
+        raise ValueError('Only .stdata or legacy Klipper raw accelerometer CSV files are supported!')
+
     fig = belts_calibration(
-        args, options.kinematics, options.klipperdir, options.max_freq, options.accel_per_hz, 'unknown'
+        measurements_manager.get_measurements(),
+        options.kinematics,
+        options.klipperdir,
+        options.max_freq,
+        options.accel_per_hz,
+        'unknown',
     )
     fig.savefig(options.output, dpi=150)
 
