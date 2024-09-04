@@ -562,7 +562,7 @@ def belts_calibration(
 
     # We add the estimated similarity and the MHI value to the title only if the kinematics is CoreXY
     # as it make no sense to compute these values for other kinematics that doesn't have paired belts
-    if kinematics in {'corexy', 'corexz'}:
+    if kinematics in {'limited_corexy', 'corexy', 'limited_corexz', 'corexz'}:
         title_line3 = f'| Estimated similarity: {similarity_factor:.1f}%'
         title_line4 = f'| {mhi} (experimental)'
         fig.text(0.55, 0.985, title_line3, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
