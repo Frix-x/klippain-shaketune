@@ -3,7 +3,7 @@
 USER_CONFIG_PATH="${HOME}/printer_data/config"
 MOONRAKER_CONFIG="${HOME}/printer_data/config/moonraker.conf"
 KLIPPER_PATH="${HOME}/klipper"
-KLIPPER_VENV_PATH="${HOME}/klippy-env"
+KLIPPER_VENV_PATH="${KLIPPER_VENV:-${HOME}/klippy-env}"
 
 OLD_K_SHAKETUNE_VENV="${HOME}/klippain_shaketune-env"
 K_SHAKETUNE_PATH="${HOME}/klippain_shaketune"
