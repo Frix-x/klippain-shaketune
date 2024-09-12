@@ -190,10 +190,10 @@ def compute_dir_speed_spectrogram(
     # Compute the spectrum vibrations for each angle and speed combination
     for target_angle_idx, (cos_val, sin_val) in enumerate(zip(cos_vals, sin_vals)):
         for target_speed_idx, target_speed in enumerate(spectrum_speeds):
-            if kinematics == 'cartesian' or kinematics == 'corexz':
+            if kinematics in {'cartesian', 'limited_cartesian', 'corexz', 'limited_corexz'}:
                 speed_1 = np.abs(target_speed * cos_val)
                 speed_2 = np.abs(target_speed * sin_val)
-            elif kinematics == 'corexy':
+            elif kinematics in {'corexy', 'limited_corexy'}:
                 speed_1 = np.abs(target_speed * (cos_val + sin_val) * sqrt_2_inv)
                 speed_2 = np.abs(target_speed * (cos_val - sin_val) * sqrt_2_inv)
 
@@ -475,8 +475,8 @@ def plot_angular_speed_profiles(
     angle_settings = {
         0: ('X (0 deg)', 'purple', 10),
         90: ('Y (90 deg)', 'dark_purple', 5),
-        45: ('A (45 deg)' if kinematics == 'corexy' else '45 deg', 'orange', 10),
-        135: ('B (135 deg)' if kinematics == 'corexy' else '135 deg', 'dark_orange', 5),
+        45: ('A (45 deg)' if kinematics in {'corexy', 'limited_corexy'} else '45 deg', 'orange', 10),
+        135: ('B (135 deg)' if kinematics in {'corexy', 'limited_corexy'} else '135 deg', 'dark_orange', 5),
     }
 
     # Plot each angle using settings from the dictionary
@@ -731,9 +731,9 @@ def vibrations_profile(
     global shaper_calibrate
     shaper_calibrate = setup_klipper_import(klipperdir)
 
-    if kinematics == 'cartesian' or kinematics == 'corexz':
+    if kinematics in {'cartesian', 'limited_cartesian', 'corexz', 'limited_corexz'}:
         main_angles = [0, 90]
-    elif kinematics == 'corexy':
+    elif kinematics in {'corexy', 'limited_corexy'}:
         main_angles = [45, 135]
     else:
         raise ValueError('Only Cartesian, CoreXY and CoreXZ kinematics are supported by this tool at the moment!')
@@ -863,7 +863,7 @@ def vibrations_profile(
     if motors is not None and len(motors) == 2:
         differences = motors[0].compare_to(motors[1])
         plot_motor_config_txt(fig, motors, differences)
-        if differences is not None and kinematics == 'corexy':
+        if differences is not None and kinematics in {'corexy', 'limited_corexy'}: 
             ConsoleOutput.print(f'Warning: motors have different TMC configurations!\n{differences}')
 
     # Plot the graphs
@@ -923,8 +923,8 @@ def main():
         opts.error('No CSV file(s) to analyse')
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
-    if options.kinematics not in {'cartesian', 'corexy', 'corexz'}:
-        opts.error('Only cartesian, corexy and corexz kinematics are supported by this tool at the moment!')
+    if options.kinematics not in {'cartesian', 'limited_cartesian', 'corexy', 'limited_corexy', 'corexz', 'limited_corexz'}:
+        opts.error('Only cartesian, limited_cartesian, corexy, limited_corexy, corexz, limited_corexz kinematics are supported by this tool at the moment!')
 
     fig = vibrations_profile(args, options.klipperdir, options.kinematics, options.accel, options.max_freq)
     fig.savefig(options.output, dpi=150)

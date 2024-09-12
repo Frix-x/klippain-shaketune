@@ -45,15 +45,15 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     creator = st_process.get_graph_creator()
     creator.configure(motors_config_parser.kinematics, accel_per_hz)
 
-    if motors_config_parser.kinematics == 'corexy':
+    if motors_config_parser.kinematics in {'corexy', 'limited_corexy'}:
         filtered_config = [a for a in AXIS_CONFIG if a['axis'] in ('a', 'b')]
         accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy')
-    elif motors_config_parser.kinematics == 'corexz':
+    elif motors_config_parser.kinematics in {'corexz', 'limited_corexz'}:
         filtered_config = [a for a in AXIS_CONFIG if a['axis'] in ('corexz_x', 'corexz_z')]
         # For CoreXZ kinematics, we can use the X axis accelerometer as most of the time they are moving bed printers
         accel_chip = Accelerometer.find_axis_accelerometer(printer, 'x')
     else:
-        raise gcmd.error('Only CoreXY and CoreXZ kinematics are supported for the belt comparison tool!')
+        raise gcmd.error(f'CoreXY and CoreXZ kinematics required, {motors_config_parser.kinematics} found')
     ConsoleOutput.print(f'{motors_config_parser.kinematics.upper()} kinematics mode')
 
     if accel_chip is None:

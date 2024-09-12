@@ -211,8 +211,8 @@ def plot_compare_frequency(
     ax: plt.Axes, signal1: SignalData, signal2: SignalData, signal1_belt: str, signal2_belt: str, max_freq: float
 ) -> None:
     # Plot the two belts PSD signals
-    ax.plot(signal1.freqs, signal1.psd, label='Belt ' + signal1_belt, color=KLIPPAIN_COLORS['purple'])
-    ax.plot(signal2.freqs, signal2.psd, label='Belt ' + signal2_belt, color=KLIPPAIN_COLORS['orange'])
+    ax.plot(signal1.freqs, signal1.psd, label='Belt ' + signal1_belt, color=KLIPPAIN_COLORS['orange'])
+    ax.plot(signal2.freqs, signal2.psd, label='Belt ' + signal2_belt, color=KLIPPAIN_COLORS['purple'])
 
     psd_highest_max = max(signal1.psd.max(), signal2.psd.max())
 
@@ -562,7 +562,7 @@ def belts_calibration(
 
     # We add the estimated similarity and the MHI value to the title only if the kinematics is CoreXY
     # as it make no sense to compute these values for other kinematics that doesn't have paired belts
-    if kinematics in {'corexy', 'corexz'}:
+    if kinematics in {'limited_corexy', 'corexy', 'limited_corexz', 'corexz'}:
         title_line3 = f'| Estimated similarity: {similarity_factor:.1f}%'
         title_line4 = f'| {mhi} (experimental)'
         fig.text(0.55, 0.985, title_line3, ha='left', va='top', fontsize=14, color=KLIPPAIN_COLORS['dark_purple'])
