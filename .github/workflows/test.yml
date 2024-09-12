@@ -13,7 +13,18 @@ jobs:
         klipper_repo:
           - klipper3d/klipper
           - DangerKlippers/danger-klipper
+        klipper_version:
+          - master
+          - v0.12.0
+        python_version:
+          - '3.9' # Debian Bullseye default
+          - '3.11' # Debian Bookworm default
+          # Below disabled - Greenlet upstream version not compatable with py 3.12
+          # - '3.12' # Latest Released as of 2024/9
     steps: 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
       - name: Checkout shaketune
         uses: actions/checkout@v4
         with:
@@ -23,7 +34,7 @@ jobs:
         with:
           path: klipper
           repository: ${{ matrix.klipper_repo }}
-          ref: master
+          ref: ${{ matrix.klipper_version }}
       - name: Install build dependencies
         run: |
           sudo apt-get update
