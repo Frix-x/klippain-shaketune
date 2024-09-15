@@ -137,6 +137,11 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
             accelerometer.stop_recording()
             accelerometer.wait_for_samples()
 
+            # For this command, we need to wait for the data transfers after finishing each of
+            # the measurements as there is a high probability to have a lot of measurements in
+            # the measurement manager and that chunks are written into the /tmp filesystem folder
+            measurements_manager.wait_for_data_transfers(printer.get_reactor())
+
             toolhead.dwell(0.3)
             toolhead.wait_moves()
 

@@ -113,5 +113,6 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     ConsoleOutput.print('This may take some time (1-3min)')
     creator = st_process.get_graph_creator()
     creator.configure(accel, SEGMENT_LENGTH)
+    measurements_manager.wait_for_data_transfers(printer.get_reactor())
     st_process.run(measurements_manager)
     st_process.wait_for_completion()
