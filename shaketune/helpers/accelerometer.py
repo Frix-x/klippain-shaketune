@@ -124,7 +124,7 @@ class MeasurementsManager:
 
         return self.measurements
 
-    def wait_for_file_writes(self, k_reactor, timeout: int = 20):
+    def wait_for_file_writes(self, k_reactor, timeout: int = 30):
         if self._write_process is None:
             return  # No file write is pending
 
@@ -140,7 +140,7 @@ class MeasurementsManager:
 
         if not complete:
             raise TimeoutError(
-                'Shake&Tune was unable to write the accelerometer data into the archive file. '
+                'Shake&Tune was unable to write the accelerometer data into the .STDATA file. '
                 'This might be due to a slow SD card or a busy or full filesystem.'
             )
 
@@ -148,10 +148,13 @@ class MeasurementsManager:
 
 
 class Accelerometer:
-    def __init__(self, klipper_accelerometer):
+    def __init__(self, klipper_accelerometer, k_reactor):
         self._k_accelerometer = klipper_accelerometer
+        self._k_reactor = k_reactor
         self._bg_client = None
         self._measurements_manager: MeasurementsManager = None
+        self._samples_ready = False
+        self._sample_error = None
 
     @staticmethod
     def find_axis_accelerometer(printer, axis: str = 'xy'):
@@ -186,13 +189,39 @@ class Accelerometer:
             ConsoleOutput.print('Warning: no recording to stop!')
             return None
 
-        bg_client = self._bg_client
-        self._bg_client = None
-        bg_client.finish_measurements()
+        # Register a callback in Klipper's reactor to finish the measurements and get the
+        # samples when Klipper is ready to process them (and without blocking its main thread)
+        self._k_reactor.register_callback(self._finish_and_get_samples)
 
-        samples = bg_client.samples or bg_client.get_samples()
-        self._measurements_manager.append_samples_to_last_measurement(samples)
-        m_manager = self._measurements_manager
-        self._measurements_manager = None
+        return self._measurements_manager
 
-        return m_manager
+    def _finish_and_get_samples(self, bg_client):
+        try:
+            self._bg_client.finish_measurements()
+            samples = self._bg_client.samples or self._bg_client.get_samples()
+            self._measurements_manager.append_samples_to_last_measurement(samples)
+            self._samples_ready = True
+        except Exception as e:
+            ConsoleOutput.print(f'Error during accelerometer data retrieval: {e}')
+            self._sample_error = e
+        finally:
+            self._bg_client = None
+
+    def wait_for_samples(self, timeout: int = 60):
+        eventtime = self._k_reactor.monotonic()
+        endtime = eventtime + timeout
+
+        while eventtime < endtime:
+            eventtime = self._k_reactor.pause(eventtime + 0.05)
+            if self._samples_ready:
+                break
+            if self._sample_error:
+                raise self._sample_error
+
+        if not self._samples_ready:
+            raise TimeoutError(
+                'Shake&Tune was unable to retrieve accelerometer data in time. '
+                'This might be due to slow hardware or a busy system.'
+            )
+
+        self._samples_ready = False

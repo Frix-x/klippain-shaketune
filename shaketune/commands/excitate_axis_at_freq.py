@@ -41,7 +41,7 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
         k_accelerometer = printer.lookup_object(accel_chip, None)
         if k_accelerometer is None:
             raise gcmd.error(f'Accelerometer chip [{accel_chip}] was not found!')
-        accelerometer = Accelerometer(k_accelerometer)
+        accelerometer = Accelerometer(k_accelerometer, printer.get_reactor())
         measurements_manager = MeasurementsManager()
 
     ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq}Hz for {duration} seconds')
@@ -101,6 +101,7 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # If the user wanted to create a graph, we stop the recording and generate it
     if create_graph:
         accelerometer.stop_recording()
+        accelerometer.wait_for_samples()
         toolhead.dwell(0.5)
 
         creator = st_process.get_graph_creator()

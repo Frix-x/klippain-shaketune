@@ -103,13 +103,14 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         accel_chip = Accelerometer.find_axis_accelerometer(printer, config['axis'])
         if accel_chip is None:
             raise gcmd.error('No suitable accelerometer found for measurement!')
-        accelerometer = Accelerometer(printer.lookup_object(accel_chip))
+        accelerometer = Accelerometer(printer.lookup_object(accel_chip), printer.get_reactor())
 
         # Then do the actual measurements
         ConsoleOutput.print(f'Measuring {config["label"]}...')
         accelerometer.start_recording(measurements_manager, name=config['label'], append_time=True)
         vibrate_axis(toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz)
         accelerometer.stop_recording()
+        accelerometer.wait_for_samples()
         toolhead.dwell(0.5)
         toolhead.wait_moves()
 

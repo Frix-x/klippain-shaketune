@@ -60,7 +60,7 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
         raise gcmd.error(
             'No suitable accelerometer found for measurement! Multi-accelerometer configurations are not supported for this macro.'
         )
-    accelerometer = Accelerometer(printer.lookup_object(accel_chip))
+    accelerometer = Accelerometer(printer.lookup_object(accel_chip), printer.get_reactor())
 
     # Move to the starting point
     test_points = res_tester.test.get_start_test_points()
@@ -111,6 +111,7 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
         accelerometer.start_recording(measurements_manager, name=config['label'], append_time=True)
         vibrate_axis(toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz)
         accelerometer.stop_recording()
+        accelerometer.wait_for_samples()
         toolhead.dwell(0.5)
         toolhead.wait_moves()
 
