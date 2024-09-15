@@ -14,6 +14,7 @@
 import os
 import pickle
 import time
+import uuid
 from multiprocessing import Process
 from pathlib import Path
 from typing import List, Tuple, TypedDict
@@ -26,6 +27,8 @@ from ..helpers.console_output import ConsoleOutput
 Sample = Tuple[float, float, float, float]
 SamplesList = List[Sample]
 
+CHUNK_SIZE = 15  # Maximum number of measurements to keep in memory at once
+
 
 class Measurement(TypedDict):
     name: str
@@ -35,14 +38,17 @@ class Measurement(TypedDict):
 class MeasurementsManager:
     def __init__(self):
         self.measurements: List[Measurement] = []
-        self._write_process = None
+        self._uuid = str(uuid.uuid4())[:8]
+        self._temp_dir = Path(f'/tmp/shaketune_{self._uuid}')
+        self._temp_dir.mkdir(parents=True, exist_ok=True)
+        self._chunk_files = []
+        self._write_processes = []
 
-    def add_measurement(self, name: str, samples: SamplesList = None):
-        samples = samples if samples is not None else []
-        self.measurements.append({'name': name, 'samples': samples})
-
-    def get_measurements(self) -> List[Measurement]:
-        return self.measurements
+    def clear_measurements(self, keep_last: bool = False):
+        if keep_last:
+            self.measurements = [self.measurements[-1]]
+        else:
+            self.measurements = []
 
     def append_samples_to_last_measurement(self, additional_samples: SamplesList):
         try:
@@ -50,15 +56,55 @@ class MeasurementsManager:
         except IndexError as err:
             raise ValueError('no measurements available to append samples to.') from err
 
-    def clear_measurements(self):
-        self.measurements = []
+    def add_measurement(self, name: str, samples: SamplesList = None):
+        samples = samples if samples is not None else []
+        self.measurements.append({'name': name, 'samples': samples})
+        if len(self.measurements) > CHUNK_SIZE:
+            self._save_chunk()
+
+    def _save_chunk(self):
+        # Save the measurements to the chunk file. We keep the last measurement
+        # in memory to be able to append new samples to it later if needed
+        chunk_filename = self._temp_dir / f'{self._uuid}_{len(self._chunk_files)}.stchunk'
+        process = Process(target=self._save_to_file, args=(chunk_filename, self.measurements[:-1].copy()))
+        process.daemon = False
+        process.start()
+        self._write_processes.append(process)
+        self._chunk_files.append(chunk_filename)
+        self.clear_measurements(keep_last=True)
 
     def save_stdata(self, filename: Path):
-        self._write_process = Process(target=self._save_to_file, args=(filename,))
-        self._write_process.daemon = False
-        self._write_process.start()
+        process = Process(target=self._reassemble_chunks, args=(filename,))
+        process.daemon = False
+        process.start()
+        self._write_processes.append(process)
 
-    def _save_to_file(self, filename: Path):
+    def _reassemble_chunks(self, filename: Path):
+        try:
+            os.nice(19)
+        except Exception:
+            pass  # Ignore errors as it's not critical
+        try:
+            all_measurements = []
+            for chunk_file in self._chunk_files:
+                chunk_measurements = self._load_measurements_from_file(chunk_file)
+                all_measurements.extend(chunk_measurements)
+                os.remove(chunk_file)  # Remove the chunk file after reading
+
+            # Include any remaining measurements in memory
+            if self.measurements:
+                all_measurements.extend(self.measurements)
+
+            # Save all measurements to the final .stdata file
+            self._save_to_file(filename, all_measurements)
+
+            # Clean up
+            self.clear_measurements()
+            self._chunk_files = []
+        except Exception as e:
+            ConsoleOutput.print(f'Warning: unable to assemble chunks into {filename}: {e}')
+
+    def _save_to_file(self, filename: Path, measurements: List[Measurement]):
         try:
             os.nice(19)
         except Exception:
@@ -67,15 +113,54 @@ class MeasurementsManager:
             with open(filename, 'wb') as f:
                 cctx = zstd.ZstdCompressor(level=3)
                 with cctx.stream_writer(f) as compressor:
-                    pickle.dump(self.measurements, compressor)
+                    pickle.dump(measurements, compressor)
         except Exception as e:
-            ConsoleOutput.print(f'Warning: unable to save the measurements to {filename}: {e}')
+            ConsoleOutput.print(f'Warning: unable to save the data to {filename}: {e}')
+
+    def wait_for_data_transfers(self, k_reactor, timeout: int = 30):
+        if not self._write_processes:
+            return  # No file write is pending
+
+        eventtime = k_reactor.monotonic()
+        endtime = eventtime + timeout
+        complete = False
+
+        while eventtime < endtime:
+            eventtime = k_reactor.pause(eventtime + 0.05)
+            if all(not p.is_alive() for p in self._write_processes):
+                complete = True
+                break
+
+        if not complete:
+            raise TimeoutError(
+                'Shake&Tune was unable to write the accelerometer data on the fylesystem. '
+                'This might be due to a slow, busy or full SD card.'
+            )
+
+        self._write_processes = []
+
+    def _load_measurements_from_file(self, filename: Path) -> List[Measurement]:
+        try:
+            with open(filename, 'rb') as f:
+                dctx = zstd.ZstdDecompressor()
+                with dctx.stream_reader(f) as decompressor:
+                    measurements = pickle.load(decompressor)
+            return measurements
+        except Exception as e:
+            ConsoleOutput.print(f'Warning: unable to load measurements from {filename}: {e}')
+            return []
+
+    def get_measurements(self) -> List[Measurement]:
+        all_measurements = []
+        for chunk_file in self._chunk_files:
+            chunk_measurements = self._load_measurements_from_file(chunk_file)
+            all_measurements.extend(chunk_measurements)
+        all_measurements.extend(self.measurements)  # Include any remaining measurements in memory
+
+        return all_measurements
 
     def load_from_stdata(self, filename: Path) -> List[Measurement]:
-        with open(filename, 'rb') as f:
-            dctx = zstd.ZstdDecompressor()
-            with dctx.stream_reader(f) as decompressor:
-                self.measurements = pickle.load(decompressor)
+        self.measurements = self._load_measurements_from_file(filename)
         return self.measurements
 
     def load_from_csvs(self, klipper_CSVs: List[Path]) -> List[Measurement]:
@@ -124,27 +209,14 @@ class MeasurementsManager:
 
         return self.measurements
 
-    def wait_for_file_writes(self, k_reactor, timeout: int = 30):
-        if self._write_process is None:
-            return  # No file write is pending
-
-        eventtime = k_reactor.monotonic()
-        endtime = eventtime + timeout
-        complete = False
-
-        while eventtime < endtime:
-            eventtime = k_reactor.pause(eventtime + 0.05)
-            if not self._write_process.is_alive():
-                complete = True
-                break
-
-        if not complete:
-            raise TimeoutError(
-                'Shake&Tune was unable to write the accelerometer data into the .STDATA file. '
-                'This might be due to a slow SD card or a busy or full filesystem.'
-            )
-
-        self._write_process = None
+    def __del__(self):
+        try:
+            if self._temp_dir.exists():
+                for chunk_file in self._temp_dir.glob('*.stchunk'):
+                    chunk_file.unlink()
+                self._temp_dir.rmdir()
+        except Exception:
+            pass  # Ignore errors during cleanup
 
 
 class Accelerometer:

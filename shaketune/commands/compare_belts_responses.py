@@ -128,5 +128,6 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # Run post-processing
     ConsoleOutput.print('Belts comparative frequency profile generation...')
     ConsoleOutput.print('This may take some time (1-3min)')
+    measurements_manager.wait_for_data_transfers(printer.get_reactor())
     st_process.run(measurements_manager)
     st_process.wait_for_completion()

@@ -90,14 +90,12 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     else:
         input_shaper = None
 
-    measurements_manager = MeasurementsManager()
-
     # Filter axis configurations based on user input, assuming 'axis_input' can be 'x', 'y', 'all' (that means 'x' and 'y')
     filtered_config = [
         a for a in AXIS_CONFIG if a['axis'] == axis_input or (axis_input == 'all' and a['axis'] in ('x', 'y'))
     ]
     for config in filtered_config:
-        measurements_manager.clear_measurements()  # Clear the measurements in each iteration of the loop
+        measurements_manager = MeasurementsManager()
 
         # First we need to find the accelerometer chip suited for the axis
         accel_chip = Accelerometer.find_axis_accelerometer(printer, config['axis'])
@@ -117,6 +115,7 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         # And finally generate the graph for each measured axis
         ConsoleOutput.print(f'{config["axis"].upper()} axis frequency profile generation...')
         ConsoleOutput.print('This may take some time (1-3min)')
+        measurements_manager.wait_for_data_transfers(printer.get_reactor())
         st_process.run(measurements_manager)
         st_process.wait_for_completion()
         toolhead.dwell(1)
