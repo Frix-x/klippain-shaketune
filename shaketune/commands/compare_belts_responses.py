@@ -103,7 +103,7 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     else:
         input_shaper = None
 
-    measurements_manager = MeasurementsManager()
+    measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size)
 
     # Run the test for each axis
     for config in filtered_config:

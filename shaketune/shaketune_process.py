@@ -30,6 +30,9 @@ class ShakeTuneProcess:
     def get_graph_creator(self):
         return self.graph_creator
 
+    def get_st_config(self):
+        return self._config
+
     def run(self, measurements_manager: MeasurementsManager) -> None:
         # Start the target function in a new process (a thread is known to cause issues with Klipper and CANbus due to the GIL)
         self._process = Process(

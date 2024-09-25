@@ -491,7 +491,7 @@ def main():
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
 
-    measurements_manager = MeasurementsManager()
+    measurements_manager = MeasurementsManager(10)
     if args[0].endswith('.csv'):
         measurements_manager.load_from_csvs(args)
     elif args[0].endswith('.stdata'):

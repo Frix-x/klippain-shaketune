@@ -69,7 +69,7 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     toolhead.move([mid_x - SEGMENT_LENGTH / 2, mid_y - SEGMENT_LENGTH / 2, z_height, E], feedrate_travel)
     toolhead.dwell(0.5)
 
-    measurements_manager = MeasurementsManager()
+    measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size)
 
     # Start the measurements and do the movements (+X, +Y and then +Z)
     accelerometer.start_recording(measurements_manager, name='axesmap_X', append_time=True)

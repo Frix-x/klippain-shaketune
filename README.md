@@ -32,6 +32,12 @@ Follow these steps to install Shake&Tune on your printer:
      #    printer.cfg file. If you want to see the macros in the webui, set this to True.
      # timeout: 600
      #    The maximum time in seconds to let Shake&Tune process the data and generate the graphs.
+     # measurements_chunk_size: 15
+     #    The number of measurements to keep in RAM before writing them to disk. This is useful
+     #    to avoid running out of memory when processing large datasets like for the vibrations
+     #    measurements. If you get Timer Too Close errors, try reducing this value (minimum is 2).
+     # dpi: 300
+     #    The resolution of the generated graphs. This usually doesn't need to be changed.
      ```
 
 Don't forget to check out **[Shake&Tune documentation here](./docs/README.md)**.

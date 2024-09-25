@@ -30,12 +30,14 @@ class ShakeTuneConfig:
         result_folder: Path = RESULTS_BASE_FOLDER,
         keep_n_results: int = 3,
         keep_raw_data: bool = False,
+        chunk_size: int = 15,
         dpi: int = 150,
     ) -> None:
         self._result_folder = result_folder
 
         self.keep_n_results = keep_n_results
         self.keep_raw_data = keep_raw_data
+        self.chunk_size = chunk_size
         self.dpi = dpi
 
         self.klipper_folder = KLIPPER_FOLDER
