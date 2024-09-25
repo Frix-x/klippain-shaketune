@@ -31,12 +31,12 @@ from .shaketune_config import ShakeTuneConfig
 from .shaketune_process import ShakeTuneProcess
 
 DEFAULT_FOLDER = '~/printer_data/config/ShakeTune_results'
-DEFAULT_NUMBER_OF_RESULTS = 3
+DEFAULT_NUMBER_OF_RESULTS = 10
 DEFAULT_KEEP_RAW_DATA = False
 DEFAULT_DPI = 150
 DEFAULT_TIMEOUT = 600
 DEFAULT_SHOW_MACROS = True
-DEFAULT_MEASUREMENTS_CHUNK_SIZE = 15  # Maximum number of measurements to keep in memory at once
+DEFAULT_MEASUREMENTS_CHUNK_SIZE = 2  # Maximum number of measurements to keep in memory at once
 ST_COMMANDS = {
     'EXCITATE_AXIS_AT_FREQ': (
         'Maintain a specified excitation frequency for a period '
