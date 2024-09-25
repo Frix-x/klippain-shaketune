@@ -27,6 +27,8 @@ from ..helpers.console_output import ConsoleOutput
 Sample = Tuple[float, float, float, float]
 SamplesList = List[Sample]
 
+CHUNK_SIZE = 15  # Maximum number of measurements to keep in memory at once
+
 
 class Measurement(TypedDict):
     name: str
@@ -132,7 +134,7 @@ class MeasurementsManager:
 
         if not complete:
             raise TimeoutError(
-                'Shake&Tune was unable to write the accelerometer data on the fylesystem. '
+                'Shake&Tune was unable to write the accelerometer data on the filesystem. '
                 'This might be due to a slow, busy or full SD card.'
             )
 
