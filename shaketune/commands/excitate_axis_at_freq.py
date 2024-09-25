@@ -42,7 +42,7 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
         if k_accelerometer is None:
             raise gcmd.error(f'Accelerometer chip [{accel_chip}] was not found!')
         accelerometer = Accelerometer(k_accelerometer, printer.get_reactor())
-        measurements_manager = MeasurementsManager()
+        measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size)
 
     ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq}Hz for {duration} seconds')
 

@@ -722,7 +722,7 @@ def main():
     if options.max_smoothing is not None and options.max_smoothing < 0.05:
         opts.error('Too small max_smoothing specified (must be at least 0.05)')
 
-    measurements_manager = MeasurementsManager()
+    measurements_manager = MeasurementsManager(10)
     if args[0].endswith('.csv'):
         measurements_manager.load_from_csvs(args)
     elif args[0].endswith('.stdata'):

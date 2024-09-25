@@ -36,7 +36,8 @@ class Measurement(TypedDict):
 
 
 class MeasurementsManager:
-    def __init__(self):
+    def __init__(self, chunk_size: int):
+        self._chunk_size = chunk_size
         self.measurements: List[Measurement] = []
         self._uuid = str(uuid.uuid4())[:8]
         self._temp_dir = Path(f'/tmp/shaketune_{self._uuid}')
@@ -59,7 +60,7 @@ class MeasurementsManager:
     def add_measurement(self, name: str, samples: SamplesList = None):
         samples = samples if samples is not None else []
         self.measurements.append({'name': name, 'samples': samples})
-        if len(self.measurements) > CHUNK_SIZE:
+        if len(self.measurements) > self._chunk_size:
             self._save_chunk()
 
     def _save_chunk(self):
@@ -133,7 +134,7 @@ class MeasurementsManager:
 
         if not complete:
             raise TimeoutError(
-                'Shake&Tune was unable to write the accelerometer data on the fylesystem. '
+                'Shake&Tune was unable to write the accelerometer data on the filesystem. '
                 'This might be due to a slow, busy or full SD card.'
             )
 

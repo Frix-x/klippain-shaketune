@@ -911,7 +911,7 @@ def main():
     if options.kinematics not in {'cartesian', 'corexy', 'corexz'}:
         opts.error('Only cartesian, corexy and corexz kinematics are supported by this tool at the moment!')
 
-    measurements_manager = MeasurementsManager()
+    measurements_manager = MeasurementsManager(10)
     if args[0].endswith('.csv'):
         measurements_manager.load_from_csvs(args)
     elif args[0].endswith('.stdata'):

@@ -81,7 +81,7 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
     toolhead.move([mid_x - 15, mid_y - 15, z_height, E], feedrate_travel)
     toolhead.dwell(0.5)
 
-    measurements_manager = MeasurementsManager()
+    measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size)
 
     nb_speed_samples = int((max_speed - MIN_SPEED) / speed_increment + 1)
     for curr_angle in main_angles:
