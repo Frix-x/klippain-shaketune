@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This script is used to install the Shake&Tune module on a Klipper machine
+
+
 USER_CONFIG_PATH="${HOME}/printer_data/config"
 MOONRAKER_CONFIG="${HOME}/printer_data/config/moonraker.conf"
 KLIPPER_PATH="${HOME}/klipper"
@@ -10,7 +13,6 @@ K_SHAKETUNE_PATH="${HOME}/klippain_shaketune"
 
 set -eu
 export LC_ALL=C
-
 
 function preflight_checks {
     if [ "$EUID" -eq 0 ]; then
@@ -23,7 +25,7 @@ function preflight_checks {
         exit -1
     fi
 
-    if [ "$(sudo systemctl list-units --full -all -t service --no-legend | grep -F 'klipper.service')" ]; then
+    if sudo systemctl is-active --quiet klipper; then
         printf "[PRE-CHECK] Klipper service found! Continuing...\n\n"
     else
         echo "[ERROR] Klipper service not found, please install Klipper first!"
@@ -40,7 +42,7 @@ function is_package_installed {
 }
 
 function install_package_requirements {
-    packages=("libopenblas-dev" "libatlas-base-dev")
+    packages=("libopenblas-dev" "libatlas-base-dev" "sudo")
     packages_to_install=""
 
     for package in "${packages[@]}"; do
@@ -76,6 +78,13 @@ function check_download {
     fi
 }
 
+function setup_shaketune_sudo {
+    echo "[SETUP] Setting up sudo permissions for Shake&Tune swap file management..."
+    chmod +x ${K_SHAKETUNE_PATH}/install_swap_access.sh
+    ${K_SHAKETUNE_PATH}/install_swap_access.sh
+    printf "\n"
+}
+
 function setup_venv {
     if [ ! -d "${KLIPPER_VENV_PATH}" ]; then
         echo "[ERROR] Klipper's Python virtual environment not found!"
@@ -83,7 +92,7 @@ function setup_venv {
     fi
 
     if [ -d "${OLD_K_SHAKETUNE_VENV}" ]; then
-        echo "[INFO] Old K-Shake&Tune virtual environement found, cleaning it!"
+        echo "[INFO] Old K-Shake&Tune virtual environment found, cleaning it!"
         rm -rf "${OLD_K_SHAKETUNE_VENV}"
     fi
 
@@ -101,12 +110,12 @@ function link_extension {
     if [ -d "${HOME}/klippain_config" ] && [ -f "${USER_CONFIG_PATH}/.VERSION" ]; then
         if [ -d "${USER_CONFIG_PATH}/scripts/K-ShakeTune" ]; then
             echo "[INFO] Old K-Shake&Tune macro folder found, cleaning it!"
-            rm -d "${USER_CONFIG_PATH}/scripts/K-ShakeTune"
+            rm -rf "${USER_CONFIG_PATH}/scripts/K-ShakeTune"
         fi
     else
         if [ -d "${USER_CONFIG_PATH}/K-ShakeTune" ]; then
             echo "[INFO] Old K-Shake&Tune macro folder found, cleaning it!"
-            rm -d "${USER_CONFIG_PATH}/K-ShakeTune"
+            rm -rf "${USER_CONFIG_PATH}/K-ShakeTune"
         fi
     fi
 }
@@ -147,9 +156,31 @@ printf "=============================================\n\n"
 # Run steps
 preflight_checks
 check_download
+setup_shaketune_sudo
 setup_venv
 link_extension
 link_module
 add_updater
-restart_klipper
-restart_moonraker
+
+
+echo "[POST-INSTALL] Shake&Tune installation complete!"
+
+# Ask the user if he want to reboot now
+read -p "Do you want to reboot now? [y/N] " answer1
+case $answer1 in
+    [yY][eE][sS]|[yY])
+        sudo reboot
+        ;;
+    *)
+        # Ask the user if he still want to restart Klipper and Moonraker
+        read -p "Ok, but do you want to at least restart Klipper and Moonraker? [y/N] " answer2
+        case $answer2 in
+            [yY][eE][sS]|[yY])
+                restart_klipper
+                restart_moonraker
+                ;;
+            *)
+            echo "Ok, but just a heads-up: Shake&Tune won't be available until you restart your printer!"
+        esac
+        ;;        
+esac

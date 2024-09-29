@@ -47,6 +47,12 @@ Follow these steps to install Shake&Tune on your printer:
      #    RAM, and should work for everyone. However, if you are using a powerful computer, you may
      #    wish to increase this value to keep more measurements in memory (e.g., 15-20) before writing
      #    the chunk and avoid stressing the SD card too much.
+     # temporary_swap_size: 0
+     #    This allows to specify the size in MB of an additional temporary swap file that will be dynamically
+     #    created on the system to avoid running out of memory. This should help mitigating Klipper Timer
+     #    Too Close errors that can occur on low-end devices with little RAM like the CB1 when processing
+     #    large measurements. If you want to use this setting, be sure to have enough disk space available
+     #    in your home folder, and a value like 512 or 1024 (MB) should be enough in most cases.
      # dpi: 300
      #    Controls the resolution of the generated graphs. The default value of 300 dpi was optimized
      #    and strikes a balance between performance and readability, ensuring that graphs are clear

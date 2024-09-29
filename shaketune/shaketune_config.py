@@ -31,6 +31,7 @@ class ShakeTuneConfig:
         keep_n_results: int = 10,
         keep_raw_data: bool = False,
         chunk_size: int = 2,
+        temp_swap_size_mb: int = 0,
         dpi: int = 150,
     ) -> None:
         self._result_folder = result_folder
@@ -38,6 +39,7 @@ class ShakeTuneConfig:
         self.keep_n_results = keep_n_results
         self.keep_raw_data = keep_raw_data
         self.chunk_size = chunk_size
+        self.temp_swap_size_mb = temp_swap_size_mb
         self.dpi = dpi
 
         self.klipper_folder = KLIPPER_FOLDER
