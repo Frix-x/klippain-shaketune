@@ -29,14 +29,16 @@ from .graph_creators import (
 from .helpers.console_output import ConsoleOutput
 from .shaketune_config import ShakeTuneConfig
 from .shaketune_process import ShakeTuneProcess
+from .swap_manager import SwapManager
 
 DEFAULT_FOLDER = '~/printer_data/config/ShakeTune_results'
-DEFAULT_NUMBER_OF_RESULTS = 10
-DEFAULT_KEEP_RAW_DATA = False
-DEFAULT_DPI = 150
-DEFAULT_TIMEOUT = 600
-DEFAULT_SHOW_MACROS = True
+DEFAULT_NUMBER_OF_RESULTS = 10  # Number of results to keep in the results folder before rotating them
+DEFAULT_KEEP_RAW_DATA = False  # Whether to also tore the .stdata files in the results folder
+DEFAULT_DPI = 150  # Resolution of the generated graphs
+DEFAULT_TIMEOUT = 600  # Maximum processing time (in seconds) to allow to Shake&Tune for generating graphs
+DEFAULT_SHOW_MACROS = True  # Whether to show the Shake&Tune macros in the web UI
 DEFAULT_MEASUREMENTS_CHUNK_SIZE = 2  # Maximum number of measurements to keep in memory at once
+DEFAULT_TEMP_SWAP_SIZE_MB = 0  # 0 means no swap file is created
 ST_COMMANDS = {
     'EXCITATE_AXIS_AT_FREQ': (
         'Maintain a specified excitation frequency for a period '
@@ -82,10 +84,18 @@ class ShakeTune:
         keep_raw_data = config.getboolean('keep_raw_data', default=DEFAULT_KEEP_RAW_DATA)
         dpi = config.getint('dpi', default=DEFAULT_DPI, minval=100, maxval=500)
         m_chunk_size = config.getint('measurements_chunk_size', default=DEFAULT_MEASUREMENTS_CHUNK_SIZE, minval=2)
-        self._st_config = ShakeTuneConfig(result_folder_path, keep_n_results, keep_raw_data, m_chunk_size, dpi)
-
+        temp_swap_size_mb = config.getint('temporary_swap_size', default=DEFAULT_TEMP_SWAP_SIZE_MB, minval=0)
+        self._st_config = ShakeTuneConfig(
+            result_folder_path,
+            keep_n_results,
+            keep_raw_data,
+            m_chunk_size,
+            temp_swap_size_mb,
+            dpi,
+        )
         self.timeout = config.getfloat('timeout', DEFAULT_TIMEOUT, above=0.0)
         self._show_macros = config.getboolean('show_macros_in_webui', default=DEFAULT_SHOW_MACROS)
+        self._swap_manager = SwapManager(temp_swap_size_mb)
 
     # Create the Klipper commands to allow the user to run Shake&Tune's tools
     def _register_commands(self) -> None:
@@ -160,7 +170,9 @@ class ShakeTune:
             static_freq_graph_creator,
             self.timeout,
         )
+        self._swap_manager.add_swap()
         excitate_axis_at_freq(gcmd, self._config, st_process)
+        self._swap_manager.remove_swap()
 
     def cmd_AXES_MAP_CALIBRATION(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
@@ -171,7 +183,9 @@ class ShakeTune:
             axes_map_graph_creator,
             self.timeout,
         )
+        self._swap_manager.add_swap()
         axes_map_calibration(gcmd, self._config, st_process)
+        self._swap_manager.remove_swap()
 
     def cmd_COMPARE_BELTS_RESPONSES(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
@@ -182,7 +196,9 @@ class ShakeTune:
             belt_graph_creator,
             self.timeout,
         )
+        self._swap_manager.add_swap()
         compare_belts_responses(gcmd, self._config, st_process)
+        self._swap_manager.remove_swap()
 
     def cmd_AXES_SHAPER_CALIBRATION(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
@@ -193,7 +209,9 @@ class ShakeTune:
             shaper_graph_creator,
             self.timeout,
         )
+        self._swap_manager.add_swap()
         axes_shaper_calibration(gcmd, self._config, st_process)
+        self._swap_manager.remove_swap()
 
     def cmd_CREATE_VIBRATIONS_PROFILE(self, gcmd) -> None:
         ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
@@ -204,4 +222,6 @@ class ShakeTune:
             vibration_profile_creator,
             self.timeout,
         )
+        self._swap_manager.add_swap()
         create_vibrations_profile(gcmd, self._config, st_process)
+        self._swap_manager.remove_swap()
