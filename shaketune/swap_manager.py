@@ -21,21 +21,29 @@ class SwapManager:
     def __init__(self, swap_size_mb: int = 0) -> None:
         self._swap_size_mb = swap_size_mb
         self._swap_file_path = SWAP_FILE_PATH
-        self._swap_activated = False
 
     def is_swap_activated(self) -> bool:
-        return self._swap_activated
+        try:
+            result = subprocess.run(
+                ['swapon', '--noheadings', '--show=NAME'],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            active_swaps = result.stdout.strip().split('\n')
+            return str(self._swap_file_path) in active_swaps
+        except subprocess.CalledProcessError as err:
+            ConsoleOutput.print(f"Error: Shake&Tune couldn't check the temporary swap file status: {err.stderr}")
+            return False
 
     def add_swap(self) -> None:
         if self._swap_size_mb <= 0:
             return
 
-        # Check if swap file already exists and delete it if it does
-        if self._swap_file_path.exists():
-            ConsoleOutput.print(f'Warning: {self._swap_file_path} already exists. Replacing it...')
+        if self.is_swap_activated():
             self.remove_swap()
 
-        # Check available disk space to be sure there is enough space for the swap file
+        # Check available disk space to be sure there is enough space to create the swap file
         total, used, free = shutil.disk_usage(self._swap_file_path.parent)
         free_mb = free // (1024 * 1024)
         if free_mb < self._swap_size_mb:
@@ -45,50 +53,40 @@ class SwapManager:
             )
             return
 
-        # Create the swap file and activate it
+        # Then, create the swap file (if not already created) and activate it
         try:
-            fallocate_result = subprocess.run(
-                [
-                    'sudo',
-                    'fallocate',
-                    '-l',
-                    f'{self._swap_size_mb}M',
-                    str(self._swap_file_path),
-                ],
-                check=True,
-            )
-            if fallocate_result.returncode != 0:
-                ConsoleOutput.print(
-                    'Warning: failed to allocate the temporary swap file using fallocate. '
-                    'Falling back to dd, this may take a while...'
-                )
+            if not self._swap_file_path.exists():
                 subprocess.run(
                     [
                         'sudo',
-                        'dd',
-                        'if=/dev/zero',
-                        f'of={self._swap_file_path}',
-                        'bs=1M',
-                        f'count={self._swap_size_mb}',
+                        'fallocate',
+                        '-l',
+                        f'{self._swap_size_mb}M',
+                        str(self._swap_file_path),
                     ],
                     check=True,
+                    capture_output=True,
+                    text=True,
                 )
-            subprocess.run(['sudo', 'chmod', '600', str(self._swap_file_path)], check=True)
-            subprocess.run(['sudo', 'mkswap', str(self._swap_file_path)], check=True)
-            subprocess.run(['sudo', 'swapon', str(self._swap_file_path)], check=True)
-            self._swap_activated = True
-            ConsoleOutput.print(f'Temporary swap file of {self._swap_size_mb} MB activated')
+            if not self.is_swap_activated():
+                subprocess.run(
+                    ['sudo', 'chmod', '600', str(self._swap_file_path)], check=True, capture_output=True, text=True
+                )
+                subprocess.run(
+                    ['sudo', 'mkswap', str(self._swap_file_path)], check=True, capture_output=True, text=True
+                )
+                subprocess.run(
+                    ['sudo', 'swapon', str(self._swap_file_path)], check=True, capture_output=True, text=True
+                )
+            ConsoleOutput.print(f'Temporary swap file of {self._swap_size_mb} MB ready!')
         except subprocess.CalledProcessError as err:
+            ConsoleOutput.print(f'Error while creating the temporary swap file: {err.stderr}')
             self.remove_swap()
             raise RuntimeError('Failed to create and activate the temporary swap file!') from err
 
     def remove_swap(self) -> None:
         if not self._swap_file_path.exists():
             return
-
-        try:
-            if self._swap_activated:
-                subprocess.run(['sudo', 'swapoff', str(self._swap_file_path)], check=True)
-            subprocess.run(['sudo', 'rm', str(self._swap_file_path)], check=True)
-        except subprocess.CalledProcessError as err:
-            raise RuntimeError('Failed to deactivate and delete the temporary swap file!') from err
+        if self.is_swap_activated():
+            subprocess.run(['sudo', 'swapoff', str(self._swap_file_path)])
+        subprocess.run(['sudo', 'rm', str(self._swap_file_path)])
