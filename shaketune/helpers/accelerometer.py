@@ -46,10 +46,7 @@ class MeasurementsManager:
         self._write_processes = []
 
     def clear_measurements(self, keep_last: bool = False):
-        if keep_last:
-            self.measurements = [self.measurements[-1]]
-        else:
-            self.measurements = []
+        self.measurements = [self.measurements[-1]] if keep_last else []
 
     def append_samples_to_last_measurement(self, additional_samples: SamplesList):
         try:

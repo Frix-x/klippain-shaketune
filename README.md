@@ -37,7 +37,7 @@ Follow these steps to install Shake&Tune on your printer:
      #    their names manually, which can be useful if you prefer to encapsulate them into your own macros.
      # timeout: 600
      #    This defines the maximum processing time (in seconds) to allow to Shake&Tune for generating 
-     #    graphs from a .stdata file. 10 minutes should be more than enough in most case, but if you have
+     #    graphs from a .stdata file. 10 minutes should be more than enough in most cases, but if you have
      #    slower hardware (e.g., older SD cards or low-performance devices), increase it to prevent timeouts.
      # measurements_chunk_size: 2
      #    Each Shake&Tune command uses the accelerometer to take multiple measurements. By default,
@@ -46,7 +46,7 @@ Follow these steps to install Shake&Tune on your printer:
      #    conservative setting to avoid Klipper Timer Too Close errors on lower end devices with little
      #    RAM, and should work for everyone. However, if you are using a powerful computer, you may
      #    wish to increase this value to keep more measurements in memory (e.g., 15-20) before writing
-     #    the chunk and avoid stressing the SD card too much.
+     #    the chunk and avoid stressing the filesystem too much.
      # dpi: 300
      #    Controls the resolution of the generated graphs. The default value of 300 dpi was optimized
      #    and strikes a balance between performance and readability, ensuring that graphs are clear
