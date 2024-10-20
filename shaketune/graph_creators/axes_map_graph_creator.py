@@ -23,7 +23,7 @@ from scipy import stats
 
 matplotlib.use('Agg')
 
-from ..helpers.common_func import parse_log
+from ..helpers.accelerometer import Measurement, MeasurementsManager
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_config import ShakeTuneConfig
 from .graph_creator import GraphCreator
@@ -48,30 +48,14 @@ class AxesMapGraphCreator(GraphCreator):
         self._accel = accel
         self._segment_length = segment_length
 
-    def create_graph(self) -> None:
-        lognames = self._move_and_prepare_files(
-            glob_pattern='shaketune-axesmap_*.csv',
-            min_files_required=3,
-            custom_name_func=lambda f: f.stem.split('_')[1].upper(),
-        )
+    def create_graph(self, measurements_manager: MeasurementsManager) -> None:
         fig = axesmap_calibration(
-            lognames=[str(path) for path in lognames],
+            measurements=measurements_manager.get_measurements(),
             accel=self._accel,
             fixed_length=self._segment_length,
             st_version=self._version,
         )
-        self._save_figure_and_cleanup(fig, lognames)
-
-    def clean_old_files(self, keep_results: int = 3) -> None:
-        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
-        if len(files) <= keep_results:
-            return  # No need to delete any files
-        for old_file in files[keep_results:]:
-            file_date = '_'.join(old_file.stem.split('_')[1:3])
-            for suffix in {'X', 'Y', 'Z'}:
-                csv_file = self._folder / f'axesmap_{file_date}_{suffix}.csv'
-                csv_file.unlink(missing_ok=True)
-            old_file.unlink()
+        self._save_figure(fig, measurements_manager)
 
 
 ######################################################################
@@ -340,18 +324,17 @@ def format_direction_vector(vectors: List[np.ndarray]) -> str:
 
 
 def axesmap_calibration(
-    lognames: List[str], fixed_length: float, accel: Optional[float] = None, st_version: str = 'unknown'
+    measurements: List[Measurement], fixed_length: float, accel: Optional[float] = None, st_version: str = 'unknown'
 ) -> plt.Figure:
-    # Parse data from the log files while ignoring CSV in the wrong format (sorted by axis name)
-    raw_datas = {}
-    for logname in lognames:
-        data = parse_log(logname)
-        if data is not None:
-            _axis = logname.split('_')[-1].split('.')[0].lower()
-            raw_datas[_axis] = data
+    if len(measurements) != 3:
+        raise ValueError('This tool needs 3 measurements to work with (like axesmap_X, axesmap_Y and axesmap_Z)')
 
-    if len(raw_datas) != 3:
-        raise ValueError('This tool needs 3 CSVs to work with (like axesmap_X.csv, axesmap_Y.csv and axesmap_Z.csv)')
+    raw_datas = {}
+    for measurement in measurements:
+        data = np.array(measurement['samples'])
+        if data is not None:
+            _axis = measurement['name'].split('_')[1].lower()
+            raw_datas[_axis] = data
 
     fig, ((ax1, ax2)) = plt.subplots(
         1,
@@ -379,7 +362,7 @@ def axesmap_calibration(
     gravities = []
     for _, machine_axis in enumerate(MACHINE_AXES):
         if machine_axis not in raw_datas:
-            raise ValueError(f'Missing CSV file for axis {machine_axis}')
+            raise ValueError(f'Missing measurement for axis {machine_axis}')
 
         # Get the accel data according to the current axes_map
         time = raw_datas[machine_axis][:, 0]
@@ -451,16 +434,17 @@ def axesmap_calibration(
         0.060, 0.947, title_line1, ha='left', va='bottom', fontsize=20, color=KLIPPAIN_COLORS['purple'], weight='bold'
     )
     try:
-        filename = lognames[0].split('/')[-1]
-        dt = datetime.strptime(f"{filename.split('_')[1]} {filename.split('_')[2]}", '%Y%m%d %H%M%S')
+        filename = measurements[0]['name']
+        dt = datetime.strptime(f"{filename.split('_')[2]} {filename.split('_')[3]}", '%Y%m%d %H%M%S')
         title_line2 = dt.strftime('%x %X')
         if accel is not None:
             title_line2 += f' -- at {accel:0.0f} mm/s²'
     except Exception:
         ConsoleOutput.print(
-            f'Warning: CSV filenames look to be different than expected ({lognames[0]}, {lognames[1]}, {lognames[2]})'
+            f"Warning: Shake&Tune measurements names look to be different than expected ({measurements[0]['name']}, "
+            f"{measurements[1]['name']}, {measurements[2]['name']})"
         )
-        title_line2 = lognames[0].split('/')[-1] + ' ...'
+        title_line2 = measurements[0]['name'] + ' ...'
     fig.text(0.060, 0.939, title_line2, ha='left', va='top', fontsize=16, color=KLIPPAIN_COLORS['dark_purple'])
 
     title_line3 = f'| Detected axes_map: {formatted_direction_vector}'
@@ -491,9 +475,9 @@ def main():
     )
     options, args = opts.parse_args()
     if len(args) < 1:
-        opts.error('No CSV file(s) to analyse')
+        opts.error('No measurements to analyse')
     if options.accel is None:
-        opts.error('You must specify the acceleration value used when generating the CSV file (option -a)')
+        opts.error('You must specify the acceleration value used when recording the measurements (option -a)')
     try:
         accel_value = float(options.accel)
     except ValueError:
@@ -507,7 +491,15 @@ def main():
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
 
-    fig = axesmap_calibration(args, length_value, accel_value, 'unknown')
+    measurements_manager = MeasurementsManager(10)
+    if args[0].endswith('.csv'):
+        measurements_manager.load_from_csvs(args)
+    elif args[0].endswith('.stdata'):
+        measurements_manager.load_from_stdata(args[0])
+    else:
+        raise ValueError('Only .stdata or legacy Klipper raw accelerometer CSV files are supported!')
+
+    fig = axesmap_calibration(measurements_manager.get_measurements(), length_value, accel_value, 'unknown')
     fig.savefig(options.output, dpi=150)
 
 

@@ -11,13 +11,12 @@
 
 
 import abc
-import shutil
 from datetime import datetime
-from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Optional
 
 from matplotlib.figure import Figure
 
+from ..helpers.accelerometer import MeasurementsManager
 from ..shaketune_config import ShakeTuneConfig
 
 
@@ -29,56 +28,28 @@ class GraphCreator(abc.ABC):
         self._type = graph_type
         self._folder = self._config.get_results_folder(graph_type)
 
-    def _move_and_prepare_files(
-        self,
-        glob_pattern: str,
-        min_files_required: Optional[int] = None,
-        custom_name_func: Optional[Callable[[Path], str]] = None,
-    ) -> List[Path]:
-        tmp_path = Path('/tmp')
-        globbed_files = list(tmp_path.glob(glob_pattern))
-
-        # If min_files_required is not set, use the number of globbed files as the minimum
-        min_files_required = min_files_required or len(globbed_files)
-
-        if not globbed_files:
-            raise FileNotFoundError(f'no CSV files found in the /tmp folder to create the {self._type} graphs!')
-        if len(globbed_files) < min_files_required:
-            raise FileNotFoundError(f'{min_files_required} CSV files are needed to create the {self._type} graphs!')
-
-        lognames = []
-        for filename in sorted(globbed_files, key=lambda f: f.stat().st_mtime, reverse=True)[:min_files_required]:
-            custom_name = custom_name_func(filename) if custom_name_func else filename.name
-            new_file = self._folder / f"{self._type.replace(' ', '')}_{self._graph_date}_{custom_name}.csv"
-            # shutil.move() is needed to move the file across filesystems (mainly for BTT CB1 Pi default OS image)
-            shutil.move(filename, new_file)
-            lognames.append(new_file)
-        return lognames
-
-    def _save_figure_and_cleanup(self, fig: Figure, lognames: List[Path], axis_label: Optional[str] = None) -> None:
+    def _save_figure(
+        self, fig: Figure, measurements_manager: MeasurementsManager, axis_label: Optional[str] = None
+    ) -> None:
         axis_suffix = f'_{axis_label}' if axis_label else ''
-        png_filename = self._folder / f"{self._type.replace(' ', '')}_{self._graph_date}{axis_suffix}.png"
-        fig.savefig(png_filename, dpi=self._config.dpi)
+        filename = self._folder / f"{self._type.replace(' ', '')}_{self._graph_date}{axis_suffix}"
+        fig.savefig(f'{filename}.png', dpi=self._config.dpi)
 
-        if self._config.keep_csv:
-            self._archive_files(lognames)
-        else:
-            self._remove_files(lognames)
-
-    def _archive_files(self, lognames: List[Path]) -> None:
-        return
-
-    def _remove_files(self, lognames: List[Path]) -> None:
-        for csv in lognames:
-            csv.unlink(missing_ok=True)
+        if self._config.keep_raw_data:
+            measurements_manager.save_stdata(f'{filename}.stdata')
 
     def get_type(self) -> str:
         return self._type
 
     @abc.abstractmethod
-    def create_graph(self) -> None:
+    def create_graph(self, measurements_manager: MeasurementsManager) -> None:
         pass
 
-    @abc.abstractmethod
-    def clean_old_files(self, keep_results: int) -> None:
-        pass
+    def clean_old_files(self, keep_results: int = 3) -> None:
+        files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
+        if len(files) <= keep_results:
+            return  # No need to delete any files
+        for old_png_file in files[keep_results:]:
+            stdata_file = old_png_file.with_suffix('.stdata')
+            stdata_file.unlink(missing_ok=True)
+            old_png_file.unlink()

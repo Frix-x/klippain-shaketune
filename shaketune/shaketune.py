@@ -31,11 +31,12 @@ from .shaketune_config import ShakeTuneConfig
 from .shaketune_process import ShakeTuneProcess
 
 DEFAULT_FOLDER = '~/printer_data/config/ShakeTune_results'
-DEFAULT_NUMBER_OF_RESULTS = 3
-DEFAULT_KEEP_RAW_CSV = False
+DEFAULT_NUMBER_OF_RESULTS = 10
+DEFAULT_KEEP_RAW_DATA = False
 DEFAULT_DPI = 150
-DEFAULT_TIMEOUT = 300
+DEFAULT_TIMEOUT = 600
 DEFAULT_SHOW_MACROS = True
+DEFAULT_MEASUREMENTS_CHUNK_SIZE = 2  # Maximum number of measurements to keep in memory at once
 ST_COMMANDS = {
     'EXCITATE_AXIS_AT_FREQ': (
         'Maintain a specified excitation frequency for a period '
@@ -78,12 +79,13 @@ class ShakeTune:
         result_folder = config.get('result_folder', default=DEFAULT_FOLDER)
         result_folder_path = Path(result_folder).expanduser() if result_folder else None
         keep_n_results = config.getint('number_of_results_to_keep', default=DEFAULT_NUMBER_OF_RESULTS, minval=0)
-        keep_csv = config.getboolean('keep_raw_csv', default=DEFAULT_KEEP_RAW_CSV)
+        keep_raw_data = config.getboolean('keep_raw_data', default=DEFAULT_KEEP_RAW_DATA)
         dpi = config.getint('dpi', default=DEFAULT_DPI, minval=100, maxval=500)
-        self._st_config = ShakeTuneConfig(result_folder_path, keep_n_results, keep_csv, dpi)
+        m_chunk_size = config.getint('measurements_chunk_size', default=DEFAULT_MEASUREMENTS_CHUNK_SIZE, minval=2)
+        self._st_config = ShakeTuneConfig(result_folder_path, keep_n_results, keep_raw_data, m_chunk_size, dpi)
 
-        self.timeout = config.getfloat('timeout', 300, above=0.0)
-        self._show_macros = config.getboolean('show_macros_in_webui', default=True)
+        self.timeout = config.getfloat('timeout', DEFAULT_TIMEOUT, above=0.0)
+        self._show_macros = config.getboolean('show_macros_in_webui', default=DEFAULT_SHOW_MACROS)
 
     # Create the Klipper commands to allow the user to run Shake&Tune's tools
     def _register_commands(self) -> None:
