@@ -7,7 +7,7 @@ As more and more people are using these macros, questions about interpreting the
 
 When a 3D printer moves, the motors apply some force to move the toolhead along a precise path. This force is transmitted from the motor shaft to the toolhead through the entire printer motion system. When the toolhead reaches a sharp corner and needs to change direction, its inertia makes it want to continue the movement in a straight line. The motors force the toolhead to turn, but the belts act like springs, allowing the toolhead to oscillate in the perpendicular direction. These oscillations produce visible artifacts on the printed parts, known as ringing or ghosting.
 
-![](images/generalities/ghosting.png)
+![](./images/generalities/ghosting.png)
 
 
 ## Generalities on the graphs
@@ -48,7 +48,7 @@ The motion system of a 3D printer can be described as a spring and mass system, 
 | $$\frac{1}{2\pi}\sqrt{\frac{k}{m}}$$ | $$\frac{c}{2}\sqrt{\frac{1}{km}}$$ |
 | `k` [N/m]: spring constant<br />`m` [g]: moving mass | `c` [N·s/m]: viscous damping coefficient<br />`k` [N/m]: spring constant<br />`m` [g]: moving mass |
 
-![](images/generalities/harmonic_oscil.png)
+![](./images/generalities/harmonic_oscil.png)
 
 When an oscillating input force is applied at a resonant frequency (or a Fourier component of it) on a dynamic system, the system will oscillate at a higher amplitude than when the same force is applied at other, non-resonant frequencies. This is called a resonance and can be dangerous for some systems but on our printers this will mainly lead to vibrations and oscillations of the toolhead.
 
@@ -61,6 +61,6 @@ The rapid movement of machines is a challenging control problem because it often
 
 It works by creating a command signal that cancels its own vibration, achieved by [convoluting](https://en.wikipedia.org/wiki/Convolution) specifically crafted impulse signals (A2) with the original system control signal (A1). The resulting shaped signal is then used to drive the system (Total Response). To craft these impulses, the system's undamped resonant frequency and damping ratio are used.
 
-![](images/generalities/how_IS_works.png)
+![](./images/generalities/how_IS_works.png)
 
 Klipper measures these parameters by exciting the printer with a series of input commands and recording the response behavior using an accelerometer. Resonances can be identified on the resulting graphs by large spikes indicating their frequency and energy. Additionnaly, the damping ratio is usually hard to measure without a special equipment, but these scripts gives an estimation that should be good enough in most cases. There is no need to use Klipper's default 0.1 value anymore!
