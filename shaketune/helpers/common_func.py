@@ -9,9 +9,6 @@
 
 
 import math
-import os
-import sys
-from importlib import import_module
 from pathlib import Path
 
 import numpy as np
@@ -26,12 +23,6 @@ AXIS_CONFIG = [
     {'axis': 'corexz_x', 'direction': (1, 0, 1), 'label': 'belt_X'},
     {'axis': 'corexz_z', 'direction': (-1, 0, 1), 'label': 'belt_Z'},
 ]
-
-
-def setup_klipper_import(kdir):
-    kdir = os.path.expanduser(kdir)
-    sys.path.append(os.path.join(kdir, 'klippy'))
-    return import_module('.shaper_calibrate', 'extras')
 
 
 # This is used to print the current S&T version on top of the png graph file

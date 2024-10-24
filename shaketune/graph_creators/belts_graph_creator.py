@@ -23,8 +23,9 @@ from scipy.stats import pearsonr
 
 matplotlib.use('Agg')
 
+from ... import shaper_calibrate
 from ..helpers.accelerometer import Measurement, MeasurementsManager
-from ..helpers.common_func import detect_peaks, setup_klipper_import
+from ..helpers.common_func import detect_peaks
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_config import ShakeTuneConfig
 from .graph_creator import GraphCreator
@@ -480,9 +481,6 @@ def belts_calibration(
 ) -> plt.Figure:
     if len(measurements) != 2:
         raise ValueError('This tool needs 2 measurements to work with (one for each belt)!')
-
-    global shaper_calibrate
-    shaper_calibrate = setup_klipper_import(klipperdir)
 
     datas = [np.array(m['samples']) for m in measurements if m['samples'] is not None]
 

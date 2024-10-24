@@ -24,13 +24,9 @@ import numpy as np
 
 matplotlib.use('Agg')
 
+from ... import shaper_calibrate
 from ..helpers.accelerometer import Measurement, MeasurementsManager
-from ..helpers.common_func import (
-    compute_mechanical_parameters,
-    detect_peaks,
-    identify_low_energy_zones,
-    setup_klipper_import,
-)
+from ..helpers.common_func import compute_mechanical_parameters, detect_peaks, identify_low_energy_zones
 from ..helpers.console_output import ConsoleOutput
 from ..helpers.motors_config_parser import Motor, MotorsConfigParser
 from ..shaketune_config import ShakeTuneConfig
@@ -704,9 +700,6 @@ def vibrations_profile(
     st_version: Optional[str] = None,
     motors: Optional[List[MotorsConfigParser]] = None,
 ) -> plt.Figure:
-    global shaper_calibrate
-    shaper_calibrate = setup_klipper_import(klipperdir)
-
     if kinematics in {'cartesian', 'limited_cartesian', 'corexz', 'limited_corexz'}:
         main_angles = [0, 90]
     elif kinematics in {'corexy', 'limited_corexy'}:
@@ -848,7 +841,7 @@ def vibrations_profile(
     if motors is not None and len(motors) == 2:
         differences = motors[0].compare_to(motors[1])
         plot_motor_config_txt(fig, motors, differences)
-        if differences is not None and kinematics in {'corexy', 'limited_corexy'}: 
+        if differences is not None and kinematics in {'corexy', 'limited_corexy'}:
             ConsoleOutput.print(f'Warning: motors have different TMC configurations!\n{differences}')
 
     # Plot the graphs
@@ -908,8 +901,17 @@ def main():
         opts.error('No measurements to analyse')
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
-    if options.kinematics not in {'cartesian', 'limited_cartesian', 'corexy', 'limited_corexy', 'corexz', 'limited_corexz'}:
-        opts.error('Only cartesian, limited_cartesian, corexy, limited_corexy, corexz, limited_corexz kinematics are supported by this tool at the moment!')
+    if options.kinematics not in {
+        'cartesian',
+        'limited_cartesian',
+        'corexy',
+        'limited_corexy',
+        'corexz',
+        'limited_corexz',
+    }:
+        opts.error(
+            'Only cartesian, limited_cartesian, corexy, limited_corexy, corexz, limited_corexz kinematics are supported by this tool at the moment!'
+        )
 
     measurements_manager = MeasurementsManager(10)
     if args[0].endswith('.csv'):

@@ -33,13 +33,9 @@ from scipy.interpolate import interp1d
 
 matplotlib.use('Agg')
 
+from ... import shaper_calibrate
 from ..helpers.accelerometer import Measurement, MeasurementsManager
-from ..helpers.common_func import (
-    compute_mechanical_parameters,
-    compute_spectrogram,
-    detect_peaks,
-    setup_klipper_import,
-)
+from ..helpers.common_func import compute_mechanical_parameters, compute_spectrogram, detect_peaks
 from ..helpers.console_output import ConsoleOutput
 from ..shaketune_config import ShakeTuneConfig
 from .graph_creator import GraphCreator
@@ -593,9 +589,6 @@ def shaper_calibration(
         raise ValueError('No valid data found in the provided measurements!')
     if len(measurements) > 1:
         ConsoleOutput.print('Warning: incorrect number of measurements detected. Only the first one will be used!')
-
-    global shaper_calibrate
-    shaper_calibrate = setup_klipper_import(klipperdir)
 
     datas = [np.array(m['samples']) for m in measurements if m['samples'] is not None]
 
