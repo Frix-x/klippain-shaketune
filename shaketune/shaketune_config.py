@@ -27,12 +27,14 @@ RESULTS_SUBFOLDERS = {
 class ShakeTuneConfig:
     def __init__(
         self,
+        dk_git_info: dict = None,
         result_folder: Path = RESULTS_BASE_FOLDER,
         keep_n_results: int = 10,
         keep_raw_data: bool = False,
         chunk_size: int = 2,
         dpi: int = 150,
     ) -> None:
+        self._dk_git_info = dk_git_info
         self._result_folder = result_folder
 
         self.keep_n_results = keep_n_results
@@ -42,6 +44,8 @@ class ShakeTuneConfig:
 
         self.klipper_folder = KLIPPER_FOLDER
         self.klipper_log_folder = KLIPPER_LOG_FOLDER
+
+        self.version = self._get_version()
 
     def get_results_folder(self, type: str = None) -> Path:
         if type is None:
@@ -53,21 +57,24 @@ class ShakeTuneConfig:
         subfolders = [self._result_folder / subfolder for subfolder in RESULTS_SUBFOLDERS.values()]
         return subfolders
 
-    @staticmethod
-    def get_git_version() -> str:
-        try:
-            from git import GitCommandError, Repo
-
-            # Get the absolute path of the script, resolving any symlinks
-            # Then get 1 times to parent dir to be at the git root folder
-            script_path = Path(__file__).resolve()
-            repo_path = script_path.parents[1]
-            repo = Repo(repo_path)
+    def _get_version(self) -> str:
+        if self._dk_git_info:
+            return f"DK-{self._dk_git_info['version']} ({self._dk_git_info['branch']})"
+        else:
             try:
-                version = repo.git.describe('--tags')
-            except GitCommandError:
-                version = repo.head.commit.hexsha[:7]  # If no tag is found, use the simplified commit SHA instead
-            return version
-        except Exception as e:
-            ConsoleOutput.print(f'Warning: unable to retrieve Shake&Tune version number: {e}')
-            return 'unknown'
+                from git import GitCommandError, Repo
+
+                # Get the absolute path of the script, resolving any symlinks
+                # Then get 1 times to parent dir to be at the git root folder
+                script_path = Path(__file__).resolve()
+                repo_path = script_path.parents[1]
+                repo = Repo(repo_path)
+                try:
+                    version = repo.git.describe('--tags')
+                except GitCommandError:
+                    version = repo.head.commit.hexsha[:7]  # If no tag is found, use the simplified commit SHA instead
+                branch = repo.active_branch.name
+                return f'OG-{version} ({branch})'
+            except Exception as e:
+                ConsoleOutput.print(f'Warning: unable to retrieve Shake&Tune version number: {e}')
+                return 'unknown'

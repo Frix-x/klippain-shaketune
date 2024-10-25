@@ -23,10 +23,10 @@ from ..shaketune_config import ShakeTuneConfig
 class GraphCreator(abc.ABC):
     def __init__(self, config: ShakeTuneConfig, graph_type: str):
         self._config = config
+        self._version = config.version
         self._graph_date = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self._version = ShakeTuneConfig.get_git_version()
         self._type = graph_type
-        self._folder = self._config.get_results_folder(graph_type)
+        self._folder = config.get_results_folder(graph_type)
 
     def _save_figure(
         self, fig: Figure, measurements_manager: MeasurementsManager, axis_label: Optional[str] = None

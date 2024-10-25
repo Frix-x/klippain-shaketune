@@ -71,21 +71,28 @@ class ShakeTune:
         gcode = self._printer.lookup_object('gcode')
         ConsoleOutput.register_output_callback(gcode.respond_info)
 
-        self._initialize_config(config)
+        self._initialize_st_config()
         self._register_commands()
 
     # Initialize the ShakeTune object and its configuration
-    def _initialize_config(self, config) -> None:
-        result_folder = config.get('result_folder', default=DEFAULT_FOLDER)
+    def _initialize_st_config(self) -> None:
+        result_folder = self._config.get('result_folder', default=DEFAULT_FOLDER)
         result_folder_path = Path(result_folder).expanduser() if result_folder else None
-        keep_n_results = config.getint('number_of_results_to_keep', default=DEFAULT_NUMBER_OF_RESULTS, minval=0)
-        keep_raw_data = config.getboolean('keep_raw_data', default=DEFAULT_KEEP_RAW_DATA)
-        dpi = config.getint('dpi', default=DEFAULT_DPI, minval=100, maxval=500)
-        m_chunk_size = config.getint('measurements_chunk_size', default=DEFAULT_MEASUREMENTS_CHUNK_SIZE, minval=2)
-        self._st_config = ShakeTuneConfig(result_folder_path, keep_n_results, keep_raw_data, m_chunk_size, dpi)
+        keep_n_results = self._config.getint('number_of_results_to_keep', default=DEFAULT_NUMBER_OF_RESULTS, minval=0)
+        keep_raw_data = self._config.getboolean('keep_raw_data', default=DEFAULT_KEEP_RAW_DATA)
+        dpi = self._config.getint('dpi', default=DEFAULT_DPI, minval=100, maxval=500)
+        m_chunk_size = self._config.getint('measurements_chunk_size', default=DEFAULT_MEASUREMENTS_CHUNK_SIZE, minval=2)
+        self._st_config = ShakeTuneConfig(
+            self._printer.get_start_args().get('git_info', None) if self.IN_DANGER else None,
+            result_folder_path,
+            keep_n_results,
+            keep_raw_data,
+            m_chunk_size,
+            dpi,
+        )
 
-        self.timeout = config.getfloat('timeout', DEFAULT_TIMEOUT, above=0.0)
-        self._show_macros = config.getboolean('show_macros_in_webui', default=DEFAULT_SHOW_MACROS)
+        self.timeout = self._config.getfloat('timeout', DEFAULT_TIMEOUT, above=0.0)
+        self._show_macros = self._config.getboolean('show_macros_in_webui', default=DEFAULT_SHOW_MACROS)
 
     # Create the Klipper commands to allow the user to run Shake&Tune's tools
     def _register_commands(self) -> None:
@@ -145,6 +152,12 @@ class ShakeTune:
                 'No [resonance_tester] config section found in printer.cfg! Please add one to use Shake&Tune!'
             )
 
+    def _print_version(self) -> None:
+        if self.IN_DANGER:
+            ConsoleOutput.print(f'Shake&Tune in DK version: {self._st_config.version}')
+        else:
+            ConsoleOutput.print(f'Shake&Tune version: {self._st_config.version}')
+
     # ------------------------------------------------------------------------------------------
     # ------------------------------------------------------------------------------------------
     # Following are all the Shake&Tune commands that are registered to the Klipper console
@@ -152,7 +165,7 @@ class ShakeTune:
     # ------------------------------------------------------------------------------------------
 
     def cmd_EXCITATE_AXIS_AT_FREQ(self, gcmd) -> None:
-        ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
+        self._print_version()
         static_freq_graph_creator = StaticGraphCreator(self._st_config)
         st_process = ShakeTuneProcess(
             self._st_config,
@@ -163,7 +176,7 @@ class ShakeTune:
         excitate_axis_at_freq(gcmd, self._config, st_process)
 
     def cmd_AXES_MAP_CALIBRATION(self, gcmd) -> None:
-        ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
+        self._print_version()
         axes_map_graph_creator = AxesMapGraphCreator(self._st_config)
         st_process = ShakeTuneProcess(
             self._st_config,
@@ -174,7 +187,7 @@ class ShakeTune:
         axes_map_calibration(gcmd, self._config, st_process)
 
     def cmd_COMPARE_BELTS_RESPONSES(self, gcmd) -> None:
-        ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
+        self._print_version()
         belt_graph_creator = BeltsGraphCreator(self._st_config)
         st_process = ShakeTuneProcess(
             self._st_config,
@@ -185,7 +198,7 @@ class ShakeTune:
         compare_belts_responses(gcmd, self._config, st_process)
 
     def cmd_AXES_SHAPER_CALIBRATION(self, gcmd) -> None:
-        ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
+        self._print_version()
         shaper_graph_creator = ShaperGraphCreator(self._st_config)
         st_process = ShakeTuneProcess(
             self._st_config,
@@ -196,7 +209,7 @@ class ShakeTune:
         axes_shaper_calibration(gcmd, self._config, st_process)
 
     def cmd_CREATE_VIBRATIONS_PROFILE(self, gcmd) -> None:
-        ConsoleOutput.print(f'Shake&Tune version: {ShakeTuneConfig.get_git_version()}')
+        self._print_version()
         vibration_profile_creator = VibrationsGraphCreator(self._st_config)
         st_process = ShakeTuneProcess(
             self._st_config,

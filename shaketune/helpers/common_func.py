@@ -9,7 +9,6 @@
 
 
 import math
-from pathlib import Path
 
 import numpy as np
 from scipy.signal import spectrogram
@@ -23,28 +22,6 @@ AXIS_CONFIG = [
     {'axis': 'corexz_x', 'direction': (1, 0, 1), 'label': 'belt_X'},
     {'axis': 'corexz_z', 'direction': (-1, 0, 1), 'label': 'belt_Z'},
 ]
-
-
-# This is used to print the current S&T version on top of the png graph file
-def get_git_version():
-    try:
-        # Get the absolute path of the script, resolving any symlinks
-        # Then get 2 times to parent dir to be at the git root folder
-        from git import GitCommandError, Repo
-
-        script_path = Path(__file__).resolve()
-        repo_path = script_path.parents[1]
-        repo = Repo(repo_path)
-
-        try:
-            version = repo.git.describe('--tags')
-        except GitCommandError:
-            # If no tag is found, use the simplified commit SHA instead
-            version = repo.head.commit.hexsha[:7]
-        return version
-
-    except Exception:
-        return None
 
 
 # This is Klipper's spectrogram generation function adapted to use Scipy
