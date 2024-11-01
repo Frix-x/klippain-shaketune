@@ -60,9 +60,10 @@ KLIPPAIN_COLORS = {
 }
 
 
+@GraphCreator.register('input shaper')
 class ShaperGraphCreator(GraphCreator):
     def __init__(self, config: ShakeTuneConfig):
-        super().__init__(config, 'input shaper')
+        super().__init__(config)
         self._max_smoothing: Optional[float] = None
         self._scv: Optional[float] = None
         self._accel_per_hz: Optional[float] = None

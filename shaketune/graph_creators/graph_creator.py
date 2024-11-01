@@ -21,12 +21,23 @@ from ..shaketune_config import ShakeTuneConfig
 
 
 class GraphCreator(abc.ABC):
-    def __init__(self, config: ShakeTuneConfig, graph_type: str):
+    registry = {}
+
+    @classmethod
+    def register(cls, graph_type: str):
+        def decorator(subclass):
+            cls.registry[graph_type] = subclass
+            subclass.graph_type = graph_type
+            return subclass
+
+        return decorator
+
+    def __init__(self, config: ShakeTuneConfig):
         self._config = config
         self._graph_date = datetime.now().strftime('%Y%m%d_%H%M%S')
         self._version = ShakeTuneConfig.get_git_version()
-        self._type = graph_type
-        self._folder = self._config.get_results_folder(graph_type)
+        self._type = self.__class__.graph_type
+        self._folder = self._config.get_results_folder(self._type)
 
     def _save_figure(
         self, fig: Figure, measurements_manager: MeasurementsManager, axis_label: Optional[str] = None

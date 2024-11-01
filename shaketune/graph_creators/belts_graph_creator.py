@@ -62,9 +62,10 @@ class PeakPairingResult(NamedTuple):
     unpaired_peaks2: List[int]
 
 
+@GraphCreator.register('belts comparison')
 class BeltsGraphCreator(GraphCreator):
     def __init__(self, config: ShakeTuneConfig):
-        super().__init__(config, 'belts comparison')
+        super().__init__(config)
         self._kinematics: Optional[str] = None
         self._accel_per_hz: Optional[float] = None
 

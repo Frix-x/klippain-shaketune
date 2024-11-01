@@ -52,9 +52,10 @@ KLIPPAIN_COLORS = {
 }
 
 
+@GraphCreator.register('vibrations profile')
 class VibrationsGraphCreator(GraphCreator):
     def __init__(self, config: ShakeTuneConfig):
-        super().__init__(config, 'vibrations profile')
+        super().__init__(config)
         self._kinematics: Optional[str] = None
         self._accel: Optional[float] = None
         self._motors: Optional[List[MotorsConfigParser]] = None
@@ -848,7 +849,7 @@ def vibrations_profile(
     if motors is not None and len(motors) == 2:
         differences = motors[0].compare_to(motors[1])
         plot_motor_config_txt(fig, motors, differences)
-        if differences is not None and kinematics in {'corexy', 'limited_corexy'}: 
+        if differences is not None and kinematics in {'corexy', 'limited_corexy'}:
             ConsoleOutput.print(f'Warning: motors have different TMC configurations!\n{differences}')
 
     # Plot the graphs
@@ -908,8 +909,17 @@ def main():
         opts.error('No measurements to analyse')
     if options.output is None:
         opts.error('You must specify an output file.png to use the script (option -o)')
-    if options.kinematics not in {'cartesian', 'limited_cartesian', 'corexy', 'limited_corexy', 'corexz', 'limited_corexz'}:
-        opts.error('Only cartesian, limited_cartesian, corexy, limited_corexy, corexz, limited_corexz kinematics are supported by this tool at the moment!')
+    if options.kinematics not in {
+        'cartesian',
+        'limited_cartesian',
+        'corexy',
+        'limited_corexy',
+        'corexz',
+        'limited_corexz',
+    }:
+        opts.error(
+            'Only cartesian, limited_cartesian, corexy, limited_corexy, corexz, limited_corexz kinematics are supported by this tool at the moment!'
+        )
 
     measurements_manager = MeasurementsManager(10)
     if args[0].endswith('.csv'):

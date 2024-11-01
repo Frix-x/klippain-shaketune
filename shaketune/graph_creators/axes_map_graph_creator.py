@@ -38,9 +38,10 @@ KLIPPAIN_COLORS = {
 MACHINE_AXES = ['x', 'y', 'z']
 
 
+@GraphCreator.register('axes map')
 class AxesMapGraphCreator(GraphCreator):
     def __init__(self, config: ShakeTuneConfig):
-        super().__init__(config, 'axes map')
+        super().__init__(config)
         self._accel: Optional[int] = None
         self._segment_length: Optional[float] = None
 

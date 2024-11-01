@@ -41,9 +41,10 @@ KLIPPAIN_COLORS = {
 }
 
 
+@GraphCreator.register('static frequency')
 class StaticGraphCreator(GraphCreator):
     def __init__(self, config: ShakeTuneConfig):
-        super().__init__(config, 'static frequency')
+        super().__init__(config)
         self._freq: Optional[float] = None
         self._duration: Optional[float] = None
         self._accel_per_hz: Optional[float] = None
