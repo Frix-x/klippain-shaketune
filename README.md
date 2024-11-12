@@ -47,6 +47,10 @@ Follow these steps to install Shake&Tune on your printer:
      #    RAM, and should work for everyone. However, if you are using a powerful computer, you may
      #    wish to increase this value to keep more measurements in memory (e.g., 15-20) before writing
      #    the chunk and avoid stressing the filesystem too much.
+     # max_freq: 200
+     #    This setting defines the maximum frequency at which the calculation of the power spectral density
+     #    is cutoff. The default value should be fine for most machines and accelerometer combinations and
+     #    avoid touching it unless you know what you're doing.
      # dpi: 300
      #    Controls the resolution of the generated graphs. The default value of 300 dpi was optimized
      #    and strikes a balance between performance and readability, ensuring that graphs are clear

@@ -6,11 +6,22 @@
 # File: __init__.py
 # Description: Imports various graph creator classes for the Shake&Tune package.
 
+import os
+import sys
 
-from .axes_map_graph_creator import AxesMapGraphCreator as AxesMapGraphCreator
-from .belts_graph_creator import BeltsGraphCreator as BeltsGraphCreator
-from .graph_creator import GraphCreator as GraphCreator
-from .graph_creator_factory import GraphCreatorFactory as GraphCreatorFactory
-from .shaper_graph_creator import ShaperGraphCreator as ShaperGraphCreator
-from .static_graph_creator import StaticGraphCreator as StaticGraphCreator
-from .vibrations_graph_creator import VibrationsGraphCreator as VibrationsGraphCreator
+
+def get_shaper_calibrate_module():
+    if not os.environ.get('SHAKETUNE_IN_CLI') == '1':
+        from ... import shaper_calibrate
+    else:
+        shaper_calibrate = sys.modules['shaper_calibrate']
+    return shaper_calibrate
+
+
+from .axes_map_graph_creator import AxesMapGraphCreator as AxesMapGraphCreator  # noqa: E402
+from .belts_graph_creator import BeltsGraphCreator as BeltsGraphCreator  # noqa: E402
+from .graph_creator import GraphCreator as GraphCreator  # noqa: E402
+from .graph_creator_factory import GraphCreatorFactory as GraphCreatorFactory  # noqa: E402
+from .shaper_graph_creator import ShaperGraphCreator as ShaperGraphCreator  # noqa: E402
+from .static_graph_creator import StaticGraphCreator as StaticGraphCreator  # noqa: E402
+from .vibrations_graph_creator import VibrationsGraphCreator as VibrationsGraphCreator  # noqa: E402
