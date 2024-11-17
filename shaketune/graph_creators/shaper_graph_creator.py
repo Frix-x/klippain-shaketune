@@ -175,16 +175,15 @@ class ShaperGraphComputation:
         # and the other one is the custom "performance" recommendation that looks for a suitable shaper that doesn't have excessive
         # vibrations level but have higher accelerations. If both recommendations are the same shaper, or if no suitable "performance"
         # shaper is found, then only a single line as the "best shaper" recommendation is printed
+        ConsoleOutput.print('Recommended filters:')
         if (
             perf_shaper_choice is not None
             and perf_shaper_choice != klipper_shaper_choice
             and perf_shaper_accel >= klipper_shaper_accel
         ):
-            perf_shaper_string = (
-                f'Recommended for performance: {perf_shaper_choice.upper()} @ {perf_shaper_freq:.1f} Hz'
-            )
+            perf_shaper_string = f'    -> For performance: {perf_shaper_choice.upper()} @ {perf_shaper_freq:.1f} Hz'
             lowvibr_shaper_string = (
-                f'Recommended for low vibrations: {klipper_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz'
+                f'    -> For low vibrations: {klipper_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz'
             )
             shaper_table_data['recommendations'].append(perf_shaper_string)
             shaper_table_data['recommendations'].append(lowvibr_shaper_string)
@@ -192,7 +191,7 @@ class ShaperGraphComputation:
             ConsoleOutput.print(f'{perf_shaper_string} (with a damping ratio of {zeta:.3f})')
             ConsoleOutput.print(f'{lowvibr_shaper_string} (with a damping ratio of {zeta:.3f})')
         else:
-            shaper_string = f'Recommended best shaper: {klipper_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz'
+            shaper_string = f'    -> Best shaper: {klipper_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz'
             shaper_table_data['recommendations'].append(shaper_string)
             shaper_choices = [klipper_shaper_choice.upper()]
             ConsoleOutput.print(f'{shaper_string} (with a damping ratio of {zeta:.3f})')
@@ -216,6 +215,9 @@ class ShaperGraphComputation:
             'bins': bins,
             'pdata': pdata,
             'additional_shapers': additional_shapers,
+            'accel_per_hz': self.accel_per_hz,
+            'max_smoothing': self.max_smoothing,
+            'scv': self.scv,
             'st_version': self.st_version,
         }
 

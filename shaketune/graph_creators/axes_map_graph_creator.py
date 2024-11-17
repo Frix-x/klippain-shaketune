@@ -71,7 +71,6 @@ class AxesMapComputation:
             data = np.array(measurement['samples'])
             if data is not None:
                 _axis = measurement['name'].split('_')[1].lower()
-                print(_axis)
                 raw_datas[_axis] = data
 
         cumulative_start_position = np.array([0, 0, 0])
@@ -150,6 +149,7 @@ class AxesMapComputation:
             'angle_errors': angle_errors,
             'formatted_direction_vector': formatted_direction_vector,
             'measurements': self.measurements,
+            'accel': self.accel,
             'st_version': self.st_version,
         }
 
