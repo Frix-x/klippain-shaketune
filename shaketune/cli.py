@@ -24,15 +24,15 @@ def configure_graph_creator(graph_type, args, dummy_config):
 
     # Dynamically configure the graph creator based on graph type
     if graph_type == 'axes map':
-        config_kwargs.update({'accel': args.accel, 'segment_length': args.length})
+        config_kwargs |= {'accel': args.accel, 'segment_length': args.length}
     elif graph_type == 'static frequency':
-        config_kwargs.update({'accel_per_hz': args.accel_per_hz, 'freq': args.frequency, 'duration': args.duration})
+        config_kwargs |= {'accel_per_hz': args.accel_per_hz, 'freq': args.frequency, 'duration': args.duration}
     elif graph_type == 'belts comparison':
-        config_kwargs.update({'kinematics': args.kinematics, 'accel_per_hz': args.accel_per_hz})
+        config_kwargs |= {'kinematics': args.kinematics, 'accel_per_hz': args.accel_per_hz}
     elif graph_type == 'input shaper':
-        config_kwargs.update({'scv': args.scv, 'max_smoothing': args.max_smoothing, 'accel_per_hz': args.accel_per_hz})
+        config_kwargs |= {'scv': args.scv, 'max_smoothing': args.max_smoothing, 'accel_per_hz': args.accel_per_hz}
     elif graph_type == 'vibrations profile':
-        config_kwargs.update({'kinematics': args.kinematics, 'accel': args.accel})
+        config_kwargs |= {'kinematics': args.kinematics, 'accel': args.accel}
 
     graph_creator.configure(**config_kwargs)
     return graph_creator
