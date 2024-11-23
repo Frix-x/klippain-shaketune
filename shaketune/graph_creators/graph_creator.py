@@ -53,7 +53,10 @@ class GraphCreator(abc.ABC):
             filename = self._folder / f"{self._type.replace(' ', '')}_{self._graph_date}{axis_suffix}"
             fig.savefig(f'{filename}.png', dpi=self._config.dpi)
 
-        if self._config.keep_raw_data and not os.environ.get('SHAKETUNE_IN_CLI') == '1':
+        if (
+            self._config.keep_raw_data
+            and os.environ.get('SHAKETUNE_IN_CLI') != '1'
+        ):
             measurements_manager.save_stdata(f'{filename}.stdata')
 
     def get_type(self) -> str:
