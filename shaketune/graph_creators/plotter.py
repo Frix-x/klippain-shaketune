@@ -47,7 +47,9 @@ class Plotter:
         image_path = os.path.join(current_dir, 'klippain.png')
         self.logo_image = plt.imread(image_path)
 
-    def add_logo(self, fig, position=[0.001, 0.894, 0.105, 0.105]):  # noqa: B006
+    def add_logo(self, fig, position=None):  # noqa: B006
+        if position is None:
+            position = [0.001, 0.894, 0.105, 0.105]
         ax_logo = fig.add_axes(position, anchor='NW')
         ax_logo.imshow(self.logo_image)
         ax_logo.axis('off')
