@@ -14,7 +14,7 @@ from .graph_creator import GraphCreator
 class GraphCreatorFactory:
     @staticmethod
     def create_graph_creator(graph_type: str, config: ShakeTuneConfig) -> GraphCreator:
-        creator_class = GraphCreator.registry.get(graph_type, None)
-        if not creator_class:
+        if creator_class := GraphCreator.registry.get(graph_type):
+            return creator_class(config)
+        else:
             raise NotImplementedError(f'Graph creator for {graph_type} not implemented!')
-        return creator_class(config)
