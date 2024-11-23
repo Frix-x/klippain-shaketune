@@ -269,9 +269,8 @@ class AxesMapComputation:
                     axes_count[MACHINE_AXES[i]] += 1
                     break
 
-        # Check if all axes are present in the axes_map and return an error message if not
-        for _, count in axes_count.items():
-            if count != 1:
-                return 'unable to determine it correctly!'
-
-        return ', '.join(formatted_vector)
+        # If all axes are present, return the formatted vector
+        return next(
+            ('unable to determine it correctly!' for count in axes_count.values() if count != 1),
+            ', '.join(formatted_vector),
+        )
