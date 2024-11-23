@@ -78,7 +78,7 @@ class StaticGraphComputation:
         pdata, bins, t = compute_spectrogram(datas[0])
         del datas
 
-        computation_result = {
+        return {
             'freq': self.freq,
             'duration': self.duration,
             'accel_per_hz': self.accel_per_hz,
@@ -89,5 +89,3 @@ class StaticGraphComputation:
             'pdata': pdata,
             'max_freq': self.max_freq,
         }
-
-        return computation_result

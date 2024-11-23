@@ -211,7 +211,7 @@ class VibrationGraphComputation:
                 f'Motors have a main resonant frequency at {motor_fr:.1f}Hz but it was impossible to estimate a damping ratio.'
             )
 
-        computation_results = {
+        return {
             'measurements': self.measurements,
             'all_speeds': all_speeds,
             'all_angles': all_angles,
@@ -240,8 +240,6 @@ class VibrationGraphComputation:
             'motor_res_idx': motor_res_idx,
             'st_version': self.st_version,
         }
-
-        return computation_results
 
     # Calculate motor frequency profiles based on the measured Power Spectral Density (PSD) measurements for the machine kinematics
     # main angles and then create a global motor profile as a weighted average (from their own vibrations) of all calculated profiles

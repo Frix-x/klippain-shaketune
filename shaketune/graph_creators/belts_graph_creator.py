@@ -120,8 +120,7 @@ class BeltsGraphComputation:
             mhi = self._compute_mhi(similarity_factor, signal1, signal2)
             ConsoleOutput.print(f'Mechanical health: {mhi}')
 
-        # Prepare data for plotting
-        computation_result = {
+        return {
             'signal1': signal1,
             'signal2': signal2,
             'similarity_factor': similarity_factor,
@@ -134,8 +133,6 @@ class BeltsGraphComputation:
             'measurements': self.measurements,
             'max_freq': self.max_freq,
         }
-
-        return computation_result
 
     def _compute_signal_data(self, data: np.ndarray, common_freqs: np.ndarray, max_freq: float):
         helper = get_shaper_calibrate_module().ShaperCalibrate(printer=None)

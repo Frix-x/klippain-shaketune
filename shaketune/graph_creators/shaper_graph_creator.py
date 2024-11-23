@@ -196,8 +196,7 @@ class ShaperGraphComputation:
             shaper_choices = [klipper_shaper_choice.upper()]
             ConsoleOutput.print(f'{shaper_string} (with a damping ratio of {zeta:.3f})')
 
-        # And finally setup the results to return them
-        computation_result = {
+        return {
             'measurements': self.measurements,
             'compat': compat,
             'max_smoothing_computed': max_smoothing_computed,
@@ -220,8 +219,6 @@ class ShaperGraphComputation:
             'scv': self.scv,
             'st_version': self.st_version,
         }
-
-        return computation_result
 
     # Find the best shaper parameters using Klipper's official algorithm selection with
     # a proper precomputed damping ratio (zeta) and using the configured printer SQV value

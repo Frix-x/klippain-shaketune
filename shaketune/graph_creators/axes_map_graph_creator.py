@@ -138,8 +138,7 @@ class AxesMapComputation:
         formatted_direction_vector = self._format_direction_vector(direction_vectors)
         ConsoleOutput.print(f'--> Detected axes_map: {formatted_direction_vector}')
 
-        # Prepare data for plotting
-        computation_result = {
+        return {
             'acceleration_data_0': [d[0] for d in acceleration_data],
             'acceleration_data_1': [d[1] for d in acceleration_data],
             'gravity': gravity,
@@ -152,8 +151,6 @@ class AxesMapComputation:
             'accel': self.accel,
             'st_version': self.st_version,
         }
-
-        return computation_result
 
     def _wavelet_denoise(self, data: np.ndarray, wavelet: str = 'db1', level: int = 1) -> Tuple[np.ndarray, np.ndarray]:
         coeffs = pywt.wavedec(data, wavelet, mode='smooth')
