@@ -28,6 +28,7 @@ AXIS_CONFIG = [
 ]
 
 
+# TODO: remove this function when the refactoring is finished
 def setup_klipper_import(kdir):
     kdir = os.path.expanduser(kdir)
     sys.path.append(os.path.join(kdir, 'klippy'))

@@ -31,6 +31,7 @@ class ShakeTuneConfig:
         keep_n_results: int = 10,
         keep_raw_data: bool = False,
         chunk_size: int = 2,
+        max_freq: float = 200.0,
         dpi: int = 150,
     ) -> None:
         self._result_folder = result_folder
@@ -38,6 +39,8 @@ class ShakeTuneConfig:
         self.keep_n_results = keep_n_results
         self.keep_raw_data = keep_raw_data
         self.chunk_size = chunk_size
+        self.max_freq = max_freq
+        self.max_freq_vibrations = max_freq * 5  # 1000Hz is the default (5 * 200.0)
         self.dpi = dpi
 
         self.klipper_folder = KLIPPER_FOLDER
