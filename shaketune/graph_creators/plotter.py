@@ -662,7 +662,7 @@ class Plotter:
         )
         ax_1 = fig.add_subplot(gs[0, 0])
         ax_2 = fig.add_subplot(gs[1, 0])
-        ax_3 = fig.add_subplot(gs[0, 1])
+        ax_3 = fig.add_subplot(gs[1, 1])
 
         # Add titles and logo
         try:
@@ -835,30 +835,27 @@ class Plotter:
         )
 
         # Add a zoom axes on the graph to show details at low vibrations
-        zoomed_window = np.clip(max_shaper_vibrations * self.MAX_VIBRATIONS_PLOTTED_ZOOM, 0, 20)
+        zoomed_window = np.clip(max_shaper_vibrations * self.MAX_VIBRATIONS_PLOTTED_ZOOM, 0, 15)
         axins = ax_3.inset_axes(
-            [0.575, 0.125, 0.40, 0.45],
+            [0.575, 0.070, 0.40, 0.45],
             xlim=(min_accel_limit * 0.95, max_accel_limit_zoom * 1.1),
             ylim=(-0.5, zoomed_window),
         )
-        ax_3.indicate_inset_zoom(axins, edgecolor=self.KLIPPAIN_COLORS['purple'], linewidth=3)
+        ax_3.indicate_inset_zoom(axins, edgecolor=self.KLIPPAIN_COLORS['purple'], linewidth=2)
         axins.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(500))
         axins.yaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator())
         axins.grid(which='major', color='grey')
         axins.grid(which='minor', color='lightgrey')
 
-        # Draw the green zone on both axes to highlight the low vibrations zone
-        x_fill = np.linspace(min_accel_limit * 0.95, max_accel_limit * 1.1, 100)
-        y_fill = np.full_like(x_fill, 5.0)
-        ax_3.axhline(y=5.0, color='black', linestyle='--', linewidth=0.5)
-        ax_3.fill_between(x_fill, -0.5, y_fill, color='green', alpha=0.15)
+        # Draw the green zone on inset axes to highlight the low vibrations zone
         if zoomed_window > 5.0:
-            axins.axhline(y=5.0, color='black', linestyle='--', linewidth=0.5)
+            x_fill = np.linspace(min_accel_limit * 0.95, max_accel_limit * 1.1, 100)
+            y_fill = np.full_like(x_fill, 5.0)
             axins.fill_between(x_fill, -0.5, y_fill, color='green', alpha=0.15)
 
         # Plot each shaper remaining vibrations response over acceleration
         max_vibrations = 0
-        for _, (shaper_type, data) in enumerate(shaper_data.items()):
+        for shaper_type, data in shaper_data.items():
             max_accel_values = np.array([d['max_accel'] for d in data])
             vibrs_values = np.array([d['vibrs'] for d in data])
 
@@ -899,16 +896,26 @@ class Plotter:
             for shaper in shaper_table_data['shapers']
         ]
 
-        table = plt.table(cellText=table_data, colLabels=columns, bbox=[1.130, -0.4, 0.803, 0.25], cellLoc='center')
+        table = plt.table(cellText=table_data, colLabels=columns, bbox=[1.100, 0.535, 0.830, 0.240], cellLoc='center')
         table.auto_set_font_size(False)
         table.set_fontsize(10)
         table.auto_set_column_width([0, 1, 2, 3, 4])
         table.set_zorder(100)
+        bold_font = matplotlib.font_manager.FontProperties(weight='bold')
+        for key, cell in table.get_celld().items():
+            row, col = key
+            cell.set_text_props(ha='center', va='center')
+            if col == 0:
+                cell.get_text().set_fontproperties(bold_font)
+                cell.get_text().set_color(self.KLIPPAIN_COLORS['dark_purple'])
+            if row == 0:
+                cell.get_text().set_fontproperties(bold_font)
+                cell.get_text().set_color(self.KLIPPAIN_COLORS['dark_orange'])
 
         # Add the filter general recommendations and estimated damping ratio
         fig.text(
-            0.585,
-            0.155,
+            0.575,
+            0.897,
             'Recommended filters:',
             fontsize=15,
             fontweight='bold',
@@ -916,11 +923,11 @@ class Plotter:
         )
         recommendations = shaper_table_data['recommendations']
         for idx, rec in enumerate(recommendations):
-            fig.text(0.590, 0.125 - idx * 0.025, rec, fontsize=14, color=self.KLIPPAIN_COLORS['purple'])
+            fig.text(0.580, 0.867 - idx * 0.025, rec, fontsize=14, color=self.KLIPPAIN_COLORS['purple'])
         new_idx = len(recommendations)
         fig.text(
-            0.590,
-            0.125 - new_idx * 0.025,
+            0.580,
+            0.867 - new_idx * 0.025,
             f'    -> Estimated damping ratio (ζ): {shaper_table_data["damping_ratio"]:.3f}',
             fontsize=14,
             color=self.KLIPPAIN_COLORS['purple'],
