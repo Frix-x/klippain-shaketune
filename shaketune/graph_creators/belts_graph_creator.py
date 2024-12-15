@@ -135,8 +135,8 @@ class BeltsGraphComputation:
         }
 
     def _compute_signal_data(self, data: np.ndarray, common_freqs: np.ndarray, max_freq: float):
-        helper = get_shaper_calibrate_module().ShaperCalibrate(printer=None)
-        calibration_data = helper.process_accelerometer_data(data)
+        shaper_calibrate, _ = get_shaper_calibrate_module()
+        calibration_data = shaper_calibrate.process_accelerometer_data(data)
 
         freqs = calibration_data.freq_bins[calibration_data.freq_bins <= max_freq]
         psd = calibration_data.get_psd('all')[calibration_data.freq_bins <= max_freq]

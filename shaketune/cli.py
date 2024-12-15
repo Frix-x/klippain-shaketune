@@ -44,6 +44,7 @@ def load_klipper_module(args):
         kdir = os.path.expanduser(args.klipper_dir)
         sys.path.append(os.path.join(kdir, 'klippy'))
         sys.modules['shaper_calibrate'] = import_module('.shaper_calibrate', 'extras')
+        sys.modules['shaper_defs'] = import_module('.shaper_defs', 'extras')
 
 
 def main():

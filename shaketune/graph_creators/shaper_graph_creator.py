@@ -28,8 +28,12 @@ from .graph_creator import GraphCreator
 
 PEAKS_DETECTION_THRESHOLD = 0.05
 PEAKS_EFFECT_THRESHOLD = 0.12
-SMOOTHING_TESTS = 10  # Number of smoothing values to test (it will significantly increase the computation time)
 MAX_VIBRATIONS = 5.0
+MIN_ACCEL = 100.0
+MIN_SMOOTHING = 0.001
+TARGET_SMOOTHING = 0.12
+MIN_FREQ = 5.0
+MAX_SHAPER_FREQ = 150.0
 
 
 @GraphCreator.register('input shaper')
@@ -101,13 +105,12 @@ class ShaperGraphComputation:
 
         # Compute shapers, PSD outputs and spectrogram
         (
-            klipper_shaper_choice,
-            shapers,
-            additional_shapers,
+            k_shaper_choice,
+            k_shapers,
+            shapers_tradeoff_data,
             calibration_data,
             fr,
             zeta,
-            max_smoothing_computed,
             compat,
         ) = self._calibrate_shaper(datas[0], self.max_smoothing, self.scv, self.max_freq)
         pdata, bins, t = compute_spectrogram(datas[0])
@@ -148,7 +151,8 @@ class ShaperGraphComputation:
         perf_shaper_choice = None
         perf_shaper_freq = None
         perf_shaper_accel = 0
-        for shaper in shapers:
+        max_smoothing_computed = 0
+        for shaper in k_shapers:
             shaper_info = {
                 'type': shaper.name.upper(),
                 'frequency': shaper.freq,
@@ -158,9 +162,10 @@ class ShaperGraphComputation:
                 'vals': shaper.vals,
             }
             shaper_table_data['shapers'].append(shaper_info)
+            max_smoothing_computed = max(max_smoothing_computed, shaper.smoothing)
 
             # Get the Klipper recommended shaper (usually it's a good low vibration compromise)
-            if shaper.name == klipper_shaper_choice:
+            if shaper.name == k_shaper_choice:
                 klipper_shaper_freq = shaper.freq
                 klipper_shaper_accel = shaper.max_accel
 
@@ -178,22 +183,22 @@ class ShaperGraphComputation:
         ConsoleOutput.print('Recommended filters:')
         if (
             perf_shaper_choice is not None
-            and perf_shaper_choice != klipper_shaper_choice
+            and perf_shaper_choice != k_shaper_choice
             and perf_shaper_accel >= klipper_shaper_accel
         ):
             perf_shaper_string = f'    -> For performance: {perf_shaper_choice.upper()} @ {perf_shaper_freq:.1f} Hz'
             lowvibr_shaper_string = (
-                f'    -> For low vibrations: {klipper_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz'
+                f'    -> For low vibrations: {k_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz'
             )
             shaper_table_data['recommendations'].append(perf_shaper_string)
             shaper_table_data['recommendations'].append(lowvibr_shaper_string)
-            shaper_choices = [klipper_shaper_choice.upper(), perf_shaper_choice.upper()]
+            shaper_choices = [k_shaper_choice.upper(), perf_shaper_choice.upper()]
             ConsoleOutput.print(f'{perf_shaper_string} (with a damping ratio of {zeta:.3f})')
             ConsoleOutput.print(f'{lowvibr_shaper_string} (with a damping ratio of {zeta:.3f})')
         else:
-            shaper_string = f'    -> Best shaper: {klipper_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz'
+            shaper_string = f'    -> Best shaper: {k_shaper_choice.upper()} @ {klipper_shaper_freq:.1f} Hz'
             shaper_table_data['recommendations'].append(shaper_string)
-            shaper_choices = [klipper_shaper_choice.upper()]
+            shaper_choices = [k_shaper_choice.upper()]
             ConsoleOutput.print(f'{shaper_string} (with a damping ratio of {zeta:.3f})')
 
         return {
@@ -202,7 +207,7 @@ class ShaperGraphComputation:
             'max_smoothing_computed': max_smoothing_computed,
             'max_freq': self.max_freq,
             'calibration_data': calibration_data,
-            'shapers': shapers,
+            'shapers': k_shapers,
             'shaper_table_data': shaper_table_data,
             'shaper_choices': shaper_choices,
             'peaks': peaks,
@@ -213,7 +218,7 @@ class ShaperGraphComputation:
             't': t,
             'bins': bins,
             'pdata': pdata,
-            'additional_shapers': additional_shapers,
+            'shapers_tradeoff_data': shapers_tradeoff_data,
             'accel_per_hz': self.accel_per_hz,
             'max_smoothing': self.max_smoothing,
             'scv': self.scv,
@@ -224,18 +229,20 @@ class ShaperGraphComputation:
     # a proper precomputed damping ratio (zeta) and using the configured printer SQV value
     # This function also sweep around the smoothing values to help you find the best compromise
     def _calibrate_shaper(self, datas: List[np.ndarray], max_smoothing: Optional[float], scv: float, max_freq: float):
-        helper = get_shaper_calibrate_module().ShaperCalibrate(printer=None)
-        calibration_data = helper.process_accelerometer_data(datas)
-        calibration_data.normalize_to_frequencies()
+        shaper_calibrate, shaper_defs = get_shaper_calibrate_module()
+        calib_data = shaper_calibrate.process_accelerometer_data(datas)
+        calib_data.normalize_to_frequencies()
 
         # We compute the damping ratio using the Klipper's default value if it fails
-        fr, zeta, _, _ = compute_mechanical_parameters(calibration_data.psd_sum, calibration_data.freq_bins)
+        fr, zeta, _, _ = compute_mechanical_parameters(calib_data.psd_sum, calib_data.freq_bins)
         zeta = zeta if zeta is not None else 0.1
 
+        # First we find the best shapers using the Klipper's standard algorithms. This will give us Klipper's
+        # best shaper choice and the full list of shapers that are set to the current machine response
         compat = False
         try:
-            k_shaper_choice, all_shapers = helper.find_best_shaper(
-                calibration_data,
+            k_shaper_choice, k_shapers = shaper_calibrate.find_best_shaper(
+                calib_data,
                 shapers=None,
                 damping_ratio=zeta,
                 scv=scv,
@@ -260,68 +267,111 @@ class ShaperGraphComputation:
                 )
             )
             compat = True
-            k_shaper_choice, all_shapers = helper.find_best_shaper(calibration_data, max_smoothing, None)
+            k_shaper_choice, k_shapers = shaper_calibrate.find_best_shaper(calib_data, max_smoothing, None)
 
-        # If max_smoothing is not None, we run the same computation but without a smoothing value
-        # to get the max smoothing values from the filters and create the testing list
-        all_shapers_nosmoothing = None
-        if max_smoothing is not None:
-            if compat:
-                _, all_shapers_nosmoothing = helper.find_best_shaper(calibration_data, None, None)
-            else:
-                _, all_shapers_nosmoothing = helper.find_best_shaper(
-                    calibration_data,
-                    shapers=None,
-                    damping_ratio=zeta,
-                    scv=scv,
-                    shaper_freqs=None,
-                    max_smoothing=None,
-                    test_damping_ratios=None,
-                    max_freq=max_freq,
-                    logger=None,
-                )
-
-        # Then we iterate over the all_shaperts_nosmoothing list to get the max of the smoothing values
-        max_smoothing = 0.0
-        if all_shapers_nosmoothing is not None:
-            for shaper in all_shapers_nosmoothing:
-                if shaper.smoothing > max_smoothing:
-                    max_smoothing = shaper.smoothing
+        # Then in a second time, we run again the same computation but with a super low smoothing value to
+        # get the maximum accelerations values for each algorithms.
+        if compat:
+            _, k_shapers_max = shaper_calibrate.find_best_shaper(calib_data, MIN_SMOOTHING, None)
         else:
-            for shaper in all_shapers:
-                if shaper.smoothing > max_smoothing:
-                    max_smoothing = shaper.smoothing
+            _, k_shapers_max = shaper_calibrate.find_best_shaper(
+                calib_data,
+                shapers=None,
+                damping_ratio=zeta,
+                scv=scv,
+                shaper_freqs=None,
+                max_smoothing=MIN_SMOOTHING,
+                test_damping_ratios=None,
+                max_freq=max_freq,
+                logger=None,
+            )
 
-        # Then we create a list of smoothing values to test (no need to test the max smoothing value as it was already tested)
-        smoothing_test_list = np.linspace(0.001, max_smoothing, SMOOTHING_TESTS)[:-1]
-        additional_all_shapers = {}
-        for smoothing in smoothing_test_list:
-            if compat:
-                _, all_shapers_bis = helper.find_best_shaper(calibration_data, smoothing, None)
-            else:
-                _, all_shapers_bis = helper.find_best_shaper(
-                    calibration_data,
-                    shapers=None,
-                    damping_ratio=zeta,
-                    scv=scv,
-                    shaper_freqs=None,
-                    max_smoothing=smoothing,
-                    test_damping_ratios=None,
-                    max_freq=max_freq,
-                    logger=None,
-                )
-            additional_all_shapers[f'sm_{smoothing}'] = all_shapers_bis
-        additional_all_shapers['max_smoothing'] = (
-            all_shapers_nosmoothing if all_shapers_nosmoothing is not None else all_shapers
-        )
+        # TODO: re-add this in next release
+        # --------------------------------------------------------------------------------------------------------------
+        # # Finally we create the data structure to plot the additional graphs (tradeoffs for vibrs and smoothing)
+        # shapers_tradeoff_data = {}
+        # for shaper in k_shapers_max:
+        #     shaper_cfg = next(cfg for cfg in shaper_defs.INPUT_SHAPERS if cfg.name == shaper.name)
+
+        #     accels_to_plot = np.linspace(MIN_ACCEL, shaper.max_accel, 100)
+        #     smoothing_to_plot = np.linspace(MIN_SMOOTHING, 0.20, 100)
+        #     # smoothing_to_plot = np.linspace(MIN_SMOOTHING, shaper.smoothing * 10, 100)
+
+        #     shapers_tradeoff_data[shaper.name] = self._compute_tradeoff_data(
+        #         shaper_calibrate,
+        #         shaper_cfg,
+        #         zeta,
+        #         scv,
+        #         calib_data,
+        #         accels_to_plot,
+        #         smoothing_to_plot,
+        #     )
+        # --------------------------------------------------------------------------------------------------------------
 
         return (
             k_shaper_choice.name,
-            all_shapers,
-            additional_all_shapers,
-            calibration_data,
+            k_shapers,
+            None,  # shapers_tradeoff_data,
+            calib_data,
             fr,
             zeta,
-            max_smoothing,
             compat,
         )
+
+    # # For a given shaper type and machine damping ratio, this compute the remaining vibration and smoothing
+    # # the machine will experience for a given range of acceleration values and target smoothing values.
+    # def _compute_tradeoff_data(
+    #     self, shaper_calibrate, shaper_cfg, zeta, scv, calib_data, accels_to_plot, smoothing_to_plot
+    # ):
+    #     # Initialize grids to store computed values
+    #     vibrations_grid = np.zeros((len(accels_to_plot), len(smoothing_to_plot)))
+    #     shaper_freqs_grid = np.zeros_like(vibrations_grid)
+
+    #     # Loop over acceleration and smoothing values
+    #     for i, accel in enumerate(accels_to_plot):
+    #         for j, smoothing in enumerate(smoothing_to_plot):
+    #             # Find the shaper frequency that results in the target smoothing at this acceleration
+    #             shaper_freq = self._fit_shaper(
+    #                 shaper_calibrate,
+    #                 shaper_cfg,
+    #                 accel,
+    #                 zeta,
+    #                 scv,
+    #                 target_smoothing=smoothing,
+    #                 min_freq=MIN_FREQ,
+    #                 max_freq=MAX_SHAPER_FREQ,
+    #             )
+    #             if shaper_freq is not None:
+    #                 A, T = shaper_cfg.init_func(shaper_freq, zeta)
+    #                 vibration, _ = shaper_calibrate._estimate_remaining_vibrations(
+    #                     (A, T), zeta, calib_data.freq_bins, calib_data.psd_sum
+    #                 )
+    #                 vibrations_grid[i, j] = vibration * 100.0  # Convert to percentage
+    #                 shaper_freqs_grid[i, j] = shaper_freq
+    #             else:
+    #                 # If no valid frequency is found, store NaN values
+    #                 vibrations_grid[i, j] = np.nan
+    #                 shaper_freqs_grid[i, j] = np.nan
+
+    #     return {
+    #         'accels': accels_to_plot,
+    #         'smoothings': smoothing_to_plot,
+    #         'vibrations_grid': vibrations_grid,
+    #         'shaper_freqs_grid': shaper_freqs_grid,
+    #     }
+
+    # # Fit a shaper filter to the accelerometer recording in order to find the shaper frequency that results
+    # # (or is close) to the target smoothing at the given acceleration.
+    # def _fit_shaper(self, shaper_calibrate, shaper_cfg, accel, zeta, scv, target_smoothing, min_freq, max_freq):
+    #     def smoothing_loss(freq):
+    #         # Compute shaper parameters
+    #         shaper = shaper_cfg.init_func(freq, zeta)
+    #         smoothing = shaper_calibrate._get_shaper_smoothing(shaper, accel, scv)
+    #         return smoothing - target_smoothing
+
+    #     # Use a root-finding method to solve for freq where smoothing equals target_smoothing
+    #     try:
+    #         shaper_freq = optimize.brentq(smoothing_loss, min_freq, max_freq)
+    #     except ValueError:
+    #         shaper_freq = None
+    #     return shaper_freq
