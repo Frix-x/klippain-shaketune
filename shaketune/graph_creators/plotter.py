@@ -640,7 +640,7 @@ class Plotter:
         t = data['t']
         bins = data['bins']
         pdata = data['pdata']
-        shapers_tradeoff_data = data['shapers_tradeoff_data']
+        # shapers_tradeoff_data = data['shapers_tradeoff_data']
         accel_per_hz = data['accel_per_hz']
         max_smoothing = data['max_smoothing']
         scv = data['scv']
