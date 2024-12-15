@@ -95,7 +95,7 @@ class VibrationGraphComputation:
         target_freqs_initialized = False
         target_freqs = None
 
-        helper = get_shaper_calibrate_module().ShaperCalibrate(printer=None)
+        shaper_calibrate, _ = get_shaper_calibrate_module()
 
         for measurement in self.measurements:
             data = np.array(measurement['samples'])
@@ -103,7 +103,7 @@ class VibrationGraphComputation:
                 continue  # Measurement data is not in the expected format or is empty, skip it
 
             angle, speed = self._extract_angle_and_speed(measurement['name'])
-            freq_response = helper.process_accelerometer_data(data)
+            freq_response = shaper_calibrate.process_accelerometer_data(data)
             first_freqs = freq_response.freq_bins
             psd_sum = freq_response.psd_sum
 
