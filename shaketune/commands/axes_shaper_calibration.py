@@ -23,8 +23,22 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     systime = printer.get_reactor().monotonic()
     toolhead_info = toolhead.get_status(systime)
 
-    min_freq = gcmd.get_float('FREQ_START', default=res_tester.test.min_freq, minval=1)
-    max_freq = gcmd.get_float('FREQ_END', default=res_tester.test.max_freq, minval=1)
+    # Get the default values for the frequency range and the acceleration per Hz
+    if hasattr(res_tester, 'test'):
+        # Old Klipper code (before Dec 6, 2024: https://github.com/Klipper3d/klipper/commit/16b4b6b302ac3ffcd55006cd76265aad4e26ecc8)
+        default_min_freq = res_tester.test.min_freq
+        default_max_freq = res_tester.test.max_freq
+        default_accel_per_hz = res_tester.test.accel_per_hz
+        test_points = res_tester.test.get_start_test_points()
+    else:
+        # New Klipper code (after Dec 6, 2024) with the sweeping test
+        default_min_freq = res_tester.generator.vibration_generator.min_freq
+        default_max_freq = res_tester.generator.vibration_generator.max_freq
+        default_accel_per_hz = res_tester.generator.vibration_generator.accel_per_hz
+        test_points = res_tester.probe_points
+
+    min_freq = gcmd.get_float('FREQ_START', default=default_min_freq, minval=1)
+    max_freq = gcmd.get_float('FREQ_END', default=default_max_freq, minval=1)
     hz_per_sec = gcmd.get_float('HZ_PER_SEC', default=1, minval=1)
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     axis_input = gcmd.get('AXIS', default='all').lower()
@@ -39,14 +53,13 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         accel_per_hz = None
 
     if accel_per_hz is None:
-        accel_per_hz = res_tester.test.accel_per_hz
+        accel_per_hz = default_accel_per_hz
 
     gcode = printer.lookup_object('gcode')
 
     max_accel = max_freq * accel_per_hz
 
     # Move to the starting point
-    test_points = res_tester.test.get_start_test_points()
     if len(test_points) > 1:
         raise gcmd.error('Only one test point in the [resonance_tester] section is supported by Shake&Tune.')
     if test_points[0] == (-1, -1, -1):
