@@ -24,6 +24,7 @@ from ..helpers.console_output import ConsoleOutput
 
 
 # This class is used to generate the base vibration test sequences
+# Note: it's almost untouched from the original Klipper code from Dmitry Butyugin
 class BaseVibrationGenerator:
     def __init__(self, min_freq, max_freq, accel_per_hz, hz_per_sec):
         self.min_freq = min_freq
@@ -32,8 +33,6 @@ class BaseVibrationGenerator:
         self.hz_per_sec = hz_per_sec
         self.freq_start = min_freq
         self.freq_end = max_freq
-        self.test_accel_per_hz = accel_per_hz
-        self.test_hz_per_sec = hz_per_sec
 
     def prepare_test(self, freq_start=None, freq_end=None, accel_per_hz=None, hz_per_sec=None):
         if freq_start is not None:
@@ -41,9 +40,9 @@ class BaseVibrationGenerator:
         if freq_end is not None:
             self.freq_end = freq_end
         if accel_per_hz is not None:
-            self.test_accel_per_hz = accel_per_hz
+            self.accel_per_hz = accel_per_hz
         if hz_per_sec is not None:
-            self.test_hz_per_sec = hz_per_sec
+            self.hz_per_sec = hz_per_sec
 
     def get_max_freq(self):
         return self.freq_end
@@ -55,24 +54,23 @@ class BaseVibrationGenerator:
         time = 0.0
         while freq <= self.freq_end + 0.000001:
             t_seg = 0.25 / freq
-            accel = self.test_accel_per_hz * freq
+            accel = self.accel_per_hz * freq
             time += t_seg
             result.append((time, sign * accel, freq))
             time += t_seg
             result.append((time, -sign * accel, freq))
-            freq += 2.0 * t_seg * self.test_hz_per_sec
+            freq += 2.0 * t_seg * self.hz_per_sec
             sign = -sign
         return result
 
 
 # This class is a derivative of BaseVibrationGenerator that adds slow sweeping acceleration to the test sequences (new style)
+# Note: it's almost untouched from the original Klipper code from Dmitry Butyugin
 class SweepingVibrationGenerator(BaseVibrationGenerator):
     def __init__(self, min_freq, max_freq, accel_per_hz, hz_per_sec, sweeping_accel=400.0, sweeping_period=1.2):
         super().__init__(min_freq, max_freq, accel_per_hz, hz_per_sec)
         self.sweeping_accel = sweeping_accel
         self.sweeping_period = sweeping_period
-        self.test_sweeping_accel = sweeping_accel
-        self.test_sweeping_period = sweeping_period
 
     def prepare_test(
         self,
@@ -85,19 +83,19 @@ class SweepingVibrationGenerator(BaseVibrationGenerator):
     ):
         super().prepare_test(freq_start, freq_end, accel_per_hz, hz_per_sec)
         if sweeping_accel is not None:
-            self.test_sweeping_accel = sweeping_accel
+            self.sweeping_accel = sweeping_accel
         if sweeping_period is not None:
-            self.test_sweeping_period = sweeping_period
+            self.sweeping_period = sweeping_period
 
     def gen_test(self):
         base_seq = super().gen_test()
-        if not self.test_sweeping_period:
+        if not self.sweeping_period:
             # If sweeping_period == 0, just return base sequence (old style pulse-only test)
             return base_seq
 
         accel_fraction = math.sqrt(2.0) * 0.125
-        t_rem = self.test_sweeping_period * accel_fraction
-        sweeping_accel = self.test_sweeping_accel
+        t_rem = self.sweeping_period * accel_fraction
+        sweeping_accel = self.sweeping_accel
         result = []
         last_t = 0.0
         sig = 1.0
@@ -109,7 +107,7 @@ class SweepingVibrationGenerator(BaseVibrationGenerator):
                 last_t += t_rem
                 result.append((last_t, accel + sweeping_accel * sig, freq))
                 t_seg -= t_rem
-                t_rem = self.test_sweeping_period * accel_fraction
+                t_rem = self.sweeping_period * accel_fraction
                 accel_fraction = 0.5
                 sig = -sig
             t_rem -= t_seg
@@ -130,7 +128,7 @@ class StaticFrequencyVibrationGenerator(BaseVibrationGenerator):
     def gen_test(self):
         freq = self.freq_start  # same as self.freq_end since static
         t_seg = 0.25 / freq
-        accel = self.test_accel_per_hz * freq
+        accel = self.accel_per_hz * freq
         sign = 1.0
         time = 0.0
         result = []
@@ -178,8 +176,8 @@ class ResonanceTestManager:
                 self.res_tester.generator.vibration_generator.max_freq,
                 self.res_tester.generator.vibration_generator.accel_per_hz,
                 self.res_tester.generator.vibration_generator.hz_per_sec,
-                self.res_tester.generator.test_sweeping_period,
-                self.res_tester.generator.test_sweeping_accel,
+                self.res_tester.generator.sweeping_period,
+                self.res_tester.generator.sweeping_accel,
             )
 
     def vibrate_axis(self, axis_direction, min_freq=None, max_freq=None, hz_per_sec=None, accel_per_hz=None):
@@ -192,10 +190,12 @@ class ResonanceTestManager:
         s_period = base_s_period
         s_accel = base_s_accel
 
-        if s_period > 0:
-            gen = SweepingVibrationGenerator(final_min_f, final_max_f, final_aph, final_hps, s_accel, s_period)
-        else:
+        if s_period == 0 or self.is_old_klipper:
+            ConsoleOutput.print('Using pulse-only test')
             gen = BaseVibrationGenerator(final_min_f, final_max_f, final_aph, final_hps)
+        else:
+            ConsoleOutput.print('Using pulse test with additional sweeping')
+            gen = SweepingVibrationGenerator(final_min_f, final_max_f, final_aph, final_hps, s_accel, s_period)
 
         test_seq = gen.gen_test()
         self._run_test_sequence(axis_direction, test_seq)
@@ -216,7 +216,6 @@ class ResonanceTestManager:
         X, Y, Z, E = toolhead.get_position()
 
         old_max_accel = toolhead_info['max_accel']
-        old_mcr = toolhead_info.get('minimum_cruise_ratio', 1.0)
 
         # Set velocity limits
         if test_seq:
@@ -224,7 +223,12 @@ class ResonanceTestManager:
         else:
             max_accel = old_max_accel  # no moves, just default
 
-        gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={max_accel:.3f} MINIMUM_CRUISE_RATIO=0')
+        if 'minimum_cruise_ratio' in toolhead_info:  # minimum_cruise_ratio found: Klipper >= v0.12.0-239
+            old_mcr = toolhead_info['minimum_cruise_ratio']
+            gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={max_accel} MINIMUM_CRUISE_RATIO=0')
+        else:  # minimum_cruise_ratio not found: Klipper < v0.12.0-239
+            old_mcr = None
+            gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={max_accel}')
 
         # Disable input shaper if present
         input_shaper = self.toolhead.printer.lookup_object('input_shaper', None)
@@ -240,7 +244,7 @@ class ResonanceTestManager:
 
         for next_t, accel, freq in test_seq:
             t_seg = next_t - last_t
-            gcode.run_script_from_command(f'M204 S={abs(accel):.3f}')
+            toolhead.cmd_M204(gcode.create_gcode_command('M204', 'M204', {'S': abs(accel)}))
             v = last_v + accel * t_seg
             abs_v = abs(v)
             if abs_v < 1e-6:
@@ -253,7 +257,8 @@ class ResonanceTestManager:
             dX, dY, dZ = self._project_distance(d, normalized_direction)
             nX, nY, nZ = X + dX, Y + dY, Z + dZ
 
-            toolhead.limit_next_junction_speed(abs_last_v)
+            if not self.is_old_klipper:
+                toolhead.limit_next_junction_speed(abs_last_v)
 
             # If direction changed sign, must pass through zero velocity
             if v * last_v < 0:
@@ -278,13 +283,14 @@ class ResonanceTestManager:
         if last_v != 0.0:
             d_decel = -0.5 * last_v2 / old_max_accel if old_max_accel != 0 else 0
             ddX, ddY, ddZ = self._project_distance(d_decel, normalized_direction)
-            gcode.run_script_from_command(f'M204 S={old_max_accel:.3f}')
+            toolhead.cmd_M204(gcode.create_gcode_command('M204', 'M204', {'S': old_max_accel}))
             toolhead.move([X + ddX, Y + ddY, Z + ddZ, E], abs(last_v))
 
-        # Restore original limits
-        gcode.run_script_from_command(
-            f'SET_VELOCITY_LIMIT ACCEL={old_max_accel:.3f} MINIMUM_CRUISE_RATIO={old_mcr:.3f}'
-        )
+        # Restore the previous acceleration values
+        if old_mcr is not None:  # minimum_cruise_ratio found: Klipper >= v0.12.0-239
+            gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_max_accel} MINIMUM_CRUISE_RATIO={old_mcr}')
+        else:  # minimum_cruise_ratio not found: Klipper < v0.12.0-239
+            gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={old_max_accel}')
 
         # Re-enable input shaper if disabled
         if input_shaper is not None:
