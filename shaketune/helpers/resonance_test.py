@@ -307,7 +307,7 @@ class ResonanceTestManager:
         )
 
 
-def vibrate_axis(toolhead, gcode, axis_direction, min_freq, max_freq, hz_per_sec, accel_per_hz, res_tester=None):
+def vibrate_axis(toolhead, gcode, axis_direction, min_freq, max_freq, hz_per_sec, accel_per_hz, res_tester):
     manager = ResonanceTestManager(toolhead, gcode, res_tester)
     manager.vibrate_axis(axis_direction, min_freq, max_freq, hz_per_sec, accel_per_hz)
 
