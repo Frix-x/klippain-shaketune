@@ -36,7 +36,7 @@ Follow these steps to install Shake&Tune on your printer:
      #    If set to False, the macros will be hidden but still accessible from the console by typing
      #    their names manually, which can be useful if you prefer to encapsulate them into your own macros.
      # timeout: 600
-     #    This defines the maximum processing time (in seconds) to allow to Shake&Tune for generating 
+     #    This defines the maximum processing time (in seconds) to allows to Shake&Tune for generating 
      #    graphs from a .stdata file. 10 minutes should be more than enough in most cases, but if you have
      #    slower hardware (e.g., older SD cards or low-performance devices), increase it to prevent timeouts.
      # measurements_chunk_size: 2
