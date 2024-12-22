@@ -37,6 +37,12 @@ While you should usually try to focus on the toolhead/belts mechanical subsystem
   1. **Diagnosis phase**: Begin with the nozzle tip mount to identify and troubleshoot mechanical issues to ensure the printer components are healthy and the assembly is well done and optimized.
   1. **Filter selection phase**: If the graphs are mostly clean, you can transition to a mounting point near the toolhead's center of gravity for cleaner data on the main resonance, facilitating accurate Input Shaping filter settings. You can also consider the CANBus integrated accelerometer for its simplicity, especially if the toolhead is particularly rigid and minimally affected by wobble.
 
+### Should I use the sweeping or pulse-only test?
+
+The "sweeping" test superimposes a slow motion sweep on top of the usual back-and-forth pulses of the original test. This causes the toolhead (and stepper motors) to pass through multiple positions, rather than getting stuck on the same motor steps, rotor angle, and kinematic position. The added benefit is that it can help filter out some of the random motor and mechanical noise in the measurement, especially on less rigid machines, which can be problematic with the original test. This can help focus on only the "toolhead on belts" resonance peak, which is the most important one, and prevent the recommendation results from being muddled by extra vibration and noise you might have on the graph. It can be seen as a complementary solution to placing your accelerometer right at the center of gravity of the toolhead: you'll end up with a cleaner signal.
+
+On the other hand, if you're looking for mechanical problems (like a wobbly toolhead, binding axis, loose belts, or other gremlins), the pulse-only mode can actually be more revealing. In fact, because the sweep mode smooths things out, it can hide some of the problems you want to find and fix. So if you're in full diagnostic mode, my advice is to use the pulse-only test and try placing the accelerometer in different places, like the nozzle tip, to better see the problems and fix them. Once everything is fixed, if there's still a bit of noise on your graphs, you can switch back to sweep mode for one last nice, clean reading.
+
 
 ## Theory behind it
 

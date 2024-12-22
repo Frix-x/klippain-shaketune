@@ -52,11 +52,20 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     res_tester = printer.lookup_object('resonance_tester')
     systime = printer.get_reactor().monotonic()
 
+    # Get the default values for the acceleration per Hz and the test points
+    if hasattr(res_tester, 'test'):
+        # Old Klipper code (before Dec 6, 2024: https://github.com/Klipper3d/klipper/commit/16b4b6b302ac3ffcd55006cd76265aad4e26ecc8)
+        default_accel_per_hz = res_tester.test.accel_per_hz
+        test_points = res_tester.test.get_start_test_points()
+    else:
+        # New Klipper code (after Dec 6, 2024) with the sweeping test
+        default_accel_per_hz = res_tester.generator.vibration_generator.accel_per_hz
+        test_points = res_tester.probe_points
+
     if accel_per_hz is None:
-        accel_per_hz = res_tester.test.accel_per_hz
+        accel_per_hz = default_accel_per_hz
 
     # Move to the starting point
-    test_points = res_tester.test.get_start_test_points()
     if len(test_points) > 1:
         raise gcmd.error('Only one test point in the [resonance_tester] section is supported by Shake&Tune.')
     if test_points[0] == (-1, -1, -1):
