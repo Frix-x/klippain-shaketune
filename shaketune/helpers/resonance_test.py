@@ -218,11 +218,7 @@ class ResonanceTestManager:
         old_max_accel = toolhead_info['max_accel']
 
         # Set velocity limits
-        if test_seq:
-            max_accel = max(abs(a) for _, a, _ in test_seq)
-        else:
-            max_accel = old_max_accel  # no moves, just default
-
+        max_accel = max(abs(a) for _, a, _ in test_seq) if test_seq else old_max_accel
         if 'minimum_cruise_ratio' in toolhead_info:  # minimum_cruise_ratio found: Klipper >= v0.12.0-239
             old_mcr = toolhead_info['minimum_cruise_ratio']
             gcode.run_script_from_command(f'SET_VELOCITY_LIMIT ACCEL={max_accel} MINIMUM_CRUISE_RATIO=0')
