@@ -21,6 +21,10 @@ Then, call the `AXES_SHAPER_CALIBRATION` macro and look for the graphs in the re
 |TRAVEL_SPEED|120|speed in mm/s used for all the travel movements (to go to the start position prior to the test)|
 |Z_HEIGHT|None|Z height wanted for the test. This value can be used if needed to override the Z value of the probe_point set in your `[resonance_tester]` config section|
 
+  > **Note**
+  >
+  > If you are wondering wether you should use sweeping or not, have a read on the [dedicated section here](../is_tuning_generalities.md#should-i-use-the-sweeping-or-pulse-only-test).
+
 ![](../images/shaper_graphs/shaper_graph_explanation.png)
 
 ## Generalities on IS graphs
