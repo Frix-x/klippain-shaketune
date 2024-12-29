@@ -38,6 +38,7 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     max_sm = gcmd.get_float('MAX_SMOOTHING', default=None, minval=0)
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=None, minval=1)
+    max_scale = gcmd.get_int('MAX_SCALE', default=None, minval=1)
 
     if accel_per_hz == '':
         accel_per_hz = None
@@ -74,7 +75,7 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
 
     # Configure the graph creator
     creator = st_process.get_graph_creator()
-    creator.configure(scv, max_sm, accel_per_hz)
+    creator.configure(scv, max_sm, accel_per_hz, max_scale)
 
     # set the needed acceleration values for the test
     toolhead_info = toolhead.get_status(systime)

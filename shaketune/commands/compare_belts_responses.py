@@ -33,6 +33,7 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=None, minval=1)
+    max_scale = gcmd.get_int('MAX_SCALE', default=None, minval=1)
 
     if accel_per_hz == '':
         accel_per_hz = None
@@ -47,7 +48,7 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # Configure the graph creator
     motors_config_parser = MotorsConfigParser(config, motors=None)
     creator = st_process.get_graph_creator()
-    creator.configure(motors_config_parser.kinematics, accel_per_hz)
+    creator.configure(motors_config_parser.kinematics, accel_per_hz, max_scale)
 
     if motors_config_parser.kinematics in {'corexy', 'limited_corexy'}:
         filtered_config = [a for a in AXIS_CONFIG if a['axis'] in ('a', 'b')]

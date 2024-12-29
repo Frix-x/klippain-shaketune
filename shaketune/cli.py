@@ -28,9 +28,14 @@ def configure_graph_creator(graph_type, args, dummy_config):
     elif graph_type == 'static frequency':
         config_kwargs |= {'accel_per_hz': args.accel_per_hz, 'freq': args.frequency, 'duration': args.duration}
     elif graph_type == 'belts comparison':
-        config_kwargs |= {'kinematics': args.kinematics, 'accel_per_hz': args.accel_per_hz}
+        config_kwargs |= {'kinematics': args.kinematics, 'accel_per_hz': args.accel_per_hz, 'max_scale': args.max_scale}
     elif graph_type == 'input shaper':
-        config_kwargs |= {'scv': args.scv, 'max_smoothing': args.max_smoothing, 'accel_per_hz': args.accel_per_hz}
+        config_kwargs |= {
+            'scv': args.scv,
+            'max_smoothing': args.max_smoothing,
+            'accel_per_hz': args.accel_per_hz,
+            'max_scale': args.max_scale,
+        }
     elif graph_type == 'vibrations profile':
         config_kwargs |= {'kinematics': args.kinematics, 'accel': args.accel}
 
@@ -70,6 +75,9 @@ def main():
     belts_parser.add_argument('-k', '--klipper_dir', default='~/klipper', help='Main klipper directory')
     belts_parser.add_argument('--kinematics', help='Machine kinematics configuration')
     belts_parser.add_argument('--accel_per_hz', type=float, help='Accel per Hz used during the measurement')
+    belts_parser.add_argument(
+        '--max_scale', type=lambda x: int(float(x)), help='Maximum energy value to scale the belts graph'
+    )
 
     # Input Shaper graph parser
     shaper_parser = subparsers.add_parser('input_shaper', help='Create input shaper graph')
@@ -78,6 +86,9 @@ def main():
     shaper_parser.add_argument('--scv', type=float, default=5.0, help='Square corner velocity')
     shaper_parser.add_argument('--max_smoothing', type=float, help='Maximum shaper smoothing to allow')
     shaper_parser.add_argument('--accel_per_hz', type=float, help='Accel per Hz used during the measurement')
+    shaper_parser.add_argument(
+        '--max_scale', type=lambda x: int(float(x)), help='Maximum energy value to scale the input shaper graph'
+    )
 
     # Vibrations graph parser
     vibrations_parser = subparsers.add_parser('vibrations', help='Create vibrations profile graph')

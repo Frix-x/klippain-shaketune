@@ -329,6 +329,7 @@ class Plotter:
         st_version = data['st_version']
         measurements = data['measurements']
         max_freq = data['max_freq']
+        max_scale = data['max_scale']
 
         fig, axes = plt.subplots(
             1,
@@ -401,7 +402,7 @@ class Plotter:
         ax_1.plot(signal2.freqs, signal2.psd, label='Belt ' + signal2_belt, color=self.KLIPPAIN_COLORS['purple'])
         psd_highest_max = max(signal1.psd.max(), signal2.psd.max())
         ax_1.set_xlim([0, max_freq])
-        ax_1.set_ylim([0, psd_highest_max * 1.1])
+        ax_1.set_ylim([0, max_scale if max_scale is not None else psd_highest_max * 1.1])
 
         # Annotate peaks
         paired_peak_count = 0
@@ -645,6 +646,7 @@ class Plotter:
         max_smoothing = data['max_smoothing']
         scv = data['scv']
         st_version = data['st_version']
+        max_scale = data['max_scale']
 
         fig = plt.figure(figsize=(15, 11.6))
         gs = fig.add_gridspec(
@@ -712,7 +714,7 @@ class Plotter:
         ax_1.plot(freqs, py, label='Y', color='green')
         ax_1.plot(freqs, pz, label='Z', color='blue')
         ax_1.set_xlim([0, max_freq])
-        ax_1.set_ylim([0, psd.max() * 1.05])
+        ax_1.set_ylim([0, max_scale if max_scale is not None else psd.max() * 1.05])
 
         ax_1_2 = ax_1.twinx()
         ax_1_2.yaxis.set_visible(False)

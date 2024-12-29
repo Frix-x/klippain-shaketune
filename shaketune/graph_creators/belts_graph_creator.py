@@ -28,9 +28,12 @@ class BeltsGraphCreator(GraphCreator):
         self._kinematics: Optional[str] = None
         self._accel_per_hz: Optional[float] = None
 
-    def configure(self, kinematics: Optional[str] = None, accel_per_hz: Optional[float] = None) -> None:
+    def configure(
+        self, kinematics: Optional[str] = None, accel_per_hz: Optional[float] = None, max_scale: Optional[int] = None
+    ) -> None:
         self._kinematics = kinematics
         self._accel_per_hz = accel_per_hz
+        self._max_scale = max_scale
 
     def create_graph(self, measurements_manager: MeasurementsManager) -> None:
         computer = BeltsGraphComputation(
@@ -38,6 +41,7 @@ class BeltsGraphCreator(GraphCreator):
             kinematics=self._kinematics,
             max_freq=self._config.max_freq,
             accel_per_hz=self._accel_per_hz,
+            max_scale=self._max_scale,
             st_version=self._version,
         )
         computation = computer.compute()
@@ -70,12 +74,14 @@ class BeltsGraphComputation:
         kinematics: Optional[str],
         max_freq: float,
         accel_per_hz: Optional[float],
+        max_scale: Optional[int],
         st_version: str,
     ):
         self.measurements = measurements
         self.kinematics = kinematics
         self.max_freq = max_freq
         self.accel_per_hz = accel_per_hz
+        self.max_scale = max_scale
         self.st_version = st_version
 
     def compute(self):
@@ -132,6 +138,7 @@ class BeltsGraphComputation:
             'st_version': self.st_version,
             'measurements': self.measurements,
             'max_freq': self.max_freq,
+            'max_scale': self.max_scale,
         }
 
     def _compute_signal_data(self, data: np.ndarray, common_freqs: np.ndarray, max_freq: float):

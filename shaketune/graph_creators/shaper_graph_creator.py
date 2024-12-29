@@ -45,11 +45,16 @@ class ShaperGraphCreator(GraphCreator):
         self._accel_per_hz: Optional[float] = None
 
     def configure(
-        self, scv: float, max_smoothing: Optional[float] = None, accel_per_hz: Optional[float] = None
+        self,
+        scv: float,
+        max_smoothing: Optional[float] = None,
+        accel_per_hz: Optional[float] = None,
+        max_scale: Optional[int] = None,
     ) -> None:
         self._scv = scv
         self._max_smoothing = max_smoothing
         self._accel_per_hz = accel_per_hz
+        self._max_scale = max_scale
 
     def create_graph(self, measurements_manager: MeasurementsManager) -> None:
         computer = ShaperGraphComputation(
@@ -58,6 +63,7 @@ class ShaperGraphCreator(GraphCreator):
             scv=self._scv,
             accel_per_hz=self._accel_per_hz,
             max_freq=self._config.max_freq,
+            max_scale=self._max_scale,
             st_version=self._version,
         )
         computation = computer.compute()
@@ -86,6 +92,7 @@ class ShaperGraphComputation:
         scv: float,
         max_smoothing: Optional[float],
         max_freq: float,
+        max_scale: Optional[int],
         st_version: str,
     ):
         self.measurements = measurements
@@ -93,6 +100,7 @@ class ShaperGraphComputation:
         self.scv = scv
         self.max_smoothing = max_smoothing
         self.max_freq = max_freq
+        self.max_scale = max_scale
         self.st_version = st_version
 
     def compute(self):
@@ -223,6 +231,7 @@ class ShaperGraphComputation:
             'max_smoothing': self.max_smoothing,
             'scv': self.scv,
             'st_version': self.st_version,
+            'max_scale': self.max_scale,
         }
 
     # Find the best shaper parameters using Klipper's official algorithm selection with
