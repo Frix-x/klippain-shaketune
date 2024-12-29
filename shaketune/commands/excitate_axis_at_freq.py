@@ -50,7 +50,6 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     printer = config.get_printer()
     gcode = printer.lookup_object('gcode')
     toolhead = printer.lookup_object('toolhead')
-    res_tester = printer.lookup_object('resonance_tester')
     systime = printer.get_reactor().monotonic()
 
     # Get the default values for the acceleration per Hz and the test points
