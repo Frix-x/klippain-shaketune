@@ -45,11 +45,7 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
 
     max_accel = max_freq * accel_per_hz
 
-    # Configure the graph creator
     motors_config_parser = MotorsConfigParser(config, motors=None)
-    creator = st_process.get_graph_creator()
-    creator.configure(motors_config_parser.kinematics, accel_per_hz, max_scale)
-
     if motors_config_parser.kinematics in {'corexy', 'limited_corexy'}:
         filtered_config = [a for a in AXIS_CONFIG if a['axis'] in ('a', 'b')]
         accel_chip = Accelerometer.find_axis_accelerometer(printer, 'xy')
@@ -113,7 +109,9 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     for config in filtered_config:
         ConsoleOutput.print(f'Measuring {config["label"]}...')
         accelerometer.start_recording(measurements_manager, name=config['label'], append_time=True)
-        vibrate_axis(toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz, res_tester)
+        test_params = vibrate_axis(
+            toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz, res_tester
+        )
         accelerometer.stop_recording()
         accelerometer.wait_for_samples()
         toolhead.dwell(0.5)
@@ -133,5 +131,6 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     ConsoleOutput.print('Belts comparative frequency profile generation...')
     ConsoleOutput.print('This may take some time (1-3min)')
     measurements_manager.wait_for_data_transfers(printer.get_reactor())
+    st_process.get_graph_creator().configure(motors_config_parser.kinematics, test_params, max_scale)
     st_process.run(measurements_manager)
     st_process.wait_for_completion()

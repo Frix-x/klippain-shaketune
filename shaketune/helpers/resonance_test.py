@@ -19,8 +19,13 @@
 
 
 import math
+from collections import namedtuple
 
 from ..helpers.console_output import ConsoleOutput
+
+testParams = namedtuple(
+    'testParams', ['mode', 'min_freq', 'max_freq', 'accel_per_hz', 'hz_per_sec', 'sweeping_accel', 'sweeping_period']
+)
 
 
 # This class is used to generate the base vibration test sequences
@@ -180,7 +185,9 @@ class ResonanceTestManager:
                 self.res_tester.generator.sweeping_accel,
             )
 
-    def vibrate_axis(self, axis_direction, min_freq=None, max_freq=None, hz_per_sec=None, accel_per_hz=None):
+    def vibrate_axis(
+        self, axis_direction, min_freq=None, max_freq=None, hz_per_sec=None, accel_per_hz=None
+    ) -> testParams:
         base_min_freq, base_max_freq, base_aph, base_hps, base_s_period, base_s_accel = self.get_parameters()
 
         final_min_f = min_freq if min_freq is not None else base_min_freq
@@ -193,19 +200,23 @@ class ResonanceTestManager:
         if s_period == 0 or self.is_old_klipper:
             ConsoleOutput.print('Using pulse-only test')
             gen = BaseVibrationGenerator(final_min_f, final_max_f, final_aph, final_hps)
+            test_params = testParams('PULSE-ONLY', final_min_f, final_max_f, final_aph, final_hps, None, None)
         else:
             ConsoleOutput.print('Using pulse test with additional sweeping')
             gen = SweepingVibrationGenerator(final_min_f, final_max_f, final_aph, final_hps, s_accel, s_period)
+            test_params = testParams('SWEEPING', final_min_f, final_max_f, final_aph, final_hps, s_accel, s_period)
 
         test_seq = gen.gen_test()
         self._run_test_sequence(axis_direction, test_seq)
         self.toolhead.wait_moves()
+        return test_params
 
-    def vibrate_axis_at_static_freq(self, axis_direction, freq, duration, accel_per_hz):
+    def vibrate_axis_at_static_freq(self, axis_direction, freq, duration, accel_per_hz) -> testParams:
         gen = StaticFrequencyVibrationGenerator(freq, accel_per_hz, duration)
         test_seq = gen.gen_test()
         self._run_test_sequence(axis_direction, test_seq)
         self.toolhead.wait_moves()
+        return testParams('static', freq, freq, accel_per_hz, None, None, None)
 
     def _run_test_sequence(self, axis_direction, test_seq):
         toolhead = self.toolhead
@@ -309,11 +320,13 @@ class ResonanceTestManager:
         )
 
 
-def vibrate_axis(toolhead, gcode, axis_direction, min_freq, max_freq, hz_per_sec, accel_per_hz, res_tester):
+def vibrate_axis(
+    toolhead, gcode, axis_direction, min_freq, max_freq, hz_per_sec, accel_per_hz, res_tester
+) -> testParams:
     manager = ResonanceTestManager(toolhead, gcode, res_tester)
-    manager.vibrate_axis(axis_direction, min_freq, max_freq, hz_per_sec, accel_per_hz)
+    return manager.vibrate_axis(axis_direction, min_freq, max_freq, hz_per_sec, accel_per_hz)
 
 
-def vibrate_axis_at_static_freq(toolhead, gcode, axis_direction, freq, duration, accel_per_hz):
+def vibrate_axis_at_static_freq(toolhead, gcode, axis_direction, freq, duration, accel_per_hz) -> testParams:
     manager = ResonanceTestManager(toolhead, gcode, None)
-    manager.vibrate_axis_at_static_freq(axis_direction, freq, duration, accel_per_hz)
+    return manager.vibrate_axis_at_static_freq(axis_direction, freq, duration, accel_per_hz)

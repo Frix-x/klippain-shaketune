@@ -16,6 +16,7 @@ from scipy.stats import pearsonr
 from ..helpers.accelerometer import Measurement, MeasurementsManager
 from ..helpers.common_func import detect_peaks
 from ..helpers.console_output import ConsoleOutput
+from ..helpers.resonance_test import testParams
 from ..shaketune_config import ShakeTuneConfig
 from . import get_shaper_calibrate_module
 from .graph_creator import GraphCreator
@@ -26,13 +27,16 @@ class BeltsGraphCreator(GraphCreator):
     def __init__(self, config: ShakeTuneConfig):
         super().__init__(config)
         self._kinematics: Optional[str] = None
-        self._accel_per_hz: Optional[float] = None
+        self._test_params: Optional[testParams] = None
 
     def configure(
-        self, kinematics: Optional[str] = None, accel_per_hz: Optional[float] = None, max_scale: Optional[int] = None
+        self,
+        kinematics: Optional[str] = None,
+        test_params: Optional[testParams] = None,
+        max_scale: Optional[int] = None,
     ) -> None:
         self._kinematics = kinematics
-        self._accel_per_hz = accel_per_hz
+        self._test_params = test_params
         self._max_scale = max_scale
 
     def create_graph(self, measurements_manager: MeasurementsManager) -> None:
@@ -40,7 +44,7 @@ class BeltsGraphCreator(GraphCreator):
             measurements=measurements_manager.get_measurements(),
             kinematics=self._kinematics,
             max_freq=self._config.max_freq,
-            accel_per_hz=self._accel_per_hz,
+            test_params=self._test_params,
             max_scale=self._max_scale,
             st_version=self._version,
         )
@@ -73,14 +77,14 @@ class BeltsGraphComputation:
         measurements: List[Measurement],
         kinematics: Optional[str],
         max_freq: float,
-        accel_per_hz: Optional[float],
+        test_params: Optional[testParams],
         max_scale: Optional[int],
         st_version: str,
     ):
         self.measurements = measurements
         self.kinematics = kinematics
         self.max_freq = max_freq
-        self.accel_per_hz = accel_per_hz
+        self.test_params = test_params
         self.max_scale = max_scale
         self.st_version = st_version
 
@@ -134,7 +138,7 @@ class BeltsGraphComputation:
             'signal1_belt': signal1_belt,
             'signal2_belt': signal2_belt,
             'kinematics': self.kinematics,
-            'accel_per_hz': self.accel_per_hz,
+            'test_params': self.test_params,
             'st_version': self.st_version,
             'measurements': self.measurements,
             'max_freq': self.max_freq,

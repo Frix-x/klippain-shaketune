@@ -28,12 +28,16 @@ def configure_graph_creator(graph_type, args, dummy_config):
     elif graph_type == 'static frequency':
         config_kwargs |= {'accel_per_hz': args.accel_per_hz, 'freq': args.frequency, 'duration': args.duration}
     elif graph_type == 'belts comparison':
-        config_kwargs |= {'kinematics': args.kinematics, 'accel_per_hz': args.accel_per_hz, 'max_scale': args.max_scale}
+        config_kwargs |= {
+            'kinematics': args.kinematics,
+            'test_params': (args.mode, None, None, args.accel_per_hz, None, args.sweeping_accel, args.sweeping_period),
+            'max_scale': args.max_scale,
+        }
     elif graph_type == 'input shaper':
         config_kwargs |= {
             'scv': args.scv,
             'max_smoothing': args.max_smoothing,
-            'accel_per_hz': args.accel_per_hz,
+            'test_params': (args.mode, None, None, args.accel_per_hz, None, args.sweeping_accel, args.sweeping_period),
             'max_scale': args.max_scale,
         }
     elif graph_type == 'vibrations profile':
@@ -74,7 +78,14 @@ def main():
     add_common_arguments(belts_parser)
     belts_parser.add_argument('-k', '--klipper_dir', default='~/klipper', help='Main klipper directory')
     belts_parser.add_argument('--kinematics', help='Machine kinematics configuration')
+    belts_parser.add_argument('--mode', type=str, help='Mode of the test used during the measurement')
     belts_parser.add_argument('--accel_per_hz', type=float, help='Accel per Hz used during the measurement')
+    belts_parser.add_argument(
+        '--sweeping_accel', type=float, help='Accel used during the sweeping test (if sweeping was used)'
+    )
+    belts_parser.add_argument(
+        '--sweeping_period', type=float, help='Sweeping period used during the sweeping test (if sweeping was used)'
+    )
     belts_parser.add_argument(
         '--max_scale', type=lambda x: int(float(x)), help='Maximum energy value to scale the belts graph'
     )
@@ -85,7 +96,14 @@ def main():
     shaper_parser.add_argument('-k', '--klipper_dir', default='~/klipper', help='Main klipper directory')
     shaper_parser.add_argument('--scv', type=float, default=5.0, help='Square corner velocity')
     shaper_parser.add_argument('--max_smoothing', type=float, help='Maximum shaper smoothing to allow')
+    shaper_parser.add_argument('--mode', type=str, help='Mode of the test used during the measurement')
     shaper_parser.add_argument('--accel_per_hz', type=float, help='Accel per Hz used during the measurement')
+    shaper_parser.add_argument(
+        '--sweeping_accel', type=float, help='Accel used during the sweeping test (if sweeping was used)'
+    )
+    shaper_parser.add_argument(
+        '--sweeping_period', type=float, help='Sweeping period used during the sweeping test (if sweeping was used)'
+    )
     shaper_parser.add_argument(
         '--max_scale', type=lambda x: int(float(x)), help='Maximum energy value to scale the input shaper graph'
     )

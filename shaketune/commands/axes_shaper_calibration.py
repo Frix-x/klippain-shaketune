@@ -73,10 +73,6 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     toolhead.manual_move(point, feedrate_travel)
     toolhead.dwell(0.5)
 
-    # Configure the graph creator
-    creator = st_process.get_graph_creator()
-    creator.configure(scv, max_sm, accel_per_hz, max_scale)
-
     # set the needed acceleration values for the test
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']
@@ -110,7 +106,9 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         # Then do the actual measurements
         ConsoleOutput.print(f'Measuring {config["label"]}...')
         accelerometer.start_recording(measurements_manager, name=config['label'], append_time=True)
-        vibrate_axis(toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz, res_tester)
+        test_params = vibrate_axis(
+            toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz, res_tester
+        )
         accelerometer.stop_recording()
         accelerometer.wait_for_samples()
         toolhead.dwell(0.5)
@@ -120,6 +118,7 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         ConsoleOutput.print(f'{config["axis"].upper()} axis frequency profile generation...')
         ConsoleOutput.print('This may take some time (1-3min)')
         measurements_manager.wait_for_data_transfers(printer.get_reactor())
+        st_process.get_graph_creator().configure(scv, max_sm, test_params, max_scale)
         st_process.run(measurements_manager)
         st_process.wait_for_completion()
         toolhead.dwell(1)

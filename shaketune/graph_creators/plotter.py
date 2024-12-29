@@ -325,7 +325,7 @@ class Plotter:
         signal1_belt = data['signal1_belt']
         signal2_belt = data['signal2_belt']
         kinematics = data['kinematics']
-        accel_per_hz = data['accel_per_hz']
+        mode, _, _, accel_per_hz, _, sweeping_accel, sweeping_period = data['test_params']
         st_version = data['st_version']
         measurements = data['measurements']
         max_freq = data['max_freq']
@@ -356,6 +356,12 @@ class Plotter:
                 title_line2 += ' -- ' + kinematics.upper() + ' kinematics'
         except Exception:
             title_line2 = measurements[0]['name'] + ' / ' + measurements[1]['name']
+
+        title_line3 = f'| Mode: {mode}'
+        title_line3 += f' -- ApH: {accel_per_hz}' if accel_per_hz is not None else ''
+        if mode == 'SWEEPING':
+            title_line3 += f' [sweeping period: {sweeping_period} s - accel: {sweeping_accel} mm/s²]'
+
         title_lines = [
             {
                 'x': 0.060,
@@ -366,31 +372,27 @@ class Plotter:
                 'weight': 'bold',
             },
             {'x': 0.060, 'y': 0.939, 'va': 'top', 'text': title_line2},
+            {
+                'x': 0.481,
+                'y': 0.985,
+                'va': 'top',
+                'fontsize': 10,
+                'text': title_line3,
+            },
         ]
 
         if kinematics in {'limited_corexy', 'corexy', 'limited_corexz', 'corexz'}:
             title_lines.extend(
                 [
-                    {'x': 0.55, 'y': 0.985, 'va': 'top', 'text': f'| Estimated similarity: {similarity_factor:.1f}%'},
-                    {'x': 0.55, 'y': 0.950, 'va': 'top', 'text': f'| {mhi} (experimental)'},
                     {
-                        'x': 0.551,
-                        'y': 0.915,
+                        'x': 0.480,
+                        'y': 0.953,
                         'va': 'top',
-                        'text': f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz',
-                        'fontsize': 10,
+                        'fontsize': 13,
+                        'text': f'| Estimated similarity: {similarity_factor:.1f}%',
                     },
+                    {'x': 0.480, 'y': 0.920, 'va': 'top', 'fontsize': 13, 'text': f'| {mhi} (experimental)'},
                 ]
-            )
-        else:
-            title_lines.append(
-                {
-                    'x': 0.551,
-                    'y': 0.915,
-                    'va': 'top',
-                    'text': f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz',
-                    'fontsize': 10,
-                }
             )
 
         self.add_title(fig, title_lines)
@@ -642,7 +644,7 @@ class Plotter:
         bins = data['bins']
         pdata = data['pdata']
         # shapers_tradeoff_data = data['shapers_tradeoff_data']
-        accel_per_hz = data['accel_per_hz']
+        mode, _, _, accel_per_hz, _, sweeping_accel, sweeping_period = data['test_params']
         max_smoothing = data['max_smoothing']
         scv = data['scv']
         st_version = data['st_version']
@@ -683,7 +685,10 @@ class Plotter:
             title_line2 = measurements[0]['name']
             title_line3 = ''
             title_line4 = ''
-        title_line5 = f'| Accel per Hz used: {accel_per_hz} mm/s²/Hz' if accel_per_hz is not None else ''
+        title_line5 = f'| Mode: {mode}'
+        title_line5 += f' -- ApH: {accel_per_hz}' if accel_per_hz is not None else ''
+        if mode == 'SWEEPING':
+            title_line5 += f' [sweeping period: {sweeping_period} s - accel: {sweeping_accel} mm/s²]'
         title_lines = [
             {
                 'x': 0.065,
@@ -694,9 +699,9 @@ class Plotter:
                 'weight': 'bold',
             },
             {'x': 0.065, 'y': 0.957, 'va': 'top', 'text': title_line2},
-            {'x': 0.500, 'y': 0.990, 'va': 'top', 'fontsize': 14, 'text': title_line3},
-            {'x': 0.500, 'y': 0.968, 'va': 'top', 'fontsize': 14, 'text': title_line4},
-            {'x': 0.501, 'y': 0.945, 'va': 'top', 'fontsize': 10, 'text': title_line5},
+            {'x': 0.481, 'y': 0.990, 'va': 'top', 'fontsize': 11, 'text': title_line5},
+            {'x': 0.480, 'y': 0.970, 'va': 'top', 'fontsize': 14, 'text': title_line3},
+            {'x': 0.480, 'y': 0.949, 'va': 'top', 'fontsize': 14, 'text': title_line4},
         ]
         self.add_title(fig, title_lines)
         self.add_logo(fig, position=[0.001, 0.924, 0.075, 0.075])

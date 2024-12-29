@@ -22,6 +22,7 @@ from ..helpers.common_func import (
     detect_peaks,
 )
 from ..helpers.console_output import ConsoleOutput
+from ..helpers.resonance_test import testParams
 from ..shaketune_config import ShakeTuneConfig
 from . import get_shaper_calibrate_module
 from .graph_creator import GraphCreator
@@ -42,18 +43,18 @@ class ShaperGraphCreator(GraphCreator):
         super().__init__(config)
         self._max_smoothing: Optional[float] = None
         self._scv: Optional[float] = None
-        self._accel_per_hz: Optional[float] = None
+        self._test_params: Optional[testParams] = None
 
     def configure(
         self,
         scv: float,
         max_smoothing: Optional[float] = None,
-        accel_per_hz: Optional[float] = None,
+        test_params: Optional[testParams] = None,
         max_scale: Optional[int] = None,
     ) -> None:
         self._scv = scv
         self._max_smoothing = max_smoothing
-        self._accel_per_hz = accel_per_hz
+        self._test_params = test_params
         self._max_scale = max_scale
 
     def create_graph(self, measurements_manager: MeasurementsManager) -> None:
@@ -61,7 +62,7 @@ class ShaperGraphCreator(GraphCreator):
             measurements=measurements_manager.get_measurements(),
             max_smoothing=self._max_smoothing,
             scv=self._scv,
-            accel_per_hz=self._accel_per_hz,
+            test_params=self._test_params,
             max_freq=self._config.max_freq,
             max_scale=self._max_scale,
             st_version=self._version,
@@ -88,7 +89,7 @@ class ShaperGraphComputation:
     def __init__(
         self,
         measurements: List[Measurement],
-        accel_per_hz: Optional[float],
+        test_params: Optional[testParams],
         scv: float,
         max_smoothing: Optional[float],
         max_freq: float,
@@ -96,7 +97,7 @@ class ShaperGraphComputation:
         st_version: str,
     ):
         self.measurements = measurements
-        self.accel_per_hz = accel_per_hz
+        self.test_params = test_params
         self.scv = scv
         self.max_smoothing = max_smoothing
         self.max_freq = max_freq
@@ -227,7 +228,7 @@ class ShaperGraphComputation:
             'bins': bins,
             'pdata': pdata,
             'shapers_tradeoff_data': shapers_tradeoff_data,
-            'accel_per_hz': self.accel_per_hz,
+            'test_params': self.test_params,
             'max_smoothing': self.max_smoothing,
             'scv': self.scv,
             'st_version': self.st_version,
