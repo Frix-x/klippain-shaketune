@@ -10,6 +10,7 @@
 
 from ..helpers.accelerometer import Accelerometer, MeasurementsManager
 from ..helpers.common_func import AXIS_CONFIG
+from ..helpers.compat import res_tester_config
 from ..helpers.console_output import ConsoleOutput
 from ..helpers.resonance_test import vibrate_axis_at_static_freq
 from ..shaketune_process import ShakeTuneProcess
@@ -53,14 +54,7 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     systime = printer.get_reactor().monotonic()
 
     # Get the default values for the acceleration per Hz and the test points
-    if hasattr(res_tester, 'test'):
-        # Old Klipper code (before Dec 6, 2024: https://github.com/Klipper3d/klipper/commit/16b4b6b302ac3ffcd55006cd76265aad4e26ecc8)
-        default_accel_per_hz = res_tester.test.accel_per_hz
-        test_points = res_tester.test.get_start_test_points()
-    else:
-        # New Klipper code (after Dec 6, 2024) with the sweeping test
-        default_accel_per_hz = res_tester.generator.vibration_generator.accel_per_hz
-        test_points = res_tester.probe_points
+    default_min_freq, default_max_freq, default_accel_per_hz, test_points = res_tester_config(config)
 
     if accel_per_hz is None:
         accel_per_hz = default_accel_per_hz
