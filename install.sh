@@ -3,7 +3,7 @@
 USER_CONFIG_PATH="${HOME}/printer_data/config"
 MOONRAKER_CONFIG="${HOME}/printer_data/config/moonraker.conf"
 KLIPPER_PATH="${HOME}/klipper"
-KLIPPER_VENV_PATH="${HOME}/klippy-env"
+KLIPPER_VENV_PATH="${KLIPPER_VENV:-${HOME}/klippy-env}"
 
 OLD_K_SHAKETUNE_VENV="${HOME}/klippain_shaketune-env"
 K_SHAKETUNE_PATH="${HOME}/klippain_shaketune"
@@ -124,7 +124,19 @@ function add_updater {
     update_section=$(grep -c '\[update_manager[a-z ]* Klippain-ShakeTune\]' $MOONRAKER_CONFIG || true)
     if [ "$update_section" -eq 0 ]; then
         echo -n "[INSTALL] Adding update manager to moonraker.conf..."
-        cat ${K_SHAKETUNE_PATH}/moonraker.conf >> $MOONRAKER_CONFIG
+        cat <<EOF >>$MOONRAKER_CONFIG
+
+## Klippain Shake&Tune automatic update management
+[update_manager Klippain-ShakeTune]
+type: git_repo
+origin: https://github.com/Frix-x/klippain-shaketune.git
+path: ~/klippain_shaketune
+virtualenv: ${KLIPPER_VENV_PATH}
+requirements: requirements.txt
+system_dependencies: system-dependencies.json
+primary_branch: main
+managed_services: klipper
+EOF
     fi
 }
 

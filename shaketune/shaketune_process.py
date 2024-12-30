@@ -14,6 +14,7 @@ import traceback
 from multiprocessing import Process
 from typing import Optional
 
+from .helpers.accelerometer import MeasurementsManager
 from .helpers.console_output import ConsoleOutput
 from .shaketune_config import ShakeTuneConfig
 
@@ -29,9 +30,15 @@ class ShakeTuneProcess:
     def get_graph_creator(self):
         return self.graph_creator
 
-    def run(self) -> None:
+    def get_st_config(self):
+        return self._config
+
+    def run(self, measurements_manager: MeasurementsManager) -> None:
         # Start the target function in a new process (a thread is known to cause issues with Klipper and CANbus due to the GIL)
-        self._process = Process(target=self._shaketune_process_wrapper, args=(self.graph_creator, self._timeout))
+        self._process = Process(
+            target=self._shaketune_process_wrapper,
+            args=(self.graph_creator, measurements_manager, self._timeout),
+        )
         self._process.start()
 
     def wait_for_completion(self) -> None:
@@ -50,7 +57,7 @@ class ShakeTuneProcess:
 
     # This function is a simple wrapper to start the Shake&Tune process. It's needed in order to get the timeout
     # as a Timer in a thread INSIDE the Shake&Tune child process to not interfere with the main Klipper process
-    def _shaketune_process_wrapper(self, graph_creator, timeout) -> None:
+    def _shaketune_process_wrapper(self, graph_creator, measurements_manager: MeasurementsManager, timeout) -> None:
         if timeout is not None:
             # Add 5 seconds to the timeout for safety. The goal is to avoid the Timer to finish before the
             # Shake&Tune process is done in case we call the wait_for_completion() function that uses Klipper's reactor.
@@ -58,7 +65,7 @@ class ShakeTuneProcess:
             timer = threading.Timer(timeout, self._handle_timeout)
             timer.start()
         try:
-            self._shaketune_process(graph_creator)
+            self._shaketune_process(graph_creator, measurements_manager)
         finally:
             if timeout is not None:
                 timer.cancel()
@@ -67,7 +74,7 @@ class ShakeTuneProcess:
         ConsoleOutput.print('Timeout: Shake&Tune computation did not finish within the specified timeout!')
         os._exit(1)  # Forcefully exit the process
 
-    def _shaketune_process(self, graph_creator) -> None:
+    def _shaketune_process(self, graph_creator, m_manager: MeasurementsManager) -> None:
         # Reducing Shake&Tune process priority by putting the scheduler into batch mode with low priority. This in order to avoid
         # slowing down the main Klipper process as this can lead to random "Timer too close" or "Move queue overflow" errors
         # when also already running CANbus, neopixels and other consumming stuff in Klipper's main process.
@@ -81,9 +88,13 @@ class ShakeTuneProcess:
         for folder in self._config.get_results_subfolders():
             folder.mkdir(parents=True, exist_ok=True)
 
+        if m_manager.get_measurements() is None or len(m_manager.get_measurements()) == 0:
+            ConsoleOutput.print('Error: no measurements available to create the graphs!')
+            return
+
         # Generate the graphs
         try:
-            graph_creator.create_graph()
+            graph_creator.create_graph(m_manager)
         except FileNotFoundError as e:
             ConsoleOutput.print(f'FileNotFound error: {e}')
             return
