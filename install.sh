@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 USER_CONFIG_PATH="${HOME}/printer_data/config"
 MOONRAKER_CONFIG="${HOME}/printer_data/config/moonraker.conf"
@@ -8,37 +8,43 @@ KLIPPER_VENV_PATH="${KLIPPER_VENV:-${HOME}/klippy-env}"
 OLD_K_SHAKETUNE_VENV="${HOME}/klippain_shaketune-env"
 K_SHAKETUNE_PATH="${HOME}/klippain_shaketune"
 
+LOG_FILE="/var/log/install_shaketune.log"
+exec > >(tee -a $LOG_FILE) 2>&1
+
 set -eu
 export LC_ALL=C
 
+trap 'echo "[ERROR] Installation failed. See $LOG_FILE for details."; exit 1' ERR
 
+# Perform preflight checks
 function preflight_checks {
     if [ "$EUID" -eq 0 ]; then
         echo "[PRE-CHECK] This script must not be run as root!"
-        exit -1
+        exit 1
     fi
 
     if ! command -v python3 &> /dev/null; then
         echo "[ERROR] Python 3 is not installed. Please install Python 3 to use the Shake&Tune module!"
-        exit -1
+        exit 1
     fi
 
-    if [ "$(sudo systemctl list-units --full -all -t service --no-legend | grep -F 'klipper.service')" ]; then
+    if [ "$(sudo systemctl list-units --full --all --type=service --no-legend | grep -F 'klipper.service')" ]; then
         printf "[PRE-CHECK] Klipper service found! Continuing...\n\n"
     else
         echo "[ERROR] Klipper service not found, please install Klipper first!"
-        exit -1
+        exit 1
     fi
 
     install_package_requirements
 }
 
-# Function to check if a package is installed
+# Check if a package is installed
 function is_package_installed {
     dpkg -s "$1" &> /dev/null
     return $?
 }
 
+# Install required packages
 function install_package_requirements {
     packages=("libopenblas-dev" "libatlas-base-dev")
     packages_to_install=""
@@ -57,6 +63,7 @@ function install_package_requirements {
     fi
 }
 
+# Check and download the Shake&Tune module
 function check_download {
     local shaketunedirname shaketunebasename
     shaketunedirname="$(dirname ${K_SHAKETUNE_PATH})"
@@ -69,21 +76,22 @@ function check_download {
             printf "[DOWNLOAD] Download complete!\n\n"
         else
             echo "[ERROR] Download of Klippain Shake&Tune module git repository failed!"
-            exit -1
+            exit 1
         fi
     else
         printf "[DOWNLOAD] Klippain Shake&Tune module repository already found locally. Continuing...\n\n"
     fi
 }
 
+# Setup Python virtual environment
 function setup_venv {
     if [ ! -d "${KLIPPER_VENV_PATH}" ]; then
         echo "[ERROR] Klipper's Python virtual environment not found!"
-        exit -1
+        exit 1
     fi
 
     if [ -d "${OLD_K_SHAKETUNE_VENV}" ]; then
-        echo "[INFO] Old K-Shake&Tune virtual environement found, cleaning it!"
+        echo "[INFO] Old K-Shake&Tune virtual environment found, cleaning it!"
         rm -rf "${OLD_K_SHAKETUNE_VENV}"
     fi
 
@@ -95,9 +103,8 @@ function setup_venv {
     printf "\n"
 }
 
+# Link the extension
 function link_extension {
-    # Reusing the old linking extension function to cleanup and remove the macros for older S&T versions
-
     if [ -d "${HOME}/klippain_config" ] && [ -f "${USER_CONFIG_PATH}/.VERSION" ]; then
         if [ -d "${USER_CONFIG_PATH}/scripts/K-ShakeTune" ]; then
             echo "[INFO] Old K-Shake&Tune macro folder found, cleaning it!"
@@ -111,6 +118,7 @@ function link_extension {
     fi
 }
 
+# Link the Shake&Tune module to Klipper extras
 function link_module {
     if [ ! -d "${KLIPPER_PATH}/klippy/extras/shaketune" ]; then
         echo "[INSTALL] Linking Shake&Tune module to Klipper extras"
@@ -120,6 +128,7 @@ function link_module {
     fi
 }
 
+# Add update manager to moonraker.conf
 function add_updater {
     update_section=$(grep -c '\[update_manager[a-z ]* Klippain-ShakeTune\]' $MOONRAKER_CONFIG || true)
     if [ "$update_section" -eq 0 ]; then
@@ -140,21 +149,21 @@ EOF
     fi
 }
 
+# Restart Klipper service
 function restart_klipper {
     echo "[POST-INSTALL] Restarting Klipper..."
     sudo systemctl restart klipper
 }
 
+# Restart Moonraker service
 function restart_moonraker {
     echo "[POST-INSTALL] Restarting Moonraker..."
     sudo systemctl restart moonraker
 }
 
-
 printf "\n=============================================\n"
 echo "- Klippain Shake&Tune module install script -"
 printf "=============================================\n\n"
-
 
 # Run steps
 preflight_checks
