@@ -12,11 +12,7 @@ set -eu
 export LC_ALL=C
 
 
-function preflight_checks {
-    if [ "$EUID" -eq 0 ]; then
-        echo "[PRE-CHECK] This script must not be run as root!"
-        exit -1
-    fi
+
 
     if ! command -v python3 &> /dev/null; then
         echo "[ERROR] Python 3 is not installed. Please install Python 3 to use the Shake&Tune module!"
