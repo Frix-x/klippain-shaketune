@@ -8,16 +8,6 @@ KLIPPER_VENV_PATH="${KLIPPER_VENV:-${HOME}/klippy-env}"
 OLD_K_SHAKETUNE_VENV="${HOME}/klippain_shaketune-env"
 K_SHAKETUNE_PATH="${HOME}/klippain_shaketune"
 
-set -eu
-export LC_ALL=C
-
-
-
-
-
-
-    install_package_requirements
-}
 
 # Function to check if a package is installed
 function is_package_installed {
