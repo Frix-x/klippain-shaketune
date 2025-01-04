@@ -83,7 +83,7 @@ function setup_venv {
     fi
 
     if [ -d "${OLD_K_SHAKETUNE_VENV}" ]; then
-        echo "[INFO] Old K-Shake&Tune virtual environement found, cleaning it!"
+        echo "[INFO] Old K-Shake&Tune virtual environment found, cleaning it!"
         rm -rf "${OLD_K_SHAKETUNE_VENV}"
     fi
 
