@@ -95,6 +95,10 @@ def axes_shaper_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         a for a in AXIS_CONFIG if a['axis'] == axis_input or (axis_input == 'all' and a['axis'] in ('x', 'y'))
     ]
     for config in filtered_config:
+        toolhead.manual_move(point, feedrate_travel)
+        toolhead.dwell(0.5)
+        toolhead.wait_moves()
+
         measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size)
 
         # First we need to find the accelerometer chip suited for the axis

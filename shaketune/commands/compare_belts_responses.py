@@ -107,6 +107,10 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
 
     # Run the test for each axis
     for config in filtered_config:
+        toolhead.manual_move(point, feedrate_travel)
+        toolhead.dwell(0.5)
+        toolhead.wait_moves()
+
         ConsoleOutput.print(f'Measuring {config["label"]}...')
         accelerometer.start_recording(measurements_manager, name=config['label'], append_time=True)
         test_params = vibrate_axis(
