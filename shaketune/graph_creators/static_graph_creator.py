@@ -43,11 +43,7 @@ class StaticGraphCreator(GraphCreator):
         )
         computation = computer.compute()
         fig = self._plotter.plot_static_frequency_graph(computation)
-        try:
-            axis_label = (measurements_manager.get_measurements())[0]['name'].split('_')[1]
-        except IndexError:
-            axis_label = None
-        self._save_figure(fig, measurements_manager, axis_label)
+        self._save_figure(fig)
 
 
 class StaticGraphComputation:

@@ -145,7 +145,7 @@ def main():
 
     # Create the graph creator and configure it
     graph_creator = configure_graph_creator(graph_type, args, dummy_config)
-    graph_creator.override_output_target(args.output)
+    graph_creator.define_output_target(Path(args.output))
 
     print(f'Creating {graph_type} graph...')
 

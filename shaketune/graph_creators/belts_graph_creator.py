@@ -50,7 +50,7 @@ class BeltsGraphCreator(GraphCreator):
         )
         computation = computer.compute()
         fig = self._plotter.plot_belts_graph(computation)
-        self._save_figure(fig, measurements_manager)
+        self._save_figure(fig)
 
 
 class PeakPairingResult(NamedTuple):
@@ -90,7 +90,10 @@ class BeltsGraphComputation:
 
     def compute(self):
         if len(self.measurements) != 2:
-            raise ValueError('This tool needs 2 measurements to work with (one for each belt)!')
+            raise ValueError(
+                f'This tool needs 2 measurements to work with (one for each belt)! Currently, it has {len(self.measurements)} '
+                f'measurements named {[meas.get("name", "unknown") for meas in self.measurements]}'
+            )
 
         datas = [np.array(m['samples']) for m in self.measurements if m['samples'] is not None]
 

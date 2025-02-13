@@ -69,11 +69,7 @@ class ShaperGraphCreator(GraphCreator):
         )
         computation = computer.compute()
         fig = self._plotter.plot_input_shaper_graph(computation)
-        try:
-            axis_label = (measurements_manager.get_measurements())[0]['name'].split('_')[1]
-        except IndexError:
-            axis_label = None
-        self._save_figure(fig, measurements_manager, axis_label)
+        self._save_figure(fig)
 
     def clean_old_files(self, keep_results: int = 3) -> None:
         files = sorted(self._folder.glob('*.png'), key=lambda f: f.stat().st_mtime, reverse=True)
@@ -146,7 +142,7 @@ class ShaperGraphComputation:
         peak_freqs_formated = ['{:.1f}'.format(f) for f in peaks_freqs]
         num_peaks_above_effect_threshold = np.sum(calibration_data.psd_sum[peaks] > peaks_threshold[1])
         ConsoleOutput.print(
-            f"Peaks detected on the graph: {num_peaks} @ {', '.join(map(str, peak_freqs_formated))} Hz ({num_peaks_above_effect_threshold} above effect threshold)"
+            f'Peaks detected on the graph: {num_peaks} @ {", ".join(map(str, peak_freqs_formated))} Hz ({num_peaks_above_effect_threshold} above effect threshold)'
         )
 
         # Consolidate shaper data for plotting the table summary
