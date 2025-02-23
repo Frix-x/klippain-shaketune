@@ -41,7 +41,7 @@ class AxesMapGraphCreator(GraphCreator):
         )
         computation = computer.compute()
         fig = self._plotter.plot_axes_map_detection_graph(computation)
-        self._save_figure(fig, measurements_manager)
+        self._save_figure(fig)
 
 
 ######################################################################
@@ -64,7 +64,10 @@ class AxesMapComputation:
 
     def compute(self):
         if len(self.measurements) != 3:
-            raise ValueError('This tool needs 3 measurements to work with (like axesmap_X, axesmap_Y and axesmap_Z)')
+            raise ValueError(
+                f'This tool needs 3 measurements (for X, Y and Z) to work. Currently, it has {len(self.measurements)} '
+                f'measurements named {[meas.get("name", "unknown") for meas in self.measurements]}'
+            )
 
         raw_datas = {}
         for measurement in self.measurements:
@@ -133,7 +136,7 @@ class AxesMapComputation:
         )
         ConsoleOutput.print(average_noise_intensity_label)
 
-        ConsoleOutput.print(f'--> Detected gravity: {gravity / 1000 :.2f} m/s²')
+        ConsoleOutput.print(f'--> Detected gravity: {gravity / 1000:.2f} m/s²')
 
         formatted_direction_vector = self._format_direction_vector(direction_vectors)
         ConsoleOutput.print(f'--> Detected axes_map: {formatted_direction_vector}')

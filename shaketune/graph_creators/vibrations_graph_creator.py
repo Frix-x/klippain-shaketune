@@ -62,7 +62,7 @@ class VibrationsGraphCreator(GraphCreator):
         )
         computation = computer.compute()
         fig = self._plotter.plot_vibrations_graph(computation)
-        self._save_figure(fig, measurements_manager)
+        self._save_figure(fig)
 
 
 class VibrationGraphComputation:
@@ -158,7 +158,7 @@ class VibrationGraphComputation:
         )
         formated_peaks_speeds = ['{:.1f}'.format(pspeed) for pspeed in peaks_speeds]
         ConsoleOutput.print(
-            f"Vibrations peaks detected: {num_peaks} @ {', '.join(map(str, formated_peaks_speeds))} mm/s (avoid setting a speed near these values in your slicer print profile)"
+            f'Vibrations peaks detected: {num_peaks} @ {", ".join(map(str, formated_peaks_speeds))} mm/s (avoid setting a speed near these values in your slicer print profile)'
         )
 
         good_speeds = identify_low_energy_zones(vibration_metric, SPEEDS_VALLEY_DETECTION_THRESHOLD)
@@ -172,7 +172,7 @@ class VibrationGraphComputation:
             # Add some logging about the good speeds found
             ConsoleOutput.print(f'Lowest vibrations speeds ({len(good_speeds)} ranges sorted from best to worse):')
             for idx, (start, end, _) in enumerate(good_speeds):
-                ConsoleOutput.print(f'{idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
+                ConsoleOutput.print(f'{idx + 1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s')
 
         # Angle low energy valleys identification (good angles ranges) and print them to the console
         good_angles = identify_low_energy_zones(all_angles_energy, ANGLES_VALLEY_DETECTION_THRESHOLD)
@@ -180,7 +180,7 @@ class VibrationGraphComputation:
             ConsoleOutput.print(f'Lowest vibrations angles ({len(good_angles)} ranges sorted from best to worse):')
             for idx, (start, end, energy) in enumerate(good_angles):
                 ConsoleOutput.print(
-                    f'{idx+1}: {all_angles[start]:.1f}° to {all_angles[end]:.1f}° (mean vibrations energy: {energy:.2f}% of max)'
+                    f'{idx + 1}: {all_angles[start]:.1f}° to {all_angles[end]:.1f}° (mean vibrations energy: {energy:.2f}% of max)'
                 )
 
         # Motors infos and config differences check

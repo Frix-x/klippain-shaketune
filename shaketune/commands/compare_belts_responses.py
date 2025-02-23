@@ -8,6 +8,7 @@
 #              The script performs resonance tests along specified axes, starts and stops measurements, and generates graphs
 #              for each axis to analyze the collected data.
 
+from datetime import datetime
 
 from ..helpers.accelerometer import Accelerometer, MeasurementsManager
 from ..helpers.common_func import AXIS_CONFIG
@@ -19,6 +20,8 @@ from ..shaketune_process import ShakeTuneProcess
 
 
 def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
+    date = datetime.now().strftime('%Y%m%d_%H%M%S')
+
     printer = config.get_printer()
     toolhead = printer.lookup_object('toolhead')
     res_tester = printer.lookup_object('resonance_tester')
@@ -83,9 +86,6 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
             z = z_height
         point = (x, y, z)
 
-    toolhead.manual_move(point, feedrate_travel)
-    toolhead.dwell(0.5)
-
     # set the needed acceleration values for the test
     toolhead_info = toolhead.get_status(systime)
     old_accel = toolhead_info['max_accel']
@@ -103,7 +103,7 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     else:
         input_shaper = None
 
-    measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size)
+    measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size, printer.get_reactor())
 
     # Run the test for each axis
     for config in filtered_config:
@@ -117,7 +117,6 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
             toolhead, gcode, config['direction'], min_freq, max_freq, hz_per_sec, accel_per_hz, res_tester
         )
         accelerometer.stop_recording()
-        accelerometer.wait_for_samples()
         toolhead.dwell(0.5)
         toolhead.wait_moves()
 
@@ -134,7 +133,10 @@ def compare_belts_responses(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # Run post-processing
     ConsoleOutput.print('Belts comparative frequency profile generation...')
     ConsoleOutput.print('This may take some time (1-3min)')
-    measurements_manager.wait_for_data_transfers(printer.get_reactor())
-    st_process.get_graph_creator().configure(motors_config_parser.kinematics, test_params, max_scale)
-    st_process.run(measurements_manager)
+    creator = st_process.get_graph_creator()
+    filename = creator.get_folder() / f'{creator.get_type().replace(" ", "")}_{date}'
+    creator.configure(motors_config_parser.kinematics, test_params, max_scale)
+    creator.define_output_target(filename)
+    measurements_manager.save_stdata(filename)
+    st_process.run(filename)
     st_process.wait_for_completion()
