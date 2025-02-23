@@ -17,6 +17,7 @@ import uuid
 from io import TextIOWrapper
 from multiprocessing import Process, Queue, Value
 from pathlib import Path
+from shutil import move as move_file
 from typing import List, Optional, Tuple, TypedDict
 
 import numpy as np
@@ -165,7 +166,7 @@ class MeasurementsManager:
         try:
             if filename.exists():
                 filename.unlink()
-            self._temp_file.rename(filename)
+            move_file(self._temp_file, filename)  # using shutil.move() to avoid cross-filesystem issues
         except Exception as e:
             ConsoleOutput.print(f'Shake&Tune was unable to create the final data file ({filename}): {e}')
 
