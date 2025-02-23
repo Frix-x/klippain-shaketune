@@ -1,6 +1,10 @@
-GitPython==3.1.41
-matplotlib==3.8.2
-numpy==1.26.2
-scipy==1.11.4
-PyWavelets==1.6.0
+GitPython==3.1.44
 zstandard==0.23.0
+matplotlib==3.9.4 ; python_full_version < '3.10'
+matplotlib==3.10.0 ; python_full_version >= '3.10'
+numpy==2.0.2 ; python_full_version < '3.10'
+numpy==2.2.2 ; python_full_version >= '3.10'
+scipy==1.13.1 ; python_full_version < '3.10'
+scipy==1.15.0 ; python_full_version >= '3.10'
+PyWavelets==1.6.0 ; python_full_version < '3.10'
+PyWavelets==1.8.0 ; python_full_version >= '3.10'
