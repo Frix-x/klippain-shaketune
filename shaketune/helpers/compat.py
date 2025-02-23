@@ -8,7 +8,10 @@
 
 from collections import namedtuple
 
-ResTesterConfig = namedtuple('ResTesterConfig', ['default_min_freq', 'default_max_freq', 'default_accel_per_hz', 'test_points'])
+ResTesterConfig = namedtuple(
+    'ResTesterConfig', ['default_min_freq', 'default_max_freq', 'default_accel_per_hz', 'test_points']
+)
+
 
 def res_tester_config(config) -> ResTesterConfig:
     printer = config.get_printer()

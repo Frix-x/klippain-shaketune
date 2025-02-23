@@ -35,8 +35,7 @@ DEFAULT_SHOW_MACROS = True
 DEFAULT_MEASUREMENTS_CHUNK_SIZE = 2  # Maximum number of measurements to keep in memory at once
 ST_COMMANDS = {
     'EXCITATE_AXIS_AT_FREQ': (
-        'Maintain a specified excitation frequency for a period '
-        'of time to diagnose and locate a source of vibrations'
+        'Maintain a specified excitation frequency for a period of time to diagnose and locate a source of vibrations'
     ),
     'AXES_MAP_CALIBRATION': (
         'Perform a set of movements to measure the orientation of the accelerometer '

@@ -121,7 +121,7 @@ class VibrationGraphComputation:
 
             # Store the interpolated PSD and integral values
             psds[angle][speed] = np.interp(target_freqs, first_freqs, psd_sum)
-            psds_sum[angle][speed] = np.trapz(psd_sum, first_freqs)
+            psds_sum[angle][speed] = np.trapezoid(psd_sum, first_freqs)
 
         measured_angles = sorted(psds_sum.keys())
         measured_speeds = sorted({speed for angle_speeds in psds_sum.values() for speed in angle_speeds.keys()})
@@ -270,7 +270,7 @@ class VibrationGraphComputation:
                 all_angles_energy[angle] ** energy_amplification_factor
             )  # First weighting factor is based on the total vibrations of the machine at the specified angle
             curve_area = (
-                np.trapz(motor_profiles[angle], freqs) ** energy_amplification_factor
+                np.trapezoid(motor_profiles[angle], freqs) ** energy_amplification_factor
             )  # Additional weighting factor is based on the area under the current motor profile at this specified angle
             total_angle_weight = angle_energy * curve_area
 
@@ -335,7 +335,7 @@ class VibrationGraphComputation:
         return spectrum_angles, spectrum_speeds, spectrum_vibrations
 
     def _compute_angle_powers(self, spectrogram_data: np.ndarray) -> np.ndarray:
-        angles_powers = np.trapz(spectrogram_data, axis=1)
+        angles_powers = np.trapezoid(spectrogram_data, axis=1)
 
         # Since we want to plot it on a continuous polar plot later on, we need to append parts of
         # the array to start and end of it to smooth transitions when doing the convolution

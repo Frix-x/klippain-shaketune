@@ -166,7 +166,7 @@ class AxesMapComputation:
         return denoised_data, noise
 
     def _integrate_trapz(self, accel: np.ndarray, time: np.ndarray) -> np.ndarray:
-        return np.array([np.trapz(accel[:i], time[:i]) for i in range(2, len(time) + 1)])
+        return np.array([np.trapezoid(accel[:i], time[:i]) for i in range(2, len(time) + 1)])
 
     def _process_acceleration_data(
         self, time: np.ndarray, accel_x: np.ndarray, accel_y: np.ndarray, accel_z: np.ndarray
