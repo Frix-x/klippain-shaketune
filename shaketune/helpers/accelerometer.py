@@ -11,23 +11,26 @@
 #              compressed format (.stdata) or from the legacy Klipper CSV files.
 
 
-import os
-import pickle
+import json
 import time
 import uuid
-from multiprocessing import Process
+from io import TextIOWrapper
+from multiprocessing import Process, Queue, Value
 from pathlib import Path
-from typing import List, Tuple, TypedDict
+from typing import List, Optional, Tuple, TypedDict
 
 import numpy as np
-import zstandard as zstd
+from zstandard import FLUSH_FRAME, ZstdCompressor, ZstdDecompressor
 
 from ..helpers.console_output import ConsoleOutput
 
 Sample = Tuple[float, float, float, float]
 SamplesList = List[Sample]
 
-CHUNK_SIZE = 15  # Maximum number of measurements to keep in memory at once
+STOP_SENTINEL = 'STOP_SENTINEL'
+WRITE_TIMEOUT = 300
+WAIT_FOR_SAMPLE_TIMEOUT = 30
+COMPRESSION_LEVEL = 11  # Zstandard compression level (0 to 22, higher is slower but better compression)
 
 
 class Measurement(TypedDict):
@@ -36,130 +39,166 @@ class Measurement(TypedDict):
 
 
 class MeasurementsManager:
-    def __init__(self, chunk_size: int):
+    def __init__(self, chunk_size: int, k_reactor=None, stdata_filename: Path = None):
+        # Klipper reactor is optional here as when running in CLI mode, we don't need it since in this mode
+        # we are only reading a file to create graphs and never recording anything (so no disk writes)
+        self._k_reactor = k_reactor
         self._chunk_size = chunk_size
+        self._final_file = None
+        self._temp_file = None
+
+        # Get the stdata filename and associated temporary file (with the correct extension)
+        if stdata_filename is not None:
+            self._final_file = stdata_filename
+            if self._final_file.suffix != '.stdata':
+                self._final_file = self._final_file.with_suffix('.stdata')
+            self._temp_file = self._final_file.parent / f'snt_tmp-{str(uuid.uuid4())[:8]}.stdata'
+
         self.measurements: List[Measurement] = []
-        self._uuid = str(uuid.uuid4())[:8]
-        self._temp_dir = Path(f'/tmp/shaketune_{self._uuid}')
-        self._temp_dir.mkdir(parents=True, exist_ok=True)
-        self._chunk_files = []
-        self._write_processes = []
+
+        # Create a dedicated process with a Queue to manage all the writing operations
+        self._writer_queue = Queue()
+        self._is_writing = Value('b', False)
+        self._writer_process: Optional[Process] = None
+
+    # Dedicated writer process: opens the output file in binary write mode and wraps it with a Zstandard compressor
+    # stream. It then continuously reads measurement objects from the queue and writes each as a JSON line
+    def _writer_loop(self, output_file: Path, write_queue: Queue, is_writing: Value):
+        try:
+            with open(output_file, 'wb') as f:
+                cctx = ZstdCompressor(level=COMPRESSION_LEVEL)
+                with cctx.stream_writer(f) as compressor:
+                    while True:
+                        meas = write_queue.get()
+                        if meas == STOP_SENTINEL:
+                            break
+                        with is_writing.get_lock():
+                            is_writing.value = True
+                        line = (json.dumps(meas) + '\n').encode('utf-8')
+                        compressor.write(line)
+                        with is_writing.get_lock():
+                            is_writing.value = False
+                    compressor.flush(FLUSH_FRAME)
+        except Exception as e:
+            ConsoleOutput.print(f'Error writing to file {output_file}: {e}')
 
     def clear_measurements(self, keep_last: bool = False):
-        self.measurements = [self.measurements[-1]] if keep_last else []
+        self.measurements = [self.measurements[-1]] if keep_last and self.measurements else []
 
-    def append_samples_to_last_measurement(self, additional_samples: SamplesList):
+    def append_samples_to_current_measurement(self, additional_samples: SamplesList):
         try:
             self.measurements[-1]['samples'].extend(additional_samples)
         except IndexError as err:
-            raise ValueError('no measurements available to append samples to.') from err
+            raise ValueError('no measurements available to append samples to!') from err
 
-    def add_measurement(self, name: str, samples: SamplesList = None):
+    def add_measurement(self, name: str, samples: SamplesList = None, timeout: float = WRITE_TIMEOUT):
+        if not self._temp_file:
+            raise ValueError('no file path provided to the MeasurementsManager! Unable to add any measurement.')
+
+        # Start the writer process if it's not already running
+        if self._writer_process is None:
+            self._writer_process = Process(
+                target=self._writer_loop,
+                args=(self._temp_file, self._writer_queue, self._is_writing),
+                daemon=False,
+            )
+            self._writer_process.start()
+
         samples = samples if samples is not None else []
         self.measurements.append({'name': name, 'samples': samples})
         if len(self.measurements) > self._chunk_size:
-            self._save_chunk()
+            self._flush_chunk()  # Flush the current chunk of measurements to disk
 
-    def _save_chunk(self):
-        # Save the measurements to the chunk file. We keep the last measurement
-        # in memory to be able to append new samples to it later if needed
-        chunk_filename = self._temp_dir / f'{self._uuid}_{len(self._chunk_files)}.stchunk'
-        process = Process(target=self._save_to_file, args=(chunk_filename, self.measurements[:-1].copy()))
-        process.daemon = False
-        process.start()
-        self._write_processes.append(process)
-        self._chunk_files.append(chunk_filename)
-        self.clear_measurements(keep_last=True)
+            # Force wait for the writer process to finish writing in order to avoid being able
+            # to start a new measurement while the previous one is still being written on disk
+            # This is necessary to avoid Timer too close errors in Klipper...
+            if self._k_reactor is None:
+                return  # In case no reactor is available, we can't wait for the writer to finish
+            eventtime = self._k_reactor.monotonic()
+            endtime = eventtime + timeout
+            while eventtime < endtime:
+                with self._is_writing.get_lock():
+                    if self._writer_queue.empty() and not self._is_writing.value:
+                        return  # writer process is idle, so we can continue...
+                eventtime = self._k_reactor.pause(eventtime + 0.05)
 
-    def save_stdata(self, filename: Path):
-        process = Process(target=self._reassemble_chunks, args=(filename,))
-        process.daemon = False
-        process.start()
-        self._write_processes.append(process)
-
-    def _reassemble_chunks(self, filename: Path):
-        try:
-            os.nice(19)
-        except Exception:
-            pass  # Ignore errors as it's not critical
-        try:
-            all_measurements = []
-            for chunk_file in self._chunk_files:
-                chunk_measurements = self._load_measurements_from_file(chunk_file)
-                all_measurements.extend(chunk_measurements)
-                os.remove(chunk_file)  # Remove the chunk file after reading
-
-            # Include any remaining measurements in memory
-            if self.measurements:
-                all_measurements.extend(self.measurements)
-
-            # Save all measurements to the final .stdata file
-            self._save_to_file(filename, all_measurements)
-
-            # Clean up
-            self.clear_measurements()
-            self._chunk_files = []
-        except Exception as e:
-            ConsoleOutput.print(f'Warning: unable to assemble chunks into {filename}: {e}')
-
-    def _save_to_file(self, filename: Path, measurements: List[Measurement]):
-        try:
-            os.nice(19)
-        except Exception:
-            pass  # Ignore errors as it's not critical
-        try:
-            with open(filename, 'wb') as f:
-                cctx = zstd.ZstdCompressor(level=3)
-                with cctx.stream_writer(f) as compressor:
-                    pickle.dump(measurements, compressor)
-        except Exception as e:
-            ConsoleOutput.print(f'Warning: unable to save the data to {filename}: {e}')
-
-    def wait_for_data_transfers(self, k_reactor, timeout: int = 30):
-        if not self._write_processes:
-            return  # No file write is pending
-
-        eventtime = k_reactor.monotonic()
-        endtime = eventtime + timeout
-        complete = False
-
-        while eventtime < endtime:
-            eventtime = k_reactor.pause(eventtime + 0.05)
-            if all(not p.is_alive() for p in self._write_processes):
-                complete = True
-                break
-
-        if not complete:
+            # Raise an error with some statistics about the writer process
             raise TimeoutError(
-                'Shake&Tune was unable to write the accelerometer data on the filesystem. '
-                'This might be due to a slow, busy or full SD card.'
+                'timeout while waiting for the writer process to finish writing measurements '
+                f'chunk to disk!\nWriter process is still running after {timeout} seconds and '
+                f'has {self._writer_queue.qsize()} items in the queue!'
             )
 
-        self._write_processes = []
+    # Flush all measurements except the last one (which can still receive appended samples) to the dedicated
+    # writer process. Each measurement is sent as a single JSON-serializable object via the Queue
+    def _flush_chunk(self):
+        if len(self.measurements) <= 1:
+            return
+        flush_list = self.measurements[:-1]
+        for meas in flush_list:
+            self._writer_queue.put(meas)
+        self.clear_measurements(keep_last=True)
 
-    def _load_measurements_from_file(self, filename: Path) -> List[Measurement]:
+    def save_stdata(self, timeout: int = WRITE_TIMEOUT):
+        # Klipper reactor is required to save the data to disk (but optional for the CLI mode that never saves any .stdata)
+        if not self._k_reactor:
+            raise ValueError('no Klipper reactor provided! Unable to save data to disk.')
+        if not self._writer_process:
+            raise ValueError('no writer process available! Unable to save data to disk.')
+        if not self._final_file:
+            raise ValueError('no file path provided to the MeasurementsManager! Unable to save data to disk.')
+
+        # Flush any remaining in-memory measurements
+        if len(self.measurements) > 0:
+            for meas in self.measurements:
+                self._writer_queue.put(meas)
+            self.clear_measurements()
+
+        # Signal the writer process to finish its task
+        self._writer_queue.put(STOP_SENTINEL)
+
+        # Wait for the writer process to finish its task
+        eventtime = self._k_reactor.monotonic()
+        endtime = eventtime + timeout
+        complete = False
+        while eventtime < endtime:
+            if not self._writer_process.is_alive():
+                complete = True
+                break
+            eventtime = self._k_reactor.pause(eventtime + 0.05)
+        if not complete:
+            raise TimeoutError(
+                'Shake&Tune was unable to finish and close the .stdata writing process before the '
+                f'timeout of {timeout} seconds. This might be due to a slow, busy or full SD card.'
+            )
+
+        try:
+            if self._final_file.exists():
+                self._final_file.unlink()
+            self._temp_file.rename(self._final_file)
+        except Exception as e:
+            ConsoleOutput.print(f'Shake&Tune was unable to create the final data file ({self._final_file}): {e}')
+
+    # Return all the measurements from memory. Measurements flushed to disk are available via load_from_stdata()
+    def get_measurements(self) -> List[Measurement]:
+        return self.measurements
+
+    # Load all the measurements from the .stdata file
+    def load_from_stdata(self, filename: Path) -> List[Measurement]:
+        measurements = []
         try:
             with open(filename, 'rb') as f:
-                dctx = zstd.ZstdDecompressor()
+                dctx = ZstdDecompressor()
                 with dctx.stream_reader(f) as decompressor:
-                    measurements = pickle.load(decompressor)
-            return measurements
+                    text_stream = TextIOWrapper(decompressor, encoding='utf-8')
+                    for line in text_stream:
+                        if line.strip():
+                            meas = json.loads(line)
+                            measurements.append(meas)
+            self.measurements = measurements
         except Exception as e:
             ConsoleOutput.print(f'Warning: unable to load measurements from {filename}: {e}')
-            return []
-
-    def get_measurements(self) -> List[Measurement]:
-        all_measurements = []
-        for chunk_file in self._chunk_files:
-            chunk_measurements = self._load_measurements_from_file(chunk_file)
-            all_measurements.extend(chunk_measurements)
-        all_measurements.extend(self.measurements)  # Include any remaining measurements in memory
-
-        return all_measurements
-
-    def load_from_stdata(self, filename: Path) -> List[Measurement]:
-        self.measurements = self._load_measurements_from_file(filename)
-        return self.measurements
+            self.measurements = []
 
     def load_from_csvs(self, klipper_CSVs: List[Path]) -> List[Measurement]:
         for logname in klipper_CSVs:
@@ -209,10 +248,8 @@ class MeasurementsManager:
 
     def __del__(self):
         try:
-            if self._temp_dir.exists():
-                for chunk_file in self._temp_dir.glob('*.stchunk'):
-                    chunk_file.unlink()
-                self._temp_dir.rmdir()
+            if self._temp_file.exists():
+                self._temp_file.unlink()
         except Exception:
             pass  # Ignore errors during cleanup
 
@@ -252,7 +289,7 @@ class Accelerometer:
             self._measurements_manager = measurements_manager
             self._measurements_manager.add_measurement(name=name)
         else:
-            raise ValueError('Recording already started!')
+            raise ValueError('recording already started!')
 
     def stop_recording(self) -> MeasurementsManager:
         if self._bg_client is None:
@@ -262,6 +299,7 @@ class Accelerometer:
         # Register a callback in Klipper's reactor to finish the measurements and get the
         # samples when Klipper is ready to process them (and without blocking its main thread)
         self._k_reactor.register_callback(self._finish_and_get_samples)
+        self._wait_for_samples()
 
         return self._measurements_manager
 
@@ -269,7 +307,7 @@ class Accelerometer:
         try:
             self._bg_client.finish_measurements()
             samples = self._bg_client.samples or self._bg_client.get_samples()
-            self._measurements_manager.append_samples_to_last_measurement(samples)
+            self._measurements_manager.append_samples_to_current_measurement(samples)
             self._samples_ready = True
         except Exception as e:
             ConsoleOutput.print(f'Error during accelerometer data retrieval: {e}')
@@ -277,16 +315,14 @@ class Accelerometer:
         finally:
             self._bg_client = None
 
-    def wait_for_samples(self, timeout: int = 60):
+    def _wait_for_samples(self, timeout: int = WAIT_FOR_SAMPLE_TIMEOUT):
         eventtime = self._k_reactor.monotonic()
         endtime = eventtime + timeout
 
-        while eventtime < endtime:
-            eventtime = self._k_reactor.pause(eventtime + 0.05)
-            if self._samples_ready:
-                break
+        while eventtime < endtime and not self._samples_ready:
             if self._sample_error:
                 raise self._sample_error
+            eventtime = self._k_reactor.pause(eventtime + 0.05)
 
         if not self._samples_ready:
             raise TimeoutError(

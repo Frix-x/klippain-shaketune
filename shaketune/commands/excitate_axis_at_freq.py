@@ -7,6 +7,7 @@
 # Description: Provide a command to excites a specified axis at a given frequency for a duration
 #              and optionally creates a graph of the vibration data collected by the accelerometer.
 
+from datetime import datetime
 
 from ..helpers.accelerometer import Accelerometer, MeasurementsManager
 from ..helpers.common_func import AXIS_CONFIG
@@ -17,8 +18,10 @@ from ..shaketune_process import ShakeTuneProcess
 
 
 def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
+    date = datetime.now().strftime('%Y%m%d_%H%M%S')
+
     create_graph = gcmd.get_int('CREATE_GRAPH', default=0, minval=0, maxval=1) == 1
-    freq = gcmd.get_int('FREQUENCY', default=25, minval=1)
+    freq = gcmd.get_float('FREQUENCY', default=25, minval=1)
     duration = gcmd.get_int('DURATION', default=30, minval=1)
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     axis = gcmd.get('AXIS', default='x').lower()
@@ -43,9 +46,14 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
         if k_accelerometer is None:
             raise gcmd.error(f'Accelerometer chip [{accel_chip}] was not found!')
         accelerometer = Accelerometer(k_accelerometer, printer.get_reactor())
-        measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size)
 
-    ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq}Hz for {duration} seconds')
+        creator = st_process.get_graph_creator()
+        filename = creator.get_folder() / f'{creator.get_type().replace(" ", "")}_{date}'
+        measurements_manager = MeasurementsManager(
+            st_process.get_st_config().chunk_size, printer.get_reactor(), filename
+        )
+
+    ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq:.1f}Hz for {duration} seconds')
 
     printer = config.get_printer()
     gcode = printer.lookup_object('gcode')
@@ -103,11 +111,10 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # If the user wanted to create a graph, we stop the recording and generate it
     if create_graph:
         accelerometer.stop_recording()
-        accelerometer.wait_for_samples()
         toolhead.dwell(0.5)
 
-        creator = st_process.get_graph_creator()
         creator.configure(freq, duration, accel_per_hz)
-        measurements_manager.wait_for_data_transfers(printer.get_reactor())
-        st_process.run(measurements_manager)
+        creator.define_output_target(filename)
+        measurements_manager.save_stdata()
+        st_process.run(filename)
         st_process.wait_for_completion()

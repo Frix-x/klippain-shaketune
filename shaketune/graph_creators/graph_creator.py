@@ -11,9 +11,7 @@
 
 
 import abc
-import os
-from datetime import datetime
-from typing import Optional
+from pathlib import Path
 
 from matplotlib.figure import Figure
 
@@ -36,31 +34,33 @@ class GraphCreator(abc.ABC):
 
     def __init__(self, config: ShakeTuneConfig):
         self._config = config
-        self._graph_date = datetime.now().strftime('%Y%m%d_%H%M%S')
         self._version = ShakeTuneConfig.get_git_version()
         self._type = self.__class__.graph_type
         self._folder = self._config.get_results_folder(self._type)
         self._plotter = Plotter()
-        self._custom_filepath = None
+        self._output_target: Path = None
 
-    def _save_figure(
-        self, fig: Figure, measurements_manager: MeasurementsManager, axis_label: Optional[str] = None
-    ) -> None:
-        if os.environ.get('SHAKETUNE_IN_CLI') == '1' and self._custom_filepath is not None:
-            fig.savefig(f'{self._custom_filepath}', dpi=self._config.dpi)
-        else:
-            axis_suffix = f'_{axis_label}' if axis_label else ''
-            filename = self._folder / f"{self._type.replace(' ', '')}_{self._graph_date}{axis_suffix}"
-            fig.savefig(f'{filename}.png', dpi=self._config.dpi)
+    def _save_figure(self, fig: Figure) -> None:
+        if self._output_target is None:
+            raise ValueError(
+                'Output target not defined. Please call define_output_target() before trying to save the figure!'
+            )
 
-        if self._config.keep_raw_data and os.environ.get('SHAKETUNE_IN_CLI') != '1':
-            measurements_manager.save_stdata(f'{filename}.stdata')
+        fig.savefig(f'{self._output_target.with_suffix(".png")}', dpi=self._config.dpi)
+        if not self._config.keep_raw_data:
+            self._output_target.with_suffix('.stdata').unlink(missing_ok=True)
 
     def get_type(self) -> str:
         return self._type
 
-    def override_output_target(self, filepath: str) -> None:
-        self._custom_filepath = filepath
+    def get_folder(self) -> Path:
+        return self._folder
+
+    def define_output_target(self, filepath: Path) -> None:
+        # Remove the extension if it exists (to be safer when using the CLI mode)
+        if filepath.suffix:
+            filepath = filepath.with_suffix('')
+        self._output_target = filepath
 
     @abc.abstractmethod
     def create_graph(self, measurements_manager: MeasurementsManager) -> None:

@@ -10,6 +10,7 @@
 
 
 import math
+from datetime import datetime
 
 from ..helpers.accelerometer import Accelerometer, MeasurementsManager
 from ..helpers.console_output import ConsoleOutput
@@ -20,6 +21,8 @@ MIN_SPEED = 2  # mm/s
 
 
 def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> None:
+    date = datetime.now().strftime('%Y%m%d_%H%M%S')
+
     size = gcmd.get_float('SIZE', default=100.0, minval=50.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=20.0)
     max_speed = gcmd.get_float('MAX_SPEED', default=200.0, minval=10.0)
@@ -81,7 +84,9 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
     toolhead.move([mid_x - 15, mid_y - 15, z_height, E], feedrate_travel)
     toolhead.dwell(0.5)
 
-    measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size)
+    creator = st_process.get_graph_creator()
+    filename = creator.get_folder() / f'{creator.get_type().replace(" ", "")}_{date}'
+    measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size, printer.get_reactor(), filename)
 
     nb_speed_samples = int((max_speed - MIN_SPEED) / speed_increment + 1)
     for curr_angle in main_angles:
@@ -135,12 +140,6 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
                 toolhead.move([mid_x + dX, mid_y + dY, z_height, E], curr_speed)
                 toolhead.move([mid_x - dX, mid_y - dY, z_height, E], curr_speed)
             accelerometer.stop_recording()
-            accelerometer.wait_for_samples()
-
-            # For this command, we need to wait for the data transfers after finishing each of
-            # the measurements as there is a high probability to have a lot of measurements in
-            # the measurement manager and that chunks are written into the /tmp filesystem folder
-            measurements_manager.wait_for_data_transfers(printer.get_reactor())
 
             toolhead.dwell(0.3)
             toolhead.wait_moves()
@@ -157,7 +156,8 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
     # Run post-processing
     ConsoleOutput.print('Machine vibrations profile generation...')
     ConsoleOutput.print('This may take some time (5-8min)')
-    creator = st_process.get_graph_creator()
     creator.configure(motors_config_parser.kinematics, accel, motors_config_parser)
-    st_process.run(measurements_manager)
+    creator.define_output_target(filename)
+    measurements_manager.save_stdata()
+    st_process.run(filename)
     st_process.wait_for_completion()

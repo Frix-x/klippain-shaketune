@@ -12,7 +12,8 @@ import os
 import threading
 import traceback
 from multiprocessing import Process
-from typing import Optional
+from pathlib import Path
+from typing import List, Optional, Union
 
 from .helpers.accelerometer import MeasurementsManager
 from .helpers.console_output import ConsoleOutput
@@ -33,11 +34,33 @@ class ShakeTuneProcess:
     def get_st_config(self):
         return self._config
 
-    def run(self, measurements_manager: MeasurementsManager) -> None:
+    def run(self, filenames: Union[Path, List[Path]]) -> None:
+        filelist = []
+
+        # Single .stdata or a legacy .csv file
+        if isinstance(filenames, Path):
+            if filenames.suffix not in ('.stdata', '.csv'):
+                filenames = filenames.with_suffix('.stdata')
+            if not filenames.exists():
+                raise FileNotFoundError(f'File {filenames} does not exist!')
+            filelist.append(filenames)
+
+        # List of legacy .csv files (still supported to be able to use CSVs when using the CLI mode)
+        if isinstance(filenames, List):
+            extensions = {f.suffix for f in filenames}
+            if len(extensions) > 1:
+                raise ValueError('Mixed file types are not allowed! Please provide Klipper CSV files only.')
+            for filename in filenames:
+                if filename.suffix != '.csv':
+                    filename = filename.with_suffix('.csv')
+                if not filename.exists():
+                    raise FileNotFoundError(f'File {filename} does not exist!')
+                filelist.append(filename)
+
         # Start the target function in a new process (a thread is known to cause issues with Klipper and CANbus due to the GIL)
         self._process = Process(
             target=self._shaketune_process_wrapper,
-            args=(self.graph_creator, measurements_manager, self._timeout),
+            args=(self.graph_creator, filelist, self._timeout),
         )
         self._process.start()
 
@@ -48,16 +71,16 @@ class ShakeTuneProcess:
         endtime = eventtime + self._timeout
         complete = False
         while eventtime < endtime:
-            eventtime = self._reactor.pause(eventtime + 0.05)
             if not self._process.is_alive():
                 complete = True
                 break
+            eventtime = self._reactor.pause(eventtime + 0.05)
         if not complete:
             self._handle_timeout()
 
     # This function is a simple wrapper to start the Shake&Tune process. It's needed in order to get the timeout
     # as a Timer in a thread INSIDE the Shake&Tune child process to not interfere with the main Klipper process
-    def _shaketune_process_wrapper(self, graph_creator, measurements_manager: MeasurementsManager, timeout) -> None:
+    def _shaketune_process_wrapper(self, graph_creator, filelist: List[Path], timeout) -> None:
         if timeout is not None:
             # Add 5 seconds to the timeout for safety. The goal is to avoid the Timer to finish before the
             # Shake&Tune process is done in case we call the wait_for_completion() function that uses Klipper's reactor.
@@ -65,7 +88,7 @@ class ShakeTuneProcess:
             timer = threading.Timer(timeout, self._handle_timeout)
             timer.start()
         try:
-            self._shaketune_process(graph_creator, measurements_manager)
+            self._shaketune_process(graph_creator, filelist)
         finally:
             if timeout is not None:
                 timer.cancel()
@@ -74,7 +97,7 @@ class ShakeTuneProcess:
         ConsoleOutput.print('Timeout: Shake&Tune computation did not finish within the specified timeout!')
         os._exit(1)  # Forcefully exit the process
 
-    def _shaketune_process(self, graph_creator, m_manager: MeasurementsManager) -> None:
+    def _shaketune_process(self, graph_creator, filelist: List[Path]) -> None:
         # Reducing Shake&Tune process priority by putting the scheduler into batch mode with low priority. This in order to avoid
         # slowing down the main Klipper process as this can lead to random "Timer too close" or "Move queue overflow" errors
         # when also already running CANbus, neopixels and other consumming stuff in Klipper's main process.
@@ -88,6 +111,14 @@ class ShakeTuneProcess:
         for folder in self._config.get_results_subfolders():
             folder.mkdir(parents=True, exist_ok=True)
 
+        # Load the measurements from the file
+        m_manager = MeasurementsManager(self._config.chunk_size, self._reactor)
+        if filelist[0].suffix == '.stdata':
+            m_manager.load_from_stdata(filelist[0])
+        else:
+            m_manager.load_from_csvs(filelist)
+
+        # Check if there are any measurements to process
         if m_manager.get_measurements() is None or len(m_manager.get_measurements()) == 0:
             ConsoleOutput.print('Error: no measurements available to create the graphs!')
             return
