@@ -21,7 +21,7 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
     date = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     create_graph = gcmd.get_int('CREATE_GRAPH', default=0, minval=0, maxval=1) == 1
-    freq = gcmd.get_int('FREQUENCY', default=25, minval=1)
+    freq = gcmd.get_float('FREQUENCY', default=25, minval=1)
     duration = gcmd.get_int('DURATION', default=30, minval=1)
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     axis = gcmd.get('AXIS', default='x').lower()
@@ -53,7 +53,7 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
             st_process.get_st_config().chunk_size, printer.get_reactor(), filename
         )
 
-    ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq}Hz for {duration} seconds')
+    ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq:.1f}Hz for {duration} seconds')
 
     printer = config.get_printer()
     gcode = printer.lookup_object('gcode')
