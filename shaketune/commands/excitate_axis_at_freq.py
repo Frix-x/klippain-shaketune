@@ -53,7 +53,7 @@ def excitate_axis_at_freq(gcmd, config, st_process: ShakeTuneProcess) -> None:
             st_process.get_st_config().chunk_size, printer.get_reactor(), filename
         )
 
-    ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq}Hz for {duration} seconds')
+    ConsoleOutput.print(f'Excitating {axis.upper()} axis at {freq:.1f}Hz for {duration} seconds')
 
     printer = config.get_printer()
     gcode = printer.lookup_object('gcode')

@@ -277,7 +277,7 @@ class ResonanceTestManager:
                 toolhead.move([nX, nY, nZ, E], max(abs_v, abs_last_v))
 
             if math.floor(freq) > math.floor(last_freq):
-                ConsoleOutput.print(f'Testing frequency: {freq:.0f} Hz')
+                ConsoleOutput.print(f'Testing frequency: {freq:.1f} Hz')
                 reactor.pause(reactor.monotonic() + 0.01)
 
             X, Y, Z = nX, nY, nZ
