@@ -17,7 +17,6 @@ import uuid
 from io import TextIOWrapper
 from multiprocessing import Process, Queue, Value
 from pathlib import Path
-from shutil import move as move_file
 from typing import List, Optional, Tuple, TypedDict
 
 import numpy as np
@@ -29,7 +28,7 @@ Sample = Tuple[float, float, float, float]
 SamplesList = List[Sample]
 
 STOP_SENTINEL = 'STOP_SENTINEL'
-WRITE_TIMEOUT = 30
+WRITE_TIMEOUT = 300
 WAIT_FOR_SAMPLE_TIMEOUT = 30
 
 
@@ -39,14 +38,22 @@ class Measurement(TypedDict):
 
 
 class MeasurementsManager:
-    def __init__(self, chunk_size: int, k_reactor=None):
+    def __init__(self, chunk_size: int, k_reactor=None, stdata_filename: Path = None):
         # Klipper reactor is optional here as when running in CLI mode, we don't need it since in this mode
         # we are only reading a file to create graphs and never recording anything (so no disk writes)
         self._k_reactor = k_reactor
         self._chunk_size = chunk_size
+        self._final_file = None
+        self._temp_file = None
+
+        # Get the stdata filename and associated temporary file (with the correct extension)
+        if stdata_filename is not None:
+            self._final_file = stdata_filename
+            if self._final_file.suffix != '.stdata':
+                self._final_file = self._final_file.with_suffix('.stdata')
+            self._temp_file = self._final_file.parent / f'snt_tmp-{str(uuid.uuid4())[:8]}.stdata'
 
         self.measurements: List[Measurement] = []
-        self._temp_file = Path(f'/tmp/shaketune_{str(uuid.uuid4())[:8]}.stdata')
 
         # Create a dedicated process with a Queue to manage all the writing operations
         self._writer_queue = Queue()
@@ -84,6 +91,9 @@ class MeasurementsManager:
             raise ValueError('no measurements available to append samples to!') from err
 
     def add_measurement(self, name: str, samples: SamplesList = None, timeout: float = WRITE_TIMEOUT):
+        if not self._temp_file:
+            raise ValueError('no file path provided to the MeasurementsManager! Unable to add any measurement.')
+
         # Start the writer process if it's not already running
         if self._writer_process is None:
             self._writer_process = Process(
@@ -113,8 +123,9 @@ class MeasurementsManager:
 
             # Raise an error with some statistics about the writer process
             raise TimeoutError(
-                'Timeout while waiting for the writer process to finish writing measurements chunk to disk!\n'
-                f'Writer process is still running and has {self._writer_queue.qsize()} items in the queue!'
+                'timeout while waiting for the writer process to finish writing measurements '
+                f'chunk to disk!\nWriter process is still running after {timeout} seconds and '
+                f'has {self._writer_queue.qsize()} items in the queue!'
             )
 
     # Flush all measurements except the last one (which can still receive appended samples) to the dedicated
@@ -127,17 +138,14 @@ class MeasurementsManager:
             self._writer_queue.put(meas)
         self.clear_measurements(keep_last=True)
 
-    def save_stdata(self, filename: Path, timeout: int = WRITE_TIMEOUT):
+    def save_stdata(self, timeout: int = WRITE_TIMEOUT):
         # Klipper reactor is required to save the data to disk (but optional for the CLI mode that never saves any .stdata)
         if not self._k_reactor:
-            raise ValueError('No Klipper reactor provided! Unable to save data to disk.')
-
+            raise ValueError('no Klipper reactor provided! Unable to save data to disk.')
         if not self._writer_process:
-            raise ValueError('No writer process available! Unable to save data to disk.')
-
-        # Add extension if not provided
-        if filename.suffix != '.stdata':
-            filename = filename.with_suffix('.stdata')
+            raise ValueError('no writer process available! Unable to save data to disk.')
+        if not self._final_file:
+            raise ValueError('no file path provided to the MeasurementsManager! Unable to save data to disk.')
 
         # Flush any remaining in-memory measurements
         if len(self.measurements) > 0:
@@ -159,16 +167,16 @@ class MeasurementsManager:
             eventtime = self._k_reactor.pause(eventtime + 0.05)
         if not complete:
             raise TimeoutError(
-                'Shake&Tune was unable to finish and close the .stdata writing process. '
-                'This might be due to a slow, busy or full SD card.'
+                'Shake&Tune was unable to finish and close the .stdata writing process before the '
+                f'timeout of {timeout} seconds. This might be due to a slow, busy or full SD card.'
             )
 
         try:
-            if filename.exists():
-                filename.unlink()
-            move_file(self._temp_file, filename)  # using shutil.move() to avoid cross-filesystem issues
+            if self._final_file.exists():
+                self._final_file.unlink()
+            self._temp_file.rename(self._final_file)
         except Exception as e:
-            ConsoleOutput.print(f'Shake&Tune was unable to create the final data file ({filename}): {e}')
+            ConsoleOutput.print(f'Shake&Tune was unable to create the final data file ({self._final_file}): {e}')
 
     # Return all the measurements from memory. Measurements flushed to disk are available via load_from_stdata()
     def get_measurements(self) -> List[Measurement]:
@@ -275,12 +283,12 @@ class Accelerometer:
                 name += f'_{timestamp}'
 
             if not name.replace('-', '').replace('_', '').isalnum():
-                raise ValueError('Invalid measurement name!')
+                raise ValueError('invalid measurement name!')
 
             self._measurements_manager = measurements_manager
             self._measurements_manager.add_measurement(name=name)
         else:
-            raise ValueError('Recording already started!')
+            raise ValueError('recording already started!')
 
     def stop_recording(self) -> MeasurementsManager:
         if self._bg_client is None:

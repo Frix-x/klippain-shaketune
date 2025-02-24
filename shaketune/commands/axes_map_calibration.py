@@ -72,7 +72,9 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     toolhead.move([mid_x - SEGMENT_LENGTH / 2, mid_y - SEGMENT_LENGTH / 2, z_height, E], feedrate_travel)
     toolhead.dwell(0.5)
 
-    measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size, printer.get_reactor())
+    creator = st_process.get_graph_creator()
+    filename = creator.get_folder() / f'{creator.get_type().replace(" ", "")}_{date}'
+    measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size, printer.get_reactor(), filename)
 
     # Start the measurements and do the movements (+X, +Y and then +Z)
     accelerometer.start_recording(measurements_manager, name='axesmap_X', append_time=True)
@@ -111,10 +113,8 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # Run post-processing
     ConsoleOutput.print('Analysis of the movements...')
     ConsoleOutput.print('This may take some time (1-3min)')
-    creator = st_process.get_graph_creator()
-    filename = creator.get_folder() / f'{creator.get_type().replace(" ", "")}_{date}'
     creator.configure(accel, SEGMENT_LENGTH)
     creator.define_output_target(filename)
-    measurements_manager.save_stdata(filename)
+    measurements_manager.save_stdata()
     st_process.run(filename)
     st_process.wait_for_completion()
