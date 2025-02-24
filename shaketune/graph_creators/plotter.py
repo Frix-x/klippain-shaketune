@@ -123,7 +123,7 @@ class Plotter:
         # Add titles and logo
         try:
             filename = measurements[0]['name']
-            dt = datetime.strptime(f"{filename.split('_')[2]} {filename.split('_')[3]}", '%Y%m%d %H%M%S')
+            dt = datetime.strptime(f'{filename.split("_")[2]} {filename.split("_")[3]}', '%Y%m%d %H%M%S')
             title_line2 = dt.strftime('%x %X')
             if accel is not None:
                 title_line2 += f' -- at {accel:0.0f} mm/s²'
@@ -350,7 +350,7 @@ class Plotter:
         # Add titles and logo
         try:
             filename = measurements[0]['name']
-            dt = datetime.strptime(f"{filename.split('_')[2]} {filename.split('_')[3]}", '%Y%m%d %H%M%S')
+            dt = datetime.strptime(f'{filename.split("_")[2]} {filename.split("_")[3]}', '%Y%m%d %H%M%S')
             title_line2 = dt.strftime('%x %X')
             if kinematics is not None:
                 title_line2 += ' -- ' + kinematics.upper() + ' kinematics'
@@ -739,7 +739,7 @@ class Plotter:
             fontcolor = 'red' if psd[peak] > peaks_threshold[1] else 'black'
             fontweight = 'bold' if psd[peak] > peaks_threshold[1] else 'normal'
             ax_1.annotate(
-                f'{idx+1}',
+                f'{idx + 1}',
                 (freqs[peak], psd[peak]),
                 textcoords='offset points',
                 xytext=(8, 5),
@@ -784,10 +784,10 @@ class Plotter:
         )
 
         # Add peaks lines in the spectrogram to get hint from peaks found in the first graph
-        for idx, peak in enumerate(peaks):
+        for idx, peak in enumerate(peaks_freqs):
             ax_2.axvline(peak, color='cyan', linestyle='dotted', linewidth=1)
             ax_2.annotate(
-                f'Peak {idx+1}',
+                f'Peak {idx + 1}',
                 (peak, bins[-1] * 0.9),
                 textcoords='data',
                 color='cyan',
@@ -958,7 +958,7 @@ class Plotter:
         # Add title
         try:
             filename_parts = measurements[0]['name'].split('_')
-            dt = datetime.strptime(f"{filename_parts[4]} {filename_parts[5].split('-')[0]}", '%Y%m%d %H%M%S')
+            dt = datetime.strptime(f'{filename_parts[4]} {filename_parts[5].split("-")[0]}', '%Y%m%d %H%M%S')
             title_line2 = dt.strftime('%x %X')
             if accel is not None:
                 title_line2 += f' at {accel} mm/s² -- {kinematics.upper()} kinematics'
@@ -985,15 +985,15 @@ class Plotter:
             distance = 0.27 if motors[0].get_config('autotune_enabled') else 0.16
             if motors[0].get_config('autotune_enabled'):
                 config_blocks = [
-                    f"| {lbl}: {mot.get_config('motor').upper()} on {mot.get_config('tmc').upper()} @ {mot.get_config('voltage'):0.1f}V {mot.get_config('run_current'):0.2f}A - {mot.get_config('microsteps')}usteps"
+                    f'| {lbl}: {mot.get_config("motor").upper()} on {mot.get_config("tmc").upper()} @ {mot.get_config("voltage"):0.1f}V {mot.get_config("run_current"):0.2f}A - {mot.get_config("microsteps")}usteps'
                     for mot, lbl in motor_details
                 ]
                 config_blocks.append(
-                    f'| TMC Autotune enabled (PWM freq target: X={int(motors[0].get_config("pwm_freq_target")/1000)}kHz / Y={int(motors[1].get_config("pwm_freq_target")/1000)}kHz)'
+                    f'| TMC Autotune enabled (PWM freq target: X={int(motors[0].get_config("pwm_freq_target") / 1000)}kHz / Y={int(motors[1].get_config("pwm_freq_target") / 1000)}kHz)'
                 )
             else:
                 config_blocks = [
-                    f"| {lbl}: {mot.get_config('tmc').upper()} @ {mot.get_config('run_current'):0.2f}A - {mot.get_config('microsteps')}usteps"
+                    f'| {lbl}: {mot.get_config("tmc").upper()} @ {mot.get_config("run_current"):0.2f}A - {mot.get_config("microsteps")}usteps'
                     for mot, lbl in motor_details
                 ]
                 config_blocks.append('| TMC Autotune not detected')
@@ -1142,7 +1142,7 @@ class Plotter:
             )
             for idx, peak in enumerate(vibration_peaks):
                 ax_2_2.annotate(
-                    f'{idx+1}',
+                    f'{idx + 1}',
                     (all_speeds[peak], vibration_metric[peak]),
                     textcoords='offset points',
                     xytext=(5, 5),
@@ -1159,7 +1159,7 @@ class Plotter:
                 vibration_metric[start:end],
                 color='green',
                 alpha=0.2,
-                label=f'Zone {idx+1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s',
+                label=f'Zone {idx + 1}: {all_speeds[start]:.1f} to {all_speeds[end]:.1f} mm/s',
             )
 
         fontP = self.configure_axes(
@@ -1202,7 +1202,7 @@ class Plotter:
             for idx, peak in enumerate(vibration_peaks):
                 ax_5.axvline(all_speeds[peak], color='cyan', linewidth=0.75)
                 ax_5.annotate(
-                    f'Peak {idx+1}',
+                    f'Peak {idx + 1}',
                     (all_speeds[peak], all_angles[-1] * 0.9),
                     textcoords='data',
                     color='cyan',
