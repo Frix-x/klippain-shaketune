@@ -30,6 +30,7 @@ SamplesList = List[Sample]
 STOP_SENTINEL = 'STOP_SENTINEL'
 WRITE_TIMEOUT = 300
 WAIT_FOR_SAMPLE_TIMEOUT = 30
+COMPRESSION_LEVEL = 11  # Zstandard compression level (0 to 22, higher is slower but better compression)
 
 
 class Measurement(TypedDict):
@@ -65,7 +66,7 @@ class MeasurementsManager:
     def _writer_loop(self, output_file: Path, write_queue: Queue, is_writing: Value):
         try:
             with open(output_file, 'wb') as f:
-                cctx = ZstdCompressor(level=3)
+                cctx = ZstdCompressor(level=COMPRESSION_LEVEL)
                 with cctx.stream_writer(f) as compressor:
                     while True:
                         meas = write_queue.get()
