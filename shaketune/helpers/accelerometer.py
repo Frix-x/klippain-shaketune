@@ -319,9 +319,7 @@ class Accelerometer:
         eventtime = self._k_reactor.monotonic()
         endtime = eventtime + timeout
 
-        while eventtime < endtime:
-            if self._samples_ready:
-                break
+        while eventtime < endtime and not self._samples_ready:
             if self._sample_error:
                 raise self._sample_error
             eventtime = self._k_reactor.pause(eventtime + 0.05)
