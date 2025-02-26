@@ -107,10 +107,6 @@ class ShakeTuneProcess:
         except Exception:
             ConsoleOutput.print('Warning: failed reducing Shake&Tune process priority, continuing...')
 
-        # Ensure the output folders exist
-        for folder in self._config.get_results_subfolders():
-            folder.mkdir(parents=True, exist_ok=True)
-
         # Load the measurements from the file
         m_manager = MeasurementsManager(self._config.chunk_size, self._reactor)
         if filelist[0].suffix == '.stdata':

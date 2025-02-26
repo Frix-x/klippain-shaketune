@@ -35,8 +35,7 @@ DEFAULT_SHOW_MACROS = True
 DEFAULT_MEASUREMENTS_CHUNK_SIZE = 2  # Maximum number of measurements to keep in memory at once
 ST_COMMANDS = {
     'EXCITATE_AXIS_AT_FREQ': (
-        'Maintain a specified excitation frequency for a period '
-        'of time to diagnose and locate a source of vibrations'
+        'Maintain a specified excitation frequency for a period of time to diagnose and locate a source of vibrations'
     ),
     'AXES_MAP_CALIBRATION': (
         'Perform a set of movements to measure the orientation of the accelerometer '
@@ -67,24 +66,26 @@ class ShakeTune:
         gcode = self._printer.lookup_object('gcode')
         ConsoleOutput.register_output_callback(gcode.respond_info)
 
-        self._initialize_config(config)
+        st_config, timeout, show_macros = self._initialize_config(config)
+        self._st_config = st_config
+        self.timeout = timeout
+        self._show_macros = show_macros
+
         self._register_commands()
 
     # Initialize the ShakeTune object and its configuration
-    def _initialize_config(self, config) -> None:
-        result_folder = config.get('result_folder', default=DEFAULT_FOLDER)
+    def _initialize_config(self, k_conf) -> None:
+        result_folder = k_conf.get('result_folder', default=DEFAULT_FOLDER)
         result_folder_path = Path(result_folder).expanduser() if result_folder else None
-        keep_n_results = config.getint('number_of_results_to_keep', default=DEFAULT_NUMBER_OF_RESULTS, minval=0)
-        keep_raw_data = config.getboolean('keep_raw_data', default=DEFAULT_KEEP_RAW_DATA)
-        max_freq = config.getfloat('max_freq', default=DEFAULT_MAX_FREQ, minval=100.0)
-        dpi = config.getint('dpi', default=DEFAULT_DPI, minval=100, maxval=500)
-        m_chunk_size = config.getint('measurements_chunk_size', default=DEFAULT_MEASUREMENTS_CHUNK_SIZE, minval=2)
-        self._st_config = ShakeTuneConfig(
-            result_folder_path, keep_n_results, keep_raw_data, m_chunk_size, max_freq, dpi
-        )
-
-        self.timeout = config.getfloat('timeout', DEFAULT_TIMEOUT, above=0.0)
-        self._show_macros = config.getboolean('show_macros_in_webui', default=DEFAULT_SHOW_MACROS)
+        keep_n_results = k_conf.getint('number_of_results_to_keep', default=DEFAULT_NUMBER_OF_RESULTS, minval=0)
+        keep_raw_data = k_conf.getboolean('keep_raw_data', default=DEFAULT_KEEP_RAW_DATA)
+        max_freq = k_conf.getfloat('max_freq', default=DEFAULT_MAX_FREQ, minval=100.0)
+        dpi = k_conf.getint('dpi', default=DEFAULT_DPI, minval=100, maxval=500)
+        m_chunk_size = k_conf.getint('measurements_chunk_size', default=DEFAULT_MEASUREMENTS_CHUNK_SIZE, minval=2)
+        st_config = ShakeTuneConfig(result_folder_path, keep_n_results, keep_raw_data, m_chunk_size, max_freq, dpi)
+        timeout = k_conf.getfloat('timeout', DEFAULT_TIMEOUT, above=0.0)
+        show_macros = k_conf.getboolean('show_macros_in_webui', default=DEFAULT_SHOW_MACROS)
+        return st_config, timeout, show_macros
 
     # Create the Klipper commands to allow the user to run Shake&Tune's tools
     def _register_commands(self) -> None:
@@ -143,6 +144,10 @@ class ShakeTune:
             raise self._config.error(
                 'No [resonance_tester] config section found in printer.cfg! Please add one to use Shake&Tune!'
             )
+
+        # Ensure the output folders exist
+        for f in self._st_config.get_results_subfolders():
+            f.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------------------------------
     # ------------------------------------------------------------------------------------------
