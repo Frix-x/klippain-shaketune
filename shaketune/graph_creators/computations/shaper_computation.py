@@ -189,7 +189,7 @@ class ShaperComputation:
     def _calibrate_shaper(self, datas: np.ndarray, max_smoothing: Optional[float], scv: float, max_freq: float):
         """Find the best shaper parameters using Klipper's official algorithm"""
         shaper_calibrate, shaper_defs = get_shaper_calibrate_module()
-        calib_data = shaper_calibrate.process_accelerometer_data(datas)
+        calib_data = shaper_calibrate.process_accelerometer_data(None, datas)
         calib_data.normalize_to_frequencies()
 
         # We compute the damping ratio using the Klipper's default value if it fails

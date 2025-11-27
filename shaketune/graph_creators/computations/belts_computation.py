@@ -132,7 +132,7 @@ class BeltsComputation:
     def _compute_signal_data(self, data: np.ndarray, common_freqs: np.ndarray, max_freq: float) -> SignalData:
         """Compute signal data from raw measurements"""
         shaper_calibrate, _ = get_shaper_calibrate_module()
-        calibration_data = shaper_calibrate.process_accelerometer_data(data)
+        calibration_data = shaper_calibrate.process_accelerometer_data(None, data)
 
         freqs = calibration_data.freq_bins[calibration_data.freq_bins <= max_freq]
         psd = calibration_data.get_psd('all')[calibration_data.freq_bins <= max_freq]
