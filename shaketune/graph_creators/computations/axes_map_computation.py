@@ -4,12 +4,11 @@
 # Licensed under the GNU General Public License v3.0 (GPL-3.0)
 #
 # File: axes_map_computation.py
-# Description: Computation implementation for axes map detection
+# Description: Computation for axes map detection using velocity-based algorithm
 
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
-import pywt
 
 from ...helpers.accelerometer import Measurement
 from ...helpers.console_output import ConsoleOutput
@@ -17,10 +16,66 @@ from ..base_models import GraphMetadata
 from ..computation_results import AxesMapResult
 
 MACHINE_AXES = ['x', 'y', 'z']
+ACCEL_AXES = ['x', 'y', 'z']
+
+
+def _orthonormalize_rotation_matrix(R: np.ndarray) -> np.ndarray:
+    """Orthonormalize a 3x3 matrix using SVD to get closest proper rotation.
+
+    The input matrix may have small deviations from orthonormality due to
+    measurement noise. SVD finds the closest proper rotation matrix.
+    """
+    U, _, Vt = np.linalg.svd(R)
+    R_ortho = U @ Vt
+    # Ensure proper rotation (det = +1, not reflection)
+    if np.linalg.det(R_ortho) < 0:
+        U[:, -1] *= -1
+        R_ortho = U @ Vt
+    return R_ortho
+
+
+def _extract_euler_xyz(R: np.ndarray) -> Tuple[float, float, float]:
+    """Extract XYZ intrinsic Euler angles (roll, pitch, yaw) from rotation matrix.
+
+    Convention: Intrinsic XYZ means rotations applied in order: X, then Y, then Z.
+    This is also known as Tait-Bryan angles.
+
+    Returns angles in degrees as (roll, pitch, yaw).
+    """
+    # Handle gimbal lock (pitch = +/-90 degrees)
+    sy = np.sqrt(R[2, 1] ** 2 + R[2, 2] ** 2)
+
+    if sy > 1e-6:  # Not at gimbal lock
+        roll = np.arctan2(R[2, 1], R[2, 2])
+        pitch = np.arctan2(-R[2, 0], sy)
+        yaw = np.arctan2(R[1, 0], R[0, 0])
+    else:  # Gimbal lock: pitch = +/-90 degrees
+        roll = np.arctan2(-R[1, 2], R[1, 1])
+        pitch = np.arctan2(-R[2, 0], sy)
+        yaw = 0.0
+
+    return (np.degrees(roll), np.degrees(pitch), np.degrees(yaw))
 
 
 class AxesMapComputation:
-    """Computation for axes map detection"""
+    """Computation for axes map detection using velocity-based algorithm.
+
+    This algorithm uses low-pass filtering and velocity integration to robustly
+    detect accelerometer orientation, even in the presence of structural ringing.
+
+    The approach:
+    1. Low-pass filter acceleration to remove structural ringing (50+ Hz)
+    2. Integrate to velocity (single integration, minimal drift)
+    3. Find peak velocity - the axis with largest peak velocity is the motion axis
+    4. The sign of peak velocity indicates orientation (+/-)
+    """
+
+    # Thresholds for validation
+    MIN_CONFIDENCE = 0.5
+    MAX_ANGLE_ERROR = 15.0  # degrees
+    EXPECTED_GRAVITY = 9810  # mm/s^2
+    GRAVITY_TOLERANCE = 0.20  # 20% tolerance
+    FILTER_CUTOFF = 25.0  # Hz - removes 50+ Hz ringing while preserving motion
 
     def __init__(
         self,
@@ -35,86 +90,57 @@ class AxesMapComputation:
         self.st_version = st_version
 
     def compute(self) -> AxesMapResult:
-        """Perform axes map detection computation"""
+        """Perform axes map detection computation."""
         if len(self.measurements) != 3:
             raise ValueError(
                 f'This tool needs 3 measurements (for X, Y and Z) to work. Currently, it has {len(self.measurements)} '
                 f'measurements named {[meas.get("name", "unknown") for meas in self.measurements]}'
             )
 
-        raw_datas = {}
-        for measurement in self.measurements:
-            data = np.array(measurement['samples'])
-            if data is not None:
-                _axis = measurement['name'].split('_')[1].lower()
-                raw_datas[_axis] = data
+        raw_datas = self._parse_measurements()
 
-        cumulative_start_position = np.array([0, 0, 0])
         direction_vectors = []
+        actual_directions = []
         angle_errors = []
-        total_noise_intensity = 0.0
+        confidences = []
+        noise_levels = []
+        peak_velocities_data = []
         acceleration_data = []
-        position_data = []
+        velocity_data = []
         gravities = []
 
         for machine_axis in MACHINE_AXES:
             if machine_axis not in raw_datas:
                 raise ValueError(f'Missing measurement for axis {machine_axis}')
 
-            # Get the accel data according to the current axes_map
-            time = raw_datas[machine_axis][:, 0]
-            accel_x = raw_datas[machine_axis][:, 1]
-            accel_y = raw_datas[machine_axis][:, 2]
-            accel_z = raw_datas[machine_axis][:, 3]
+            result = self._process_single_axis(raw_datas[machine_axis])
 
-            offset_x, offset_y, offset_z, position_x, position_y, position_z, noise_intensity = (
-                self._process_acceleration_data(time, accel_x, accel_y, accel_z)
-            )
-            position_x, position_y, position_z = self._scale_positions_to_fixed_length(
-                position_x, position_y, position_z, self.fixed_length
-            )
-            position_x += cumulative_start_position[0]
-            position_y += cumulative_start_position[1]
-            position_z += cumulative_start_position[2]
-
-            gravity = np.linalg.norm(np.array([offset_x, offset_y, offset_z]))
-            average_direction_vector = self._linear_regression_direction(position_x, position_y, position_z)
-            direction_vector, angle_error = self._find_nearest_perfect_vector(average_direction_vector)
-
-            ConsoleOutput.print(
-                f'Machine axis {machine_axis.upper()} -> nearest accelerometer direction vector: {direction_vector} '
-                f'(angle error: {angle_error:.2f}°)'
-            )
-
-            direction_vectors.append(direction_vector)
-            angle_errors.append(angle_error)
-            total_noise_intensity += noise_intensity
-
-            acceleration_data.append((time, (accel_x, accel_y, accel_z)))
-            position_data.append((position_x, position_y, position_z))
-            gravities.append(gravity)
-
-            # Update the cumulative start position for the next segment
-            cumulative_start_position = np.array([position_x[-1], position_y[-1], position_z[-1]])
+            direction_vectors.append(result['direction_vector'])
+            actual_directions.append(result['actual_direction'])
+            angle_errors.append(result['angle_error'])
+            confidences.append(result['confidence'])
+            noise_levels.append(result['noise_level'])
+            peak_velocities_data.append(result['peak_velocities'])
+            acceleration_data.append(result['accel_data'])
+            velocity_data.append(result['velocity_data'])
+            gravities.append(result['gravity_magnitude'])
 
         gravity = np.mean(gravities)
-        average_noise_intensity = total_noise_intensity / len(raw_datas)
+        noise_level = np.mean(noise_levels)
 
-        if average_noise_intensity <= 350:
-            average_noise_intensity_text = '-> OK'
-        elif 350 < average_noise_intensity <= 700:
-            average_noise_intensity_text = '-> WARNING: accelerometer noise is a bit high'
-        else:
-            average_noise_intensity_text = '-> ERROR: accelerometer noise is too high!'
+        # Build rotation matrix from actual directions and orthonormalize
+        raw_rotation_matrix = np.array(actual_directions)  # rows = actual directions
+        rotation_matrix = _orthonormalize_rotation_matrix(raw_rotation_matrix)
+        euler_angles = _extract_euler_xyz(rotation_matrix)
 
-        average_noise_intensity_label = (
-            f'Dynamic noise level: {average_noise_intensity:.2f} mm/s² {average_noise_intensity_text}'
-        )
-        ConsoleOutput.print(average_noise_intensity_label)
-        ConsoleOutput.print(f'--> Detected gravity: {gravity / 1000:.2f} m/s²')
-
+        # Validate results and format output
+        quality_status = self._validate_results(direction_vectors, confidences, angle_errors, noise_level, gravity)
         formatted_direction_vector = self._format_direction_vector(direction_vectors)
-        ConsoleOutput.print(f'--> Detected axes_map: {formatted_direction_vector}')
+
+        # Console output
+        self._print_results(
+            direction_vectors, angle_errors, euler_angles, noise_level, gravity, formatted_direction_vector, quality_status
+        )
 
         # Create metadata
         metadata = GraphMetadata(
@@ -125,143 +151,333 @@ class AxesMapComputation:
             metadata=metadata,
             measurements=self.measurements,
             acceleration_data=acceleration_data,
+            velocity_data=velocity_data,
             gravity=gravity,
-            average_noise_intensity_label=average_noise_intensity_label,
-            position_data=position_data,
+            noise_level=noise_level,
+            quality_status=quality_status,
+            peak_velocities_data=peak_velocities_data,
             direction_vectors=direction_vectors,
+            actual_directions=actual_directions,
+            rotation_matrix=rotation_matrix,
+            euler_angles=euler_angles,
             angle_errors=angle_errors,
+            confidences=confidences,
             formatted_direction_vector=formatted_direction_vector,
             accel=self.accel,
         )
 
-    def _wavelet_denoise(self, data: np.ndarray, wavelet: str = 'db1', level: int = 1) -> Tuple[np.ndarray, np.ndarray]:
-        """Apply wavelet denoising to data"""
-        coeffs = pywt.wavedec(data, wavelet, mode='smooth')
-        threshold = np.median(np.abs(coeffs[-level])) / 0.6745 * np.sqrt(2 * np.log(len(data)))
-        new_coeffs = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
-        denoised_data = pywt.waverec(new_coeffs, wavelet)
+    def _parse_measurements(self) -> Dict[str, np.ndarray]:
+        """Parse measurements into a dict keyed by axis name."""
+        raw_datas = {}
+        for measurement in self.measurements:
+            data = np.array(measurement['samples'])
+            if data is not None:
+                axis = measurement['name'].split('_')[1].lower()
+                raw_datas[axis] = data
+        return raw_datas
 
-        # Compute noise by subtracting denoised data from original data
-        noise = data - denoised_data[: len(data)]
-        return denoised_data, noise
+    def _process_single_axis(self, data: np.ndarray) -> Dict:
+        """Process acceleration data for a single machine axis movement."""
+        time = data[:, 0]
+        accel_x = data[:, 1].copy()
+        accel_y = data[:, 2].copy()
+        accel_z = data[:, 3].copy()
 
-    def _integrate_trapz(self, accel: np.ndarray, time: np.ndarray) -> np.ndarray:
-        """Integrate acceleration using trapezoidal rule"""
-        return np.array([np.trapz(accel[:i], time[:i]) for i in range(2, len(time) + 1)])
+        # Estimate sample rate
+        sample_rate = len(time) / (time[-1] - time[0]) if time[-1] > time[0] else 3200
 
-    def _process_acceleration_data(
-        self, time: np.ndarray, accel_x: np.ndarray, accel_y: np.ndarray, accel_z: np.ndarray
-    ) -> Tuple[float, float, float, np.ndarray, np.ndarray, np.ndarray, float]:
-        """Process acceleration data to extract position and noise information"""
-        # Calculate the constant offset (gravity component)
-        offset_x = np.mean(accel_x)
-        offset_y = np.mean(accel_y)
-        offset_z = np.mean(accel_z)
-
-        # Remove the constant offset from acceleration data
-        accel_x -= offset_x
-        accel_y -= offset_y
-        accel_z -= offset_z
-
-        # Apply wavelet denoising
-        accel_x, noise_x = self._wavelet_denoise(accel_x)
-        accel_y, noise_y = self._wavelet_denoise(accel_y)
-        accel_z, noise_z = self._wavelet_denoise(accel_z)
-
-        # Integrate acceleration to get velocity using trapezoidal rule
-        velocity_x = self._integrate_trapz(accel_x, time)
-        velocity_y = self._integrate_trapz(accel_y, time)
-        velocity_z = self._integrate_trapz(accel_z, time)
-
-        # Correct drift in velocity by resetting to zero at the beginning and end
-        velocity_x -= np.linspace(velocity_x[0], velocity_x[-1], len(velocity_x))
-        velocity_y -= np.linspace(velocity_y[0], velocity_y[-1], len(velocity_y))
-        velocity_z -= np.linspace(velocity_z[0], velocity_z[-1], len(velocity_z))
-
-        # Integrate velocity to get position using trapezoidal rule
-        position_x = self._integrate_trapz(velocity_x, time[1:])
-        position_y = self._integrate_trapz(velocity_y, time[1:])
-        position_z = self._integrate_trapz(velocity_z, time[1:])
-
-        noise_intensity = np.mean([np.std(noise_x), np.std(noise_y), np.std(noise_z)])
-
-        return offset_x, offset_y, offset_z, position_x, position_y, position_z, noise_intensity
-
-    def _scale_positions_to_fixed_length(
-        self, position_x: np.ndarray, position_y: np.ndarray, position_z: np.ndarray, fixed_length: float
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Scale positions to a fixed length"""
-        # Calculate the total distance traveled in 3D space
-        total_distance = np.sqrt(np.diff(position_x) ** 2 + np.diff(position_y) ** 2 + np.diff(position_z) ** 2).sum()
-        scale_factor = fixed_length / total_distance
-
-        # Apply the scale factor to the positions
-        position_x *= scale_factor
-        position_y *= scale_factor
-        position_z *= scale_factor
-
-        return position_x, position_y, position_z
-
-    def _find_nearest_perfect_vector(self, average_direction_vector: np.ndarray) -> Tuple[np.ndarray, float]:
-        """Find the nearest perfect vector and calculate angle error"""
-        # Define the perfect vectors
-        perfect_vectors = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1], [-1, 0, 0], [0, -1, 0], [0, 0, -1]])
-
-        # Find the nearest perfect vector
-        dot_products = perfect_vectors @ average_direction_vector
-        nearest_vector_idx = np.argmax(dot_products)
-        nearest_vector = perfect_vectors[nearest_vector_idx]
-
-        # Calculate the angle error
-        angle_error = np.arccos(dot_products[nearest_vector_idx]) * 180 / np.pi
-
-        return nearest_vector, angle_error
-
-    def _linear_regression_direction(
-        self, position_x: np.ndarray, position_y: np.ndarray, position_z: np.ndarray, trim_length: float = 0.25
-    ) -> np.ndarray:
-        """Compute direction vector using linear regression"""
-        # Trim the start and end of the position data to keep only the center of the segment
-        t = len(position_x)
-        trim_start = int(t * trim_length)
-        trim_end = int(t * (1 - trim_length))
-        position_x = position_x[trim_start:trim_end]
-        position_y = position_y[trim_start:trim_end]
-        position_z = position_z[trim_start:trim_end]
-
-        # Compute the direction vector using linear regression over the position data
-        time = np.arange(len(position_x))
-        A = np.column_stack([time, np.ones(len(time))])
-        slope_x, intercept_x = np.linalg.lstsq(A, position_x, rcond=None)[0]
-        slope_y, intercept_y = np.linalg.lstsq(A, position_y, rcond=None)[0]
-        slope_z, intercept_z = np.linalg.lstsq(A, position_z, rcond=None)[0]
-
-        end_position = np.array(
-            [slope_x * time[-1] + intercept_x, slope_y * time[-1] + intercept_y, slope_z * time[-1] + intercept_z]
+        # Step 1: Remove gravity using median (robust to motion phases)
+        accel_x_clean, accel_y_clean, accel_z_clean, gravity_magnitude = self._remove_gravity_robust(
+            accel_x, accel_y, accel_z
         )
-        direction_vector = end_position - np.array([intercept_x, intercept_y, intercept_z])
-        direction_vector = direction_vector / np.linalg.norm(direction_vector)
 
-        return direction_vector
+        # Step 2: Estimate noise level (before filtering)
+        noise_level = np.mean(
+            [
+                self._estimate_noise_level(accel_x_clean, sample_rate),
+                self._estimate_noise_level(accel_y_clean, sample_rate),
+                self._estimate_noise_level(accel_z_clean, sample_rate),
+            ]
+        )
+
+        # Step 3: Low-pass filter to remove structural ringing
+        accel_x_filt = self._lowpass_filter(accel_x_clean, sample_rate)
+        accel_y_filt = self._lowpass_filter(accel_y_clean, sample_rate)
+        accel_z_filt = self._lowpass_filter(accel_z_clean, sample_rate)
+
+        # Step 4: Integrate to velocity
+        vel_x = self._integrate_to_velocity(accel_x_filt, time)
+        vel_y = self._integrate_to_velocity(accel_y_filt, time)
+        vel_z = self._integrate_to_velocity(accel_z_filt, time)
+
+        # Step 5: Correct linear drift in velocity
+        vel_x = self._correct_velocity_drift(vel_x)
+        vel_y = self._correct_velocity_drift(vel_y)
+        vel_z = self._correct_velocity_drift(vel_z)
+
+        # Step 6: Detect direction from peak velocities
+        velocities = {'x': vel_x, 'y': vel_y, 'z': vel_z}
+        direction_vector, actual_direction, confidence, angle_error, peak_velocities = self._detect_direction(
+            velocities
+        )
+
+        return {
+            'direction_vector': direction_vector,
+            'actual_direction': actual_direction,
+            'confidence': confidence,
+            'angle_error': angle_error,
+            'noise_level': noise_level,
+            'peak_velocities': peak_velocities,
+            'gravity_magnitude': gravity_magnitude,
+            'accel_data': (time, (accel_x_filt, accel_y_filt, accel_z_filt)),
+            'velocity_data': (time, (vel_x, vel_y, vel_z)),
+        }
+
+    def _remove_gravity_robust(
+        self, accel_x: np.ndarray, accel_y: np.ndarray, accel_z: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+        """Remove gravity offset using median (robust to motion phases)."""
+        gravity_x = np.median(accel_x)
+        gravity_y = np.median(accel_y)
+        gravity_z = np.median(accel_z)
+
+        gravity_magnitude = np.sqrt(gravity_x**2 + gravity_y**2 + gravity_z**2)
+
+        return (
+            accel_x - gravity_x,
+            accel_y - gravity_y,
+            accel_z - gravity_z,
+            gravity_magnitude,
+        )
+
+    def _lowpass_filter(self, data: np.ndarray, sample_rate: float) -> np.ndarray:
+        """Low-pass filter using cascaded moving average.
+
+        Two passes of moving average approximate a 2nd order Butterworth.
+        Removes structural ringing (50+ Hz) while preserving motion signal.
+        """
+        # Window size for approximate cutoff frequency
+        window_size = int(sample_rate / self.FILTER_CUTOFF / 2)
+        window_size = max(3, window_size | 1)  # Ensure odd and at least 3
+
+        kernel = np.ones(window_size) / window_size
+
+        # Two passes for better frequency response
+        filtered = np.convolve(data, kernel, mode='same')
+        filtered = np.convolve(filtered, kernel, mode='same')
+
+        return filtered
+
+    def _integrate_to_velocity(self, accel: np.ndarray, time: np.ndarray) -> np.ndarray:
+        """Integrate acceleration to velocity using trapezoidal rule."""
+        dt = np.diff(time)
+        velocity = np.zeros(len(accel))
+        velocity[1:] = np.cumsum((accel[:-1] + accel[1:]) / 2 * dt)
+        return velocity
+
+    def _correct_velocity_drift(self, velocity: np.ndarray) -> np.ndarray:
+        """Remove linear drift from velocity signal."""
+        n = len(velocity)
+        if n < 2:
+            return velocity
+
+        # Remove linear trend (velocity should start and end at ~0)
+        slope = (velocity[-1] - velocity[0]) / (n - 1)
+        x = np.arange(n)
+        velocity_corrected = velocity - (velocity[0] + slope * x)
+        return velocity_corrected
+
+    def _detect_direction(
+        self, velocities: Dict[str, np.ndarray]
+    ) -> Tuple[np.ndarray, np.ndarray, float, float, Dict[str, float]]:
+        """Determine axis and direction from peak velocities.
+
+        Returns:
+            direction_vector: Perfect unit vector for detected axis
+            actual_direction: Actual normalized direction from velocity peaks
+            confidence: Detection confidence 0-1
+            angle_error: Angle between actual and perfect direction in degrees
+            peak_velocities: Dict of peak velocity values per axis
+        """
+        # Find peak velocity for each axis (signed)
+        peak_velocities = {}
+        for axis, vel in velocities.items():
+            max_vel = np.max(vel)
+            min_vel = np.min(vel)
+            # Use the extreme with larger magnitude
+            if abs(max_vel) >= abs(min_vel):
+                peak_velocities[axis] = max_vel
+            else:
+                peak_velocities[axis] = min_vel
+
+        # Build actual direction vector from peak velocities
+        raw_direction = np.array([peak_velocities['x'], peak_velocities['y'], peak_velocities['z']])
+        direction_norm = np.linalg.norm(raw_direction)
+
+        if direction_norm > 0:
+            actual_direction = raw_direction / direction_norm
+        else:
+            actual_direction = raw_direction
+
+        # Find axis with largest absolute peak velocity
+        abs_peaks = {axis: abs(vel) for axis, vel in peak_velocities.items()}
+        primary_axis = max(abs_peaks, key=abs_peaks.get)
+        primary_sign = 1.0 if peak_velocities[primary_axis] > 0 else -1.0
+
+        # Build perfect direction vector
+        axis_idx = {'x': 0, 'y': 1, 'z': 2}[primary_axis]
+        direction_vector = np.array([0.0, 0.0, 0.0])
+        direction_vector[axis_idx] = primary_sign
+
+        # Compute angle error between actual and perfect direction
+        dot_product = np.dot(actual_direction, direction_vector)
+        angle_error = np.degrees(np.arccos(np.clip(dot_product, -1.0, 1.0)))
+
+        # Compute confidence based on velocity ratio
+        sorted_peaks = sorted(abs_peaks.values(), reverse=True)
+        if sorted_peaks[1] > 0:
+            dominance_ratio = sorted_peaks[0] / sorted_peaks[1]
+        else:
+            dominance_ratio = float('inf')
+
+        confidence = min(1.0, max(0.0, (dominance_ratio - 1) / 4))
+
+        return direction_vector, actual_direction, confidence, angle_error, peak_velocities
+
+    def _estimate_noise_level(self, accel_axis: np.ndarray, sample_rate: float) -> float:
+        """Estimate noise level using moving average residual with MAD."""
+        if len(accel_axis) < 10:
+            return 0.0
+
+        # Moving average window: ~10ms
+        window_size = max(5, int(sample_rate * 0.01))
+        if window_size % 2 == 0:
+            window_size += 1
+
+        kernel = np.ones(window_size) / window_size
+        smoothed = np.convolve(accel_axis, kernel, mode='same')
+
+        # High-frequency noise component
+        noise = accel_axis - smoothed
+
+        # MAD-based robust noise estimation
+        noise_level = 1.4826 * np.median(np.abs(noise - np.median(noise)))
+
+        return noise_level
+
+    def _validate_results(
+        self,
+        direction_vectors: List[np.ndarray],
+        confidences: List[float],
+        angle_errors: List[float],
+        noise_level: float,
+        gravity: float,
+    ) -> Dict:
+        """Validate detection results and return quality status."""
+        messages = []
+        status = 'ok'
+
+        # Check 1: All axes detected uniquely
+        detected_axes = []
+        for dv in direction_vectors:
+            axis_idx = int(np.argmax(np.abs(dv)))
+            detected_axes.append(axis_idx)
+
+        if len(set(detected_axes)) != 3:
+            status = 'error'
+            messages.append('Same accelerometer axis detected for multiple machine axes!')
+
+        # Check 2: Confidence levels
+        avg_confidence = np.mean(confidences)
+        if avg_confidence < self.MIN_CONFIDENCE:
+            if status == 'ok':
+                status = 'warning'
+            messages.append(f'Low detection confidence ({avg_confidence:.0%})')
+
+        # Check 3: Angle errors
+        max_angle = max(angle_errors)
+        if max_angle > self.MAX_ANGLE_ERROR:
+            if status == 'ok':
+                status = 'warning'
+            messages.append(f'High angle error detected ({max_angle:.1f} degrees)')
+
+        # Check 4: Gravity magnitude
+        expected_low = self.EXPECTED_GRAVITY * (1 - self.GRAVITY_TOLERANCE)
+        expected_high = self.EXPECTED_GRAVITY * (1 + self.GRAVITY_TOLERANCE)
+        if not (expected_low <= gravity <= expected_high):
+            if status == 'ok':
+                status = 'warning'
+            messages.append(f'Unusual gravity reading ({gravity / 1000:.2f} m/s^2)')
+
+        # Check 5: Noise level
+        if self.accel and noise_level > self.accel * 0.3:
+            if status == 'ok':
+                status = 'warning'
+            messages.append(f'High noise level ({noise_level:.0f} mm/s^2)')
+
+        if status == 'ok':
+            messages.append('Detection quality: GOOD')
+
+        return {'status': status, 'messages': messages}
 
     def _format_direction_vector(self, vectors: List[np.ndarray]) -> str:
-        """Format direction vectors into a readable string"""
-        formatted_vector = []
+        """Format direction vectors into axes_map config string."""
+        formatted = []
         axes_count = {'x': 0, 'y': 0, 'z': 0}
 
         for vector in vectors:
-            for i in range(len(vector)):
-                if vector[i] > 0:
-                    formatted_vector.append(MACHINE_AXES[i])
-                    axes_count[MACHINE_AXES[i]] += 1
-                    break
-                elif vector[i] < 0:
-                    formatted_vector.append(f'-{MACHINE_AXES[i]}')
-                    axes_count[MACHINE_AXES[i]] += 1
-                    break
+            axis_idx = int(np.argmax(np.abs(vector)))
+            axis_name = ACCEL_AXES[axis_idx]
+            sign = '' if vector[axis_idx] > 0 else '-'
+            formatted.append(f'{sign}{axis_name}')
+            axes_count[axis_name] += 1
 
-        # If all axes are present, return the formatted vector
-        return next(
-            ('unable to determine it correctly!' for count in axes_count.values() if count != 1),
-            ', '.join(formatted_vector),
-        )
+        # Validate: each axis should appear exactly once
+        for count in axes_count.values():
+            if count != 1:
+                return 'unable to determine correctly!'
+
+        return ', '.join(formatted)
+
+    def _print_results(
+        self,
+        direction_vectors: List[np.ndarray],
+        angle_errors: List[float],
+        euler_angles: Tuple[float, float, float],
+        noise_level: float,
+        gravity: float,
+        formatted_direction_vector: str,
+        quality_status: Dict,
+    ) -> None:
+        """Print results to console."""
+        for i, machine_axis in enumerate(MACHINE_AXES):
+            dv = direction_vectors[i]
+            axis_idx = int(np.argmax(np.abs(dv)))
+            accel_axis = ACCEL_AXES[axis_idx]
+            sign = '+' if dv[axis_idx] > 0 else '-'
+            ConsoleOutput.print(
+                f'Machine axis {machine_axis.upper()} -> {sign}{accel_axis} '
+                f'(angle error: {angle_errors[i]:.1f} degrees)'
+            )
+
+        # Print Euler angles
+        roll, pitch, yaw = euler_angles
+        ConsoleOutput.print(f'--> Accelerometer tilt: roll={roll:.1f}°, pitch={pitch:.1f}°, yaw={yaw:.1f}°')
+
+        # Noise status
+        if noise_level <= 350:
+            noise_status = 'OK'
+        elif noise_level <= 700:
+            noise_status = 'WARNING: noise is a bit high'
+        else:
+            noise_status = 'ERROR: noise is too high!'
+        ConsoleOutput.print(f'Dynamic noise level: {noise_level:.0f} mm/s^2 -> {noise_status}')
+
+        ConsoleOutput.print(f'--> Detected gravity: {gravity / 1000:.2f} m/s^2')
+        ConsoleOutput.print(f'--> Detected axes_map: {formatted_direction_vector}')
+
+        # Quality status
+        if quality_status['status'] != 'ok':
+            for msg in quality_status['messages']:
+                if msg != 'Detection quality: GOOD':
+                    ConsoleOutput.print(f'    {msg}')
