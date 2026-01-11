@@ -6,7 +6,7 @@
 # File: axes_map_computation.py
 # Description: Computation for axes map detection using velocity-based algorithm
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -17,6 +17,9 @@ from ..computation_results import AxesMapResult
 
 MACHINE_AXES = ['x', 'y', 'z']
 ACCEL_AXES = ['x', 'y', 'z']
+
+# Detection threshold for 2-axis machines (bed moves on one axis)
+NOISE_CONFIDENCE_THRESHOLD = 0.3  # Below this + low velocity = noise-only axis
 
 
 def _orthonormalize_rotation_matrix(R: np.ndarray) -> np.ndarray:
@@ -128,6 +131,18 @@ class AxesMapComputation:
         gravity = np.mean(gravities)
         noise_level = np.mean(noise_levels)
 
+        # Detect 2-axis machine (one axis is noise-only, e.g., Voron Trident, Ender3)
+        extrapolated_axis = self._detect_noise_only_axis(confidences, peak_velocities_data)
+
+        if extrapolated_axis is not None:
+            # Extrapolate the missing axis from the two good ones
+            direction_vectors, actual_directions = self._extrapolate_missing_axis(
+                direction_vectors, actual_directions, extrapolated_axis
+            )
+            # Set confidence to 0 for extrapolated axis (it's computed, not measured)
+            confidences[extrapolated_axis] = 0.0
+            angle_errors[extrapolated_axis] = 0.0  # No angle error for extrapolated
+
         # Build rotation matrix from actual directions and orthonormalize
         raw_rotation_matrix = np.array(actual_directions)  # rows = actual directions
         rotation_matrix = _orthonormalize_rotation_matrix(raw_rotation_matrix)
@@ -139,7 +154,14 @@ class AxesMapComputation:
 
         # Console output
         self._print_results(
-            direction_vectors, angle_errors, euler_angles, noise_level, gravity, formatted_direction_vector, quality_status
+            direction_vectors,
+            angle_errors,
+            euler_angles,
+            noise_level,
+            gravity,
+            formatted_direction_vector,
+            quality_status,
+            extrapolated_axis,
         )
 
         # Create metadata
@@ -164,6 +186,7 @@ class AxesMapComputation:
             confidences=confidences,
             formatted_direction_vector=formatted_direction_vector,
             accel=self.accel,
+            extrapolated_axis=extrapolated_axis,
         )
 
     def _parse_measurements(self) -> Dict[str, np.ndarray]:
@@ -365,6 +388,81 @@ class AxesMapComputation:
 
         return noise_level
 
+    def _detect_noise_only_axis(
+        self,
+        confidences: List[float],
+        peak_velocities_data: List[Dict[str, float]],
+    ) -> Optional[int]:
+        """Detect if exactly one axis has noise-only data (2-axis machine).
+
+        On machines like Voron Trident or Ender3, the accelerometer doesn't move
+        on one axis (bed moves instead). This method detects that situation.
+
+        Returns:
+            Index of noise-only axis (0=X, 1=Y, 2=Z) or None if all axes have signal.
+            Raises ValueError if more than one axis is noise-only.
+        """
+        # Get peak velocity magnitudes for each axis
+        peak_mags = []
+        for pvd in peak_velocities_data:
+            peak_mags.append(max(abs(v) for v in pvd.values()))
+
+        # Dynamic threshold: 1/4 of max velocity from good axes
+        max_velocity = max(peak_mags)
+        velocity_threshold = max_velocity / 4.0
+
+        # Identify noise-only axes (low confidence AND low velocity)
+        noise_axes = []
+        for i in range(3):
+            is_noise = confidences[i] < NOISE_CONFIDENCE_THRESHOLD and peak_mags[i] < velocity_threshold
+            if is_noise:
+                noise_axes.append(i)
+
+        if len(noise_axes) == 0:
+            return None  # All axes good - normal 3-axis machine
+        elif len(noise_axes) == 1:
+            return noise_axes[0]  # One axis to extrapolate - 2-axis machine
+        else:
+            raise ValueError(
+                f'Multiple axes ({len(noise_axes)}) have no signal. '
+                'Ensure accelerometer is properly mounted and moves with toolhead.'
+            )
+
+    def _extrapolate_missing_axis(
+        self,
+        direction_vectors: List[np.ndarray],
+        actual_directions: List[np.ndarray],
+        noise_axis_idx: int,
+    ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        """Extrapolate missing axis using cross product of two good axes.
+
+        When exactly one axis has no signal, we can compute its direction
+        from the other two using the cross product (orthonormal constraint).
+        """
+        good_indices = [i for i in range(3) if i != noise_axis_idx]
+        i, j = good_indices
+
+        d1 = direction_vectors[i]
+        d2 = direction_vectors[j]
+
+        # Cross product gives the third orthogonal axis
+        cross = np.cross(d1, d2)
+
+        # Sign correction for right-handed coordinate system
+        # X(0) x Y(1) = +Z(2), Y(1) x Z(2) = +X(0), Z(2) x X(0) = +Y(1)
+        # With sorted indices: (0,1)->2 (+), (1,2)->0 (+), (0,2)->1 (-)
+        if (i, j) == (0, 2):  # X x Z should give -Y
+            cross = -cross
+
+        cross_normalized = cross / np.linalg.norm(cross)
+
+        new_direction_vectors = list(direction_vectors)
+        new_actual_directions = list(actual_directions)
+        new_direction_vectors[noise_axis_idx] = cross_normalized
+        new_actual_directions[noise_axis_idx] = cross_normalized
+
+        return new_direction_vectors, new_actual_directions
+
     def _validate_results(
         self,
         direction_vectors: List[np.ndarray],
@@ -448,6 +546,7 @@ class AxesMapComputation:
         gravity: float,
         formatted_direction_vector: str,
         quality_status: Dict,
+        extrapolated_axis: Optional[int] = None,
     ) -> None:
         """Print results to console."""
         for i, machine_axis in enumerate(MACHINE_AXES):
@@ -455,29 +554,47 @@ class AxesMapComputation:
             axis_idx = int(np.argmax(np.abs(dv)))
             accel_axis = ACCEL_AXES[axis_idx]
             sign = '+' if dv[axis_idx] > 0 else '-'
+
+            if i == extrapolated_axis:
+                ConsoleOutput.print(
+                    f'Machine axis {machine_axis.upper()} -> {sign}{accel_axis} '
+                    f'(VIRTUAL: no accelerometer signal on this axis)'
+                )
+            else:
+                ConsoleOutput.print(
+                    f'Machine axis {machine_axis.upper()} -> {sign}{accel_axis} '
+                    f'(angle error: {angle_errors[i]:.1f} degrees)'
+                )
+
+        # Explanatory note for 2-axis machines
+        if extrapolated_axis is not None:
+            axis_name = MACHINE_AXES[extrapolated_axis].upper()
             ConsoleOutput.print(
-                f'Machine axis {machine_axis.upper()} -> {sign}{accel_axis} '
-                f'(angle error: {angle_errors[i]:.1f} degrees)'
+                f'    Note: It looks like your machine moves the bed on another axis (here: {axis_name.upper()}) like Voron Trident, Switchwire, Ender3, etc.. '
+                f"Since there's no signal on this axis, the data is calculated from the other two axes. That's why it's marked as \"virtual.\""
             )
 
         # Print Euler angles
         roll, pitch, yaw = euler_angles
-        ConsoleOutput.print(f'--> Accelerometer tilt: roll={roll:.1f}°, pitch={pitch:.1f}°, yaw={yaw:.1f}°')
+        ConsoleOutput.print(f'Accelerometer Euler orientation: X={roll:.1f}°, Y={pitch:.1f}°, Z={yaw:.1f}°')
 
         # Noise status
         if noise_level <= 350:
-            noise_status = 'OK'
+            noise_status = 'Everything is fine'
         elif noise_level <= 700:
             noise_status = 'WARNING: noise is a bit high'
         else:
             noise_status = 'ERROR: noise is too high!'
         ConsoleOutput.print(f'Dynamic noise level: {noise_level:.0f} mm/s^2 -> {noise_status}')
 
-        ConsoleOutput.print(f'--> Detected gravity: {gravity / 1000:.2f} m/s^2')
-        ConsoleOutput.print(f'--> Detected axes_map: {formatted_direction_vector}')
+        ConsoleOutput.print(f'Detected gravity: {gravity / 1000:.2f} m/s^2')
 
         # Quality status
         if quality_status['status'] != 'ok':
+            concatenated_messages = ''
             for msg in quality_status['messages']:
                 if msg != 'Detection quality: GOOD':
-                    ConsoleOutput.print(f'    {msg}')
+                    concatenated_messages += f'{msg}; '
+            ConsoleOutput.print(f'==> Detected axes_map: {formatted_direction_vector}  ({concatenated_messages[:-2]})')
+        else:
+            ConsoleOutput.print(f'==> Detected axes_map: {formatted_direction_vector}')

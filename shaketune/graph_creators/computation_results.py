@@ -32,6 +32,7 @@ class AxesMapResult(ComputationResult):
     confidences: List[float]
     formatted_direction_vector: str
     accel: Optional[float] = None
+    extrapolated_axis: Optional[int] = None  # Index (0=X, 1=Y, 2=Z) if 2-axis machine
 
     def get_plot_data(self) -> Dict[str, Any]:
         return {
@@ -50,6 +51,7 @@ class AxesMapResult(ComputationResult):
             'formatted_direction_vector': self.formatted_direction_vector,
             'measurements': self.measurements,
             'accel': self.accel,
+            'extrapolated_axis': self.extrapolated_axis,
             'st_version': self.metadata.version,
         }
 

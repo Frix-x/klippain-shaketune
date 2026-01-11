@@ -72,20 +72,24 @@ class AxesMapPlotter(PlotterStrategy):
         except Exception:
             title_line2 = data['measurements'][0]['name'] + ' ...'
 
-        # Build mapping details string: "X → -z (2.3°)  Y → y (1.5°)  Z → x (0.8°)"
+        # Build mapping details string: "X → -z (2.3°)  Y → y (1.5°)  Z → x (extrapolated)"
+        extrapolated_axis = data.get('extrapolated_axis')
         mapping_parts = []
         for i, machine_axis in enumerate(MACHINE_AXES):
             dv = data['direction_vectors'][i]
             axis_idx = int(np.argmax(np.abs(dv)))
             accel_axis = ACCEL_AXES[axis_idx]
             sign = '' if dv[axis_idx] > 0 else '-'
-            angle = data['angle_errors'][i]
-            mapping_parts.append(f'{machine_axis} → {sign}{accel_axis} ({angle:.1f}°)')
+            if i == extrapolated_axis:
+                mapping_parts.append(f'{machine_axis} → {sign}{accel_axis.upper()} (extrapolated)')
+            else:
+                angle = data['angle_errors'][i]
+                mapping_parts.append(f'{machine_axis} → {sign}{accel_axis.upper()} (angle error: {angle:.1f}°)')
         mapping_text = '   '.join(mapping_parts)
 
         # Format Euler angles
         roll, pitch, yaw = data['euler_angles']
-        euler_text = f'Tilt: roll={roll:.1f}°  pitch={pitch:.1f}°  yaw={yaw:.1f}°'
+        euler_text = f'Accelerometer Euler orientation: X={roll:.1f}°  Y={pitch:.1f}°  Z={yaw:.1f}°'
 
         title_lines = [
             {
@@ -102,17 +106,18 @@ class AxesMapPlotter(PlotterStrategy):
                 'y': 0.985,
                 'va': 'top',
                 'text': f'| Detected axes map: {data["formatted_direction_vector"]}',
+                'weight': 'bold',
             },
             {
                 'x': 0.501,
-                'y': 0.946,
+                'y': 0.944,
                 'va': 'top',
                 'fontsize': 11,
                 'text': f'| {mapping_text}',
             },
             {
                 'x': 0.501,
-                'y': 0.913,
+                'y': 0.910,
                 'va': 'top',
                 'fontsize': 11,
                 'text': f'| {euler_text}',
@@ -122,6 +127,8 @@ class AxesMapPlotter(PlotterStrategy):
 
     def _plot_3d_orientation(self, ax, data: Dict[str, Any]) -> None:
         """Plot 3D orientation showing actual measured accelerometer axes relative to machine axes"""
+        extrapolated_axis = data.get('extrapolated_axis')
+
         # Draw machine reference axes (gray dashed)
         for i, label in enumerate(MACHINE_AXES):
             axis_vec = np.zeros(3)
@@ -159,23 +166,28 @@ class AxesMapPlotter(PlotterStrategy):
         for i, accel_label in enumerate(ACCEL_AXES):
             accel_direction = rotation_matrix[:, i]  # Column i (orthonormal after SVD)
             color = ACCEL_COLORS[accel_label]
+            is_extrapolated = i == extrapolated_axis
+
             ax.quiver(
                 0,
                 0,
                 0,
-                accel_direction[0],
-                accel_direction[1],
-                accel_direction[2],
+                accel_direction[0] * 0.9,
+                accel_direction[1] * 0.9,
+                accel_direction[2] * 0.9,
                 color=color,
                 linewidth=3,
                 arrow_length_ratio=0.12,
             )
+
+            # Add "(virtual)" suffix for extrapolated axis label
+            label_text = f'{accel_label} (virtual)' if is_extrapolated else accel_label
             ax.text(
-                accel_direction[0] * 1.2,
-                accel_direction[1] * 1.2,
-                accel_direction[2] * 1.2,
-                accel_label,
-                fontsize=14,
+                accel_direction[0] * 1.05,
+                accel_direction[1] * 1.05,
+                accel_direction[2] * 1.05,
+                label_text,
+                fontsize=20 if not is_extrapolated else 14,
                 fontweight='bold',
                 color=color,
                 ha='center',
@@ -188,7 +200,7 @@ class AxesMapPlotter(PlotterStrategy):
             xlabel='Machine X',
             ylabel='Machine Y',
             zlabel='Machine Z',
-            title='Accelerometer Orientation (actual)',
+            title='Accelerometer Orientation',
         )
         ax.set_xlim([-1, 1])
         ax.set_ylim([-1, 1])
@@ -246,36 +258,74 @@ class AxesMapPlotter(PlotterStrategy):
         y_range = y_max - y_min
 
         # Draw watermarks with confidence in background
+        extrapolated_axis = data.get('extrapolated_axis')
         for i, label in enumerate(MACHINE_AXES):
             zone_center = (zone_boundaries[i] + zone_boundaries[i + 1]) / 2
             confidence = zone_info[i]['confidence']
+            is_extrapolated = i == extrapolated_axis
 
-            # Large watermark letter
-            ax.text(
-                zone_center,
-                y_center,
-                label,
-                fontsize=55,
-                alpha=0.4,
-                ha='center',
-                va='center',
-                fontweight='bold',
-                color=PlottingConstants.KLIPPAIN_COLORS['dark_purple'],
-                zorder=1,
-            )
-            # Confidence percentage below
-            ax.text(
-                zone_center,
-                y_center - 15,
-                f'Confidence: {confidence:.0%}',
-                fontsize=11,
-                alpha=0.4,
-                ha='center',
-                va='center',
-                fontweight='bold',
-                color=PlottingConstants.KLIPPAIN_COLORS['dark_purple'],
-                zorder=1,
-            )
+            if is_extrapolated:
+                # Gray shaded background for extrapolated zone
+                ax.axvspan(
+                    zone_boundaries[i],
+                    zone_boundaries[i + 1],
+                    alpha=0.15,
+                    color='gray',
+                    zorder=0,
+                )
+                # Gray watermark for extrapolated zone
+                ax.text(
+                    zone_center,
+                    y_center,
+                    label,
+                    fontsize=55,
+                    alpha=0.25,
+                    ha='center',
+                    va='center',
+                    fontweight='bold',
+                    color='gray',
+                    zorder=1,
+                )
+                # "Extrapolated" label (usually the bed axis) instead of confidence
+                ax.text(
+                    zone_center,
+                    y_center - 15,
+                    'Extrapolated\n(no signal on this axis)',
+                    fontsize=9,
+                    alpha=0.4,
+                    ha='center',
+                    va='center',
+                    color='gray',
+                    zorder=1,
+                )
+            else:
+                # Normal styling for measured zones
+                # Large watermark letter
+                ax.text(
+                    zone_center,
+                    y_center,
+                    label,
+                    fontsize=55,
+                    alpha=0.4,
+                    ha='center',
+                    va='center',
+                    fontweight='bold',
+                    color=PlottingConstants.KLIPPAIN_COLORS['dark_purple'],
+                    zorder=1,
+                )
+                # Confidence percentage below
+                ax.text(
+                    zone_center,
+                    y_center - 15,
+                    f'Confidence: {confidence:.0%}',
+                    fontsize=11,
+                    alpha=0.4,
+                    ha='center',
+                    va='center',
+                    fontweight='bold',
+                    color=PlottingConstants.KLIPPAIN_COLORS['dark_purple'],
+                    zorder=1,
+                )
 
         # Draw zone separators
         for boundary in zone_boundaries[1:-1]:

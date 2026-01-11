@@ -20,7 +20,7 @@ Call the `AXES_MAP_CALIBRATION` macro and look for the graphs in the results fol
 
   > **Note**:
   >
-  > This command only works if you can move the same accelerometer in the 3 directions, like on a Voron V2.4 printer. If you have 2 accelerometers on your machine, like on a Prusa, Switchwire or Ender3, it won't work because it's impossible to detect the accelerometer orientation with only one movement (like for the bed).
+  > This tool also works on 2-axis machines (Voron Trident, Ender3, Switchwire, etc.) where the accelerometer only moves on 2 axes. See the [2-axis machines](#support-for-2-axis-machines) section for details.
 
 ![](../images/axesmap_example.png)
 
@@ -66,6 +66,44 @@ When the toolhead accelerates, the mechanical system (belts, carriages, frame) a
    - **Yaw**: Rotation about the machine Z axis
 
    These angles tell you exactly HOW the accelerometer is tilted relative to the machine frame. For example, "roll=2°, pitch=-1.5°, yaw=0°" means the accelerometer is tilted 2 degrees around X and -1.5 degrees around Y.
+
+
+## Support for 2-axis machines
+
+Some printer kinematics move the bed instead of the toolhead on certain axes. This means the toolhead-mounted accelerometer doesn't physically move on that axis and only records noise:
+
+| Printer Type | Toolhead axes | Bed axis | Accelerometer detects |
+|--------------|---------------|----------|----------------------|
+| Voron 2.4    | X, Y, Z       | -        | X, Y, Z (all)        |
+| Voron Trident| X, Y          | Z        | X, Y only            |
+| Ender3/Switchwire | X, Z    | Y        | X, Z only            |
+
+### Automatic detection
+
+Shake&Tune automatically detects when exactly one axis has noise-only data by checking:
+- **Low confidence**: Below 30% (no dominant axis in velocity signal)
+- **Low velocity**: Below 1/4 of the maximum velocity measured on other axes
+
+When detected, the tool:
+1. Identifies the noise-only axis as a "bed axis"
+2. Extrapolates the missing direction using the cross product of the two measured axes
+3. Marks it as "(extrap.)" in all outputs
+
+The resulting axes_map is mathematically correct and will work perfectly for your printer!
+
+### Visual indicators
+
+When an axis is extrapolated:
+- **Console output**: Shows "(EXTRAPOLATED - accelerometer stationary on this axis)"
+- **Graph header**: Shows "(extrap.)" instead of angle error
+- **Velocity plot**: Gray shaded zone with "Extrapolated (bed axis)" label
+- **3D plot**: Semi-transparent arrow with "(extrap.)" suffix
+
+### Important notes for 2-axis machines
+
+- The extrapolated axis direction is computed mathematically from the two measured axes
+- Euler angles (roll, pitch, yaw) are still computed but the extrapolated axis contributes 0° error
+- The tool will raise an error if more than one axis has no signal (accelerometer mounting issue)
 
 
 ## Understanding the graph
