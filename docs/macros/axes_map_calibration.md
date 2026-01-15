@@ -36,16 +36,16 @@ axes_map: -z,y,x
 
 To detect the accelerometer axes_map, Shake&Tune will move the toolhead on a small straight line in X, then Y, then Z and record the accelerometer data. The algorithm uses a **velocity-based detection** approach that is robust to mechanical vibrations and structural ringing and works like this:
   1. A 25 Hz cutoff filter (low-pass filtering) removes the printer structural ringing while preserving the motion signal (< 30 Hz for typical movements).
-  1. Then, instead of analyzing acceleration peaks directly that can be very noisy, we integrate the filtered acceleration to get the toolhead velocity. This is robust because the peak velocity during a move is unambiguous and integration naturally smooths out oscillations.
-  1. For each segment of the sequence, we find which accelerometer axis has the largest peak velocity. That accelerometer axis is the main aligned with the motion direction. The sign of the peak velocity directly indicates the direction (positive or negative) from the machine axis.
-  1. Finally, algorithm computes two kind of angles:
-    a. per-axis tilt angles that give you the direct 3D angle between the accelerometer measured vector and the real machine axis
+  1. Then, instead of directly analyzing acceleration peaks, which can be very noisy, we integrate the filtered acceleration to get the toolhead velocity. This is robust because the peak velocity during a move is unambiguous and integration naturally smooths out oscillations.
+  1. For each segment of the sequence, we find which accelerometer axis has the largest peak velocity. That accelerometer axis is the one most aligned with the motion direction. The sign of the peak velocity directly indicates the direction (positive or negative) from the machine axis.
+  1. Finally, the algorithm computes two kinds of angles:
+    a. per-axis tilt angles that give you the direct 3D angle between the accelerometer's measured vector and the real machine axis
     b. and full Euler angles (roll: X, pitch: Y, and then yaw: Z) to describe the accelerometer orientation in a normalized way. These angles tell you exactly how the accelerometer is tilted relative to the machine frame. For example, "X=2°, Y=-1.5°, Z=0°" means the accelerometer is tilted 2 degrees around X and -1.5 degrees around Y.
 
 
 ## Support for 2-axis machines
 
-Some printer kinematics move the bed instead of the toolhead on certain axes. This means the toolhead-mounted accelerometer doesn't physically move on that axis and only records noise. Here are some printer example with such kind of kinematics:
+Some printer kinematics move the bed instead of the toolhead on certain axes. This means the toolhead-mounted accelerometer doesn't physically move on that axis and only records noise. Here are some printer examples with this kind of kinematics:
 
 | Printer Type | Toolhead axes | Bed axis | Accelerometer detects |
 |--------------|---------------|----------|-----------------------|
@@ -60,7 +60,7 @@ Some printer kinematics move the bed instead of the toolhead on certain axes. Th
 
 ## Troubleshooting
 
-It can happen that the tool doesn't work for your usecase. For example when having this kind of graph result:
+It can happen that the tool doesn't work for your use case. For example when having this kind of graph result:
 
 ![](../images/axesmap/bad_axes_map.png)
 
@@ -68,8 +68,8 @@ When this happens, look at the following table to see if there's a solution for 
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| Same accelerometer axis detected for multiple machine axes | This error means the algorithm couldn't uniquely map each machine axis to a different accelerometer axis. Possible causes range from accelerometer mounted at ~45 degrees between axes to very noisy data making detection unreliable | Remount the accelerometer so it's better aligned with the machine axes, or increase the ACCEL parameter for stronger signals. Additionaly, if it doesn't fix it, check your accelerometer wiring and config |
+| Same accelerometer axis detected for multiple machine axes | This error means the algorithm couldn't uniquely map each machine axis to a different accelerometer axis. Possible causes range from accelerometer mounted at ~45 degrees between axes to very noisy data making detection unreliable | Remount the accelerometer so it's better aligned with the machine axes, or increase the ACCEL parameter for stronger signals. Additionally, if it doesn't fix it, check your accelerometer wiring and config |
 | Low confidence warning | The detection confidence is low, meaning the primary axis peak velocity wasn't much larger than noise or signal on other axes | Increase the ACCEL and SPEED parameters to get stronger velocity signals or check your accelerometer wiring and config |
 | High noise level | Too much vibration of the toolhead or high accelerometer noise is present in the data | Check accelerometer wiring, mounting, and ensure the machine is on a stable surface during calibration. Additionally, diagnose your printer mechanical health using the other macros from Shake&Tune to fix any problems |
-| High tilt angle warning | The accelerometer is mounted with significant rotation from the machine axes | Klipper doesn't support tilted accelerometers. So, if accuracy matters for your use case, consider remounting the accelerometer aligned with the machine axes. Otherwise, you should expect mixed axis signals readings in the other Shake&Tune commands |
+| High tilt angle warning | The accelerometer is mounted with significant rotation from the machine axes | Klipper doesn't support tilted accelerometers. So, if accuracy matters for your use case, consider remounting the accelerometer aligned with the machine axes. Otherwise, you should expect mixed signals across axes in the other Shake&Tune commands |
 | Unusual gravity reading | The measured gravity is not close to 9.81 m/s² | This may indicate an accelerometer calibration issue or a faulty sensor. Check the accelerometer connection and consider replacing it if the issue persists |
