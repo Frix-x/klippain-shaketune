@@ -662,13 +662,14 @@ class AxesMapComputation:
             ConsoleOutput.print(f'==> Detected axes_map: {formatted_direction_vector}')
 
         # Compare with configured axes_map and provide guidance
-        self.current_axes_map = self.current_axes_map.strip().lower().replace(' ', '')
-        detected_normalized = formatted_direction_vector.strip().lower().replace(' ', '')
-        if self.current_axes_map is not None and self.current_axes_map != 'x,y,z':
-            if self.current_axes_map == detected_normalized:
-                ConsoleOutput.print('    Your current axes_map configuration is already correct!')
-            else:
-                ConsoleOutput.print(
-                    f"    Your current axes_map doesn't match! "
-                    f'Please update your configuration to {detected_normalized}.'
-                )
+        if self.current_axes_map is not None:
+            current_normalized = self.current_axes_map.strip().lower().replace(' ', '')
+            detected_normalized = formatted_direction_vector.strip().lower().replace(' ', '')
+            if current_normalized != 'x,y,z':
+                if current_normalized == detected_normalized:
+                    ConsoleOutput.print('    Your current axes_map configuration is already correct!')
+                else:
+                    ConsoleOutput.print(
+                        f"    Your current axes_map doesn't match! "
+                        f'Please update your configuration to {detected_normalized}.'
+                    )

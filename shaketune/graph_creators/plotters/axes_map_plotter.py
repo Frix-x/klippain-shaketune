@@ -127,7 +127,12 @@ class AxesMapPlotter(PlotterStrategy):
 
     def _plot_3d_orientation(self, ax, data: Dict[str, Any]) -> None:
         """Plot 3D orientation showing actual measured accelerometer axes relative to machine axes"""
+        # Find which accelerometer axis corresponds to the extrapolated machine axis
+        extrapolated_accel_idx = None
         extrapolated_axis = data.get('extrapolated_axis')
+        if extrapolated_axis is not None:
+            dv = data['direction_vectors'][extrapolated_axis]
+            extrapolated_accel_idx = int(np.argmax(np.abs(dv)))
 
         # Draw machine reference axes (gray dashed)
         for i, label in enumerate(MACHINE_AXES):
@@ -166,7 +171,7 @@ class AxesMapPlotter(PlotterStrategy):
         for i, accel_label in enumerate(ACCEL_AXES):
             accel_direction = rotation_matrix[:, i]  # Column i (orthonormal after SVD)
             color = ACCEL_COLORS[accel_label]
-            is_extrapolated = i == extrapolated_axis
+            is_extrapolated = i == extrapolated_accel_idx
 
             ax.quiver(
                 0,
