@@ -24,7 +24,7 @@ def configure_graph_creator(graph_type, args, dummy_config):
 
     # Dynamically configure the graph creator based on graph type
     if graph_type == 'axes map':
-        config_kwargs |= {'accel': args.accel, 'segment_length': args.length}
+        config_kwargs |= {'accel': args.accel, 'current_axes_map': args.axes_map}
     elif graph_type == 'static frequency':
         config_kwargs |= {'accel_per_hz': args.accel_per_hz, 'freq': args.frequency, 'duration': args.duration}
     elif graph_type == 'belts comparison':
@@ -71,7 +71,11 @@ def main():
     axes_map_parser = subparsers.add_parser('axes_map', help='Create axes map detection graph')
     add_common_arguments(axes_map_parser)
     axes_map_parser.add_argument('--accel', required=True, type=float, help='Accel value used for the measurement')
-    axes_map_parser.add_argument('--length', required=True, type=float, help='Recorded length for each segment')
+    axes_map_parser.add_argument(
+        '--axes_map',
+        type=str,
+        help='Existing axes_map config to invert. Use = syntax when value starts with "-" (e.g., --axes_map="-y,x,z")',
+    )
 
     # Belts graph parser
     belts_parser = subparsers.add_parser('belts', help='Create belts comparison graph')

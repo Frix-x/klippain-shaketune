@@ -72,20 +72,27 @@ All commands support these common options:
 python -m shaketune.cli axes_map \
     -o ./results/axes_map_analysis.png \
     --accel 3000 \
-    --length 100 \
     ./data/axesmap_20240817_212948.stdata
 
 # Using CSV files (requires X, Y, Z measurements)
 python -m shaketune.cli axes_map \
     -o ./results/axes_map_analysis.png \
     --accel 3000 \
-    --length 100 \
     ./data/axesmap_*.csv
+
+# With existing axes_map to verify/correct (use = syntax when value starts with -)
+python -m shaketune.cli axes_map \
+    -o ./results/axes_map_analysis.png \
+    --accel 3000 \
+    --axes_map="-y,x,z" \
+    ./data/axesmap_20240817_212948.stdata
 ```
 
-**Required parameters:** (you need to provide the values that were used during the measurement)
+**Required parameters:**
 - `--accel`: Acceleration used during measurement (mm/s²)
-- `--length`: Length of each measurement segment (mm)
+
+**Optional parameters:**
+- `--axes_map`: Existing axes_map configuration to invert for analysis. Use this to verify or correct an already configured axes_map. **Important:** When the value starts with `-`, use the `=` syntax (e.g., `--axes_map="-y,x,z"`).
 
 ### 2. Static Frequency Analysis
 

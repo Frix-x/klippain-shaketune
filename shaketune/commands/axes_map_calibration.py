@@ -36,10 +36,6 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
         raise gcmd.error('Multi-accelerometer configurations are not supported for this macro!')
     pconfig = printer.lookup_object('configfile')
     current_axes_map = pconfig.status_raw_config[accel_chip].get('axes_map', None)
-    if current_axes_map is not None and current_axes_map.strip().replace(' ', '') != 'x,y,z':
-        raise gcmd.error(
-            f'The parameter axes_map is already set in your {accel_chip} configuration! Please remove it (or set it to "x,y,z") to be able to use this macro!'
-        )
     accelerometer = Accelerometer(k_accelerometer, printer.get_reactor())
 
     toolhead_info = toolhead.get_status(systime)
@@ -113,7 +109,7 @@ def axes_map_calibration(gcmd, config, st_process: ShakeTuneProcess) -> None:
     # Run post-processing
     ConsoleOutput.print('Analysis of the movements...')
     ConsoleOutput.print('This may take some time (1-3min)')
-    creator.configure(accel, SEGMENT_LENGTH)
+    creator.configure(accel, current_axes_map)
     creator.define_output_target(filename)
     measurements_manager.save_stdata()
     st_process.run(filename)

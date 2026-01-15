@@ -22,6 +22,52 @@ ACCEL_AXES = ['x', 'y', 'z']
 NOISE_CONFIDENCE_THRESHOLD = 0.3  # Below this + low velocity = noise-only axis
 
 
+def _parse_axes_map_to_inverse_matrix(axes_map_str: Optional[str]) -> Optional[np.ndarray]:
+    """Parse axes_map string and return inverse transformation matrix.
+
+    When Klipper has an axes_map configured, it transforms the accelerometer data.
+    This function computes the inverse transformation to recover the original
+    accelerometer readings, allowing the detection algorithm to work correctly.
+
+    Args:
+        axes_map_str: Format "ax, ay, az" where each is x/-x/y/-y/z/-z
+                      Examples: "x, y, z" (identity), "-y, x, z"
+
+    Returns:
+        3x3 inverse transformation matrix, or None if no transformation needed
+        (None, identity, or invalid format)
+    """
+    if axes_map_str is None:
+        return None
+
+    # Normalize: strip whitespace, lowercase
+    normalized = axes_map_str.strip().lower().replace(' ', '')
+
+    # Identity check - no transformation needed
+    if normalized == 'x,y,z':
+        return None
+
+    # Parse each axis component
+    parts = normalized.split(',')
+    if len(parts) != 3:
+        return None  # Invalid format, treat as no transformation
+
+    axis_map = {'x': 0, 'y': 1, 'z': 2}
+    forward_matrix = np.zeros((3, 3))
+
+    for i, part in enumerate(parts):
+        sign = -1.0 if part.startswith('-') else 1.0
+        axis_char = part.lstrip('-')
+        if axis_char not in axis_map:
+            return None  # Invalid axis
+        j = axis_map[axis_char]
+        forward_matrix[i, j] = sign
+
+    # For sign-permutation matrices, inverse = transpose
+    # (the transpose of an orthogonal matrix is its inverse)
+    return forward_matrix.T
+
+
 def _orthonormalize_rotation_matrix(R: np.ndarray) -> np.ndarray:
     """Orthonormalize a 3x3 matrix using SVD to get closest proper rotation.
 
@@ -84,13 +130,14 @@ class AxesMapComputation:
         self,
         measurements: List[Measurement],
         accel: float,
-        fixed_length: float,
         st_version: str,
+        current_axes_map: Optional[str] = None,
     ):
         self.measurements = measurements
         self.accel = accel
-        self.fixed_length = fixed_length
         self.st_version = st_version
+        self.current_axes_map = current_axes_map
+        self._inverse_axes_map_matrix = _parse_axes_map_to_inverse_matrix(current_axes_map)
 
     def compute(self) -> AxesMapResult:
         """Perform axes map detection computation."""
@@ -205,6 +252,15 @@ class AxesMapComputation:
         accel_x = data[:, 1].copy()
         accel_y = data[:, 2].copy()
         accel_z = data[:, 3].copy()
+
+        # Apply inverse transformation if an axes_map was configured
+        # This recovers the original accelerometer readings before Klipper's remapping
+        if self._inverse_axes_map_matrix is not None:
+            accel_stack = np.vstack([accel_x, accel_y, accel_z])  # 3 x N
+            accel_transformed = self._inverse_axes_map_matrix @ accel_stack
+            accel_x = accel_transformed[0].copy()
+            accel_y = accel_transformed[1].copy()
+            accel_z = accel_transformed[2].copy()
 
         # Estimate sample rate
         sample_rate = len(time) / (time[-1] - time[0]) if time[-1] > time[0] else 3200
@@ -549,6 +605,12 @@ class AxesMapComputation:
         extrapolated_axis: Optional[int] = None,
     ) -> None:
         """Print results to console."""
+        # Note about axes_map inversion if one was configured
+        if self._inverse_axes_map_matrix is not None:
+            ConsoleOutput.print(
+                f'Note: An existing axes_map ({self.current_axes_map}) was detected and temporarily deactivated for analysis'
+            )
+
         for i, machine_axis in enumerate(MACHINE_AXES):
             dv = direction_vectors[i]
             axis_idx = int(np.argmax(np.abs(dv)))
@@ -598,3 +660,15 @@ class AxesMapComputation:
             ConsoleOutput.print(f'==> Detected axes_map: {formatted_direction_vector}  ({concatenated_messages[:-2]})')
         else:
             ConsoleOutput.print(f'==> Detected axes_map: {formatted_direction_vector}')
+
+        # Compare with configured axes_map and provide guidance
+        self.current_axes_map = self.current_axes_map.strip().lower().replace(' ', '')
+        detected_normalized = formatted_direction_vector.strip().lower().replace(' ', '')
+        if self.current_axes_map is not None and self.current_axes_map != 'x,y,z':
+            if self.current_axes_map == detected_normalized:
+                ConsoleOutput.print('    Your current axes_map configuration is already correct!')
+            else:
+                ConsoleOutput.print(
+                    f"    Your current axes_map doesn't match! "
+                    f'Please update your configuration to {detected_normalized}.'
+                )
