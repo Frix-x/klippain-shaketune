@@ -52,7 +52,7 @@ class ShaperComputation:
         if len(self.measurements) > 1:
             ConsoleOutput.print('Warning: incorrect number of measurements detected. Only the first one will be used!')
 
-        datas = [np.array(m['samples']) for m in self.measurements if m['samples'] is not None]
+        datas = [np.asarray(m['samples']) for m in self.measurements if m['samples'] is not None]
 
         # Compute shapers, PSD outputs and spectrogram
         (

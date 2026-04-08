@@ -18,7 +18,7 @@ import uuid
 from io import TextIOWrapper
 from multiprocessing import Process, Queue, Value
 from pathlib import Path
-from typing import List, Optional, Tuple, TypedDict
+from typing import List, Optional, Tuple, TypedDict, Union
 
 import numpy as np
 from zstandard import FLUSH_FRAME, ZstdCompressor, ZstdDecompressor
@@ -36,7 +36,7 @@ COMPRESSION_LEVEL = 11  # Zstandard compression level (0 to 22, higher is slower
 
 class Measurement(TypedDict):
     name: str
-    samples: SamplesList
+    samples: Union[SamplesList, np.ndarray]
 
 
 class MeasurementsManager:
@@ -75,13 +75,20 @@ class MeasurementsManager:
                             break
                         with is_writing.get_lock():
                             is_writing.value = True
-                        line = (json.dumps(meas) + '\n').encode('utf-8')
+                        line = (json.dumps(self._measurement_to_jsonable(meas)) + '\n').encode('utf-8')
                         compressor.write(line)
                         with is_writing.get_lock():
                             is_writing.value = False
                     compressor.flush(FLUSH_FRAME)
         except Exception as e:
             ConsoleOutput.print(f'Error writing to file {output_file}: {e}')
+
+    @staticmethod
+    def _measurement_to_jsonable(measurement: Measurement) -> dict:
+        samples = measurement.get('samples')
+        if isinstance(samples, np.ndarray):
+            samples = samples.tolist()
+        return {'name': measurement['name'], 'samples': samples}
 
     def clear_measurements(self, keep_last: bool = False):
         self.measurements = [self.measurements[-1]] if keep_last and self.measurements else []
@@ -195,6 +202,10 @@ class MeasurementsManager:
                     for line in text_stream:
                         if line.strip():
                             meas = json.loads(line)
+                            # Convert samples eagerly to NumPy arrays to avoid the high memory
+                            # overhead of nested Python lists and repeated array copies later on.
+                            if meas.get('samples') is not None:
+                                meas['samples'] = np.asarray(meas['samples'], dtype=np.float64)
                             measurements.append(meas)
             self.measurements = measurements
         except Exception as e:
@@ -240,8 +251,8 @@ class MeasurementsManager:
                         continue
 
                     # Add the parsed klipper raw accelerometer data to Shake&Tune measurements object
-                    samples = [tuple(row) for row in data]
                     if os.environ.get('SHAKETUNE_IN_CLI') != '1':
+                        samples = [tuple(row) for row in data]
                         # When running as a Klipper plugin, we can use the standard add_measurement method
                         self.add_measurement(name=logname.stem, samples=samples)
                     else:
@@ -249,7 +260,7 @@ class MeasurementsManager:
                         # as the add_measurement method requires a temp file to be set up for writing and that
                         # is not available when running like this or would need workarounds to be implemented.
                         # But it's not a big deal as the CLI mode is only used for single shot runs.
-                        self.measurements.append({'name': logname.stem, 'samples': samples})
+                        self.measurements.append({'name': logname.stem, 'samples': data})
             except Exception as err:
                 ConsoleOutput.print(f'Error while reading {logname}: {err}. It will be ignored by Shake&Tune!')
                 continue

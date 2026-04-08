@@ -45,7 +45,7 @@ class StaticFrequencyComputation:
             ConsoleOutput.print('Warning: incorrect number of measurements detected. Only the first one will be used!')
 
         # Extract data from measurements
-        datas = [np.array(m['samples']) for m in self.measurements if m['samples'] is not None]
+        datas = [np.asarray(m['samples']) for m in self.measurements if m['samples'] is not None]
 
         # Compute spectrogram
         pdata, bins, t = compute_spectrogram(datas[0])

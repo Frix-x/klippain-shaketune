@@ -240,7 +240,7 @@ class AxesMapComputation:
         """Parse measurements into a dict keyed by axis name."""
         raw_datas = {}
         for measurement in self.measurements:
-            data = np.array(measurement['samples'])
+            data = np.asarray(measurement['samples'])
             if data is not None:
                 axis = measurement['name'].split('_')[1].lower()
                 raw_datas[axis] = data

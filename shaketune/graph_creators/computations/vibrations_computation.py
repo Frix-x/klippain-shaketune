@@ -65,7 +65,7 @@ class VibrationsComputation:
         shaper_calibrate, _ = get_shaper_calibrate_module()
 
         for measurement in self.measurements:
-            data = np.array(measurement['samples'])
+            data = np.asarray(measurement['samples'])
             if data is None:
                 continue  # Measurement data is not in the expected format or is empty, skip it
 
@@ -272,39 +272,61 @@ class VibrationsComputation:
         # We want to project the motor vibrations measured on their own axes on the [0, 360] range
         spectrum_angles = np.linspace(0, 360, 720)  # One point every 0.5 degrees
         spectrum_speeds = np.linspace(min(measured_speeds), max(measured_speeds), len(measured_speeds) * 6)
-        spectrum_vibrations = np.zeros((len(spectrum_angles), len(spectrum_speeds)))
-
-        def get_interpolated_vibrations(data: dict, speed: float, speeds: List[float]) -> float:
-            idx = np.clip(np.searchsorted(speeds, speed, side='left'), 1, len(speeds) - 1)
-            lower_speed = speeds[idx - 1]
-            upper_speed = speeds[idx]
-            lower_vibrations = data.get(lower_speed, 0)
-            upper_vibrations = data.get(upper_speed, 0)
-            return lower_vibrations + (speed - lower_speed) * (upper_vibrations - lower_vibrations) / (
-                upper_speed - lower_speed
-            )
+        measured_speeds_arr = np.asarray(measured_speeds, dtype=float)
 
         # Precompute trigonometric values and constant before the loop
         angle_radians = np.deg2rad(spectrum_angles)
         cos_vals = np.cos(angle_radians)
         sin_vals = np.sin(angle_radians)
         sqrt_2_inv = 1 / math.sqrt(2)
+        speed_axis = spectrum_speeds[None, :]
 
-        # Compute the spectrum vibrations for each angle and speed combination
-        for target_angle_idx, (cos_val, sin_val) in enumerate(zip(cos_vals, sin_vals)):
-            for target_speed_idx, target_speed in enumerate(spectrum_speeds):
-                if kinematics in {'cartesian', 'limited_cartesian', 'corexz', 'limited_corexz'}:
-                    speed_1 = np.abs(target_speed * cos_val)
-                    speed_2 = np.abs(target_speed * sin_val)
-                elif kinematics in {'corexy', 'limited_corexy'}:
-                    speed_1 = np.abs(target_speed * (cos_val + sin_val) * sqrt_2_inv)
-                    speed_2 = np.abs(target_speed * (cos_val - sin_val) * sqrt_2_inv)
+        if kinematics in {'cartesian', 'limited_cartesian', 'corexz', 'limited_corexz'}:
+            speed_1 = np.abs(cos_vals[:, None] * speed_axis)
+            speed_2 = np.abs(sin_vals[:, None] * speed_axis)
+        elif kinematics in {'corexy', 'limited_corexy'}:
+            speed_1 = np.abs(((cos_vals + sin_vals) * sqrt_2_inv)[:, None] * speed_axis)
+            speed_2 = np.abs(((cos_vals - sin_vals) * sqrt_2_inv)[:, None] * speed_axis)
+        else:
+            raise ValueError(f'Unsupported kinematics for vibrations spectrogram: {kinematics}')
 
-                vibrations_1 = get_interpolated_vibrations(data[measured_angles[0]], speed_1, measured_speeds)
-                vibrations_2 = get_interpolated_vibrations(data[measured_angles[1]], speed_2, measured_speeds)
-                spectrum_vibrations[target_angle_idx, target_speed_idx] = vibrations_1 + vibrations_2
+        # Interpolate both measured motor curves in one batch per motor instead of per cell.
+        vibrations_1_curve = np.array([data[measured_angles[0]].get(speed, 0) for speed in measured_speeds_arr], dtype=float)
+        vibrations_2_curve = np.array([data[measured_angles[1]].get(speed, 0) for speed in measured_speeds_arr], dtype=float)
+
+        spectrum_vibrations = self._interp_with_linear_extrapolation(
+            speed_1.ravel(), measured_speeds_arr, vibrations_1_curve
+        ).reshape(speed_1.shape)
+        spectrum_vibrations += self._interp_with_linear_extrapolation(
+            speed_2.ravel(), measured_speeds_arr, vibrations_2_curve
+        ).reshape(speed_2.shape)
 
         return spectrum_angles, spectrum_speeds, spectrum_vibrations
+
+    def _interp_with_linear_extrapolation(
+        self, target_speeds: np.ndarray, measured_speeds: np.ndarray, vibration_curve: np.ndarray
+    ) -> np.ndarray:
+        """Vectorized interpolation that preserves the old linear extrapolation behavior at both ends."""
+        if measured_speeds.size == 1:
+            return np.full_like(target_speeds, vibration_curve[0], dtype=float)
+
+        interpolated = np.interp(target_speeds, measured_speeds, vibration_curve)
+
+        left_mask = target_speeds < measured_speeds[0]
+        if np.any(left_mask):
+            left_slope = (vibration_curve[1] - vibration_curve[0]) / (measured_speeds[1] - measured_speeds[0])
+            interpolated[left_mask] = vibration_curve[0] + (target_speeds[left_mask] - measured_speeds[0]) * left_slope
+
+        right_mask = target_speeds > measured_speeds[-1]
+        if np.any(right_mask):
+            right_slope = (vibration_curve[-1] - vibration_curve[-2]) / (
+                measured_speeds[-1] - measured_speeds[-2]
+            )
+            interpolated[right_mask] = (
+                vibration_curve[-1] + (target_speeds[right_mask] - measured_speeds[-1]) * right_slope
+            )
+
+        return interpolated
 
     def _compute_angle_powers(self, spectrogram_data: np.ndarray) -> np.ndarray:
         """Compute angle powers from spectrogram data"""

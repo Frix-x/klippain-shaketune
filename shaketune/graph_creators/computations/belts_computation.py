@@ -57,7 +57,7 @@ class BeltsComputation:
                 f'measurements named {[meas.get("name", "unknown") for meas in self.measurements]}'
             )
 
-        datas = [np.array(m['samples']) for m in self.measurements if m['samples'] is not None]
+        datas = [np.asarray(m['samples']) for m in self.measurements if m['samples'] is not None]
 
         # Get belt names for labels
         belt_info = {'A': ' (axis 1,-1)', 'B': ' (axis 1, 1)'}
