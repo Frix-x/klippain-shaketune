@@ -15,6 +15,7 @@ Call the `CREATE_VIBRATIONS_PROFILE` macro with the speed range you want to meas
 |-----------:|---------------|-------------|
 |SIZE|100|diameter in mm of the circle in which the recorded movements take place|
 |Z_HEIGHT|20|Z height to put the toolhead before starting the movements. Be careful, if your accelerometer is mounted under the nozzle, increase it to avoid crashing it on the bed of the machine|
+|MIN_SPEED|2|minimum speed of the toolhead in mm/s for the start of the analysis. Increase this on underpowered systems if you experience accelerometer data timeouts at very low speeds|
 |MAX_SPEED|200|maximum speed of the toolhead in mm/s to record for analysis|
 |SPEED_INCREMENT|2|toolhead speed increments in mm/s between each movement|
 |ACCEL|3000|accel in mm/s^2 used for all moves. Try to keep it relatively low to avoid dynamic effects that alter the measurements, but high enough to achieve a constant speed for >~70% of the segments. 3000 is a reasonable default for most printers, unless you want to record at very high speed, in which case you will want to increase SIZE and decrease ACCEL a bit.|

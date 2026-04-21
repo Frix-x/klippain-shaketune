@@ -71,6 +71,8 @@ Regarding printer components, I do not recommend using an extra-light X-beam (al
 
 Finally, keep in mind that each axis has its own properties, such as mass and geometry, which will lead to different behaviors for each of them and will require different filters. Using the same input shaping settings for both axes is only valid if both axes are similar mechanically: this may be true for some machines, mainly Cross gantry configurations such as [CroXY](https://github.com/CroXY3D/CroXY) or [Annex-Engineering](https://github.com/Annex-Engineering) printers, but not for others.
 
+If the recommended accelerations in the table all show as **zero**, your Square Corner Velocity (SCV) is likely set too high. The max_accel value is computed by finding the highest acceleration that still keeps smoothing at an acceptable level given your SCV. When SCV is excessively high, even a very low acceleration produces too much smoothing, so the algorithm returns zero. You shouldn't use an SCV that high anyway, as it serves no real purpose and will cause defects in corners and infill anchors (similar to having too high a pressure advance). A good rule of thumb is to take your maximum print acceleration and divide it by 1000, with a maximum value of around 12-15. For example, if you print at 5000 mm/s², an SCV of 5 is a good starting point.
+
 
 ## Examples of graphs
 

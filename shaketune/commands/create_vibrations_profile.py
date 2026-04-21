@@ -17,14 +17,13 @@ from ..helpers.console_output import ConsoleOutput
 from ..helpers.motors_config_parser import MotorsConfigParser
 from ..shaketune_process import ShakeTuneProcess
 
-MIN_SPEED = 2  # mm/s
-
 
 def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> None:
     date = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     size = gcmd.get_float('SIZE', default=100.0, minval=50.0)
     z_height = gcmd.get_float('Z_HEIGHT', default=20.0)
+    min_speed = gcmd.get_float('MIN_SPEED', default=2.0, minval=1.0)
     max_speed = gcmd.get_float('MAX_SPEED', default=200.0, minval=10.0)
     speed_increment = gcmd.get_float('SPEED_INCREMENT', default=2.0, minval=1.0)
     accel = gcmd.get_int('ACCEL', default=3000, minval=100)
@@ -33,6 +32,9 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
 
     if accel_chip == '':
         accel_chip = None
+
+    if min_speed >= max_speed:
+        raise gcmd.error('MIN_SPEED must be lower than MAX_SPEED!')
 
     if (size / (max_speed / 60)) < 0.25:
         raise gcmd.error(
@@ -88,7 +90,7 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
     filename = creator.get_folder() / f'{creator.get_type().replace(" ", "")}_{date}'
     measurements_manager = MeasurementsManager(st_process.get_st_config().chunk_size, printer.get_reactor(), filename)
 
-    nb_speed_samples = int((max_speed - MIN_SPEED) / speed_increment + 1)
+    nb_speed_samples = int((max_speed - min_speed) / speed_increment + 1)
     for curr_angle in main_angles:
         ConsoleOutput.print(f'-> Measuring angle: {curr_angle} degrees...')
         radian_angle = math.radians(curr_angle)
@@ -108,7 +110,7 @@ def create_vibrations_profile(gcmd, config, st_process: ShakeTuneProcess) -> Non
 
         # Sweep the speed range to record the vibrations at different speeds
         for curr_speed_sample in range(nb_speed_samples):
-            curr_speed = MIN_SPEED + curr_speed_sample * speed_increment
+            curr_speed = min_speed + curr_speed_sample * speed_increment
             ConsoleOutput.print(f'Current speed: {curr_speed} mm/s')
 
             # Reduce the segments length for the lower speed range (0-100mm/s). The minimum length is 1/3 of the SIZE and is gradually increased

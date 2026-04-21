@@ -26,6 +26,8 @@ def excitate_axis_at_freq(gcmd, klipper_config, st_process: ShakeTuneProcess) ->
     accel_per_hz = gcmd.get_float('ACCEL_PER_HZ', default=None)
     axis = gcmd.get('AXIS', default='x').lower()
     feedrate_travel = gcmd.get_float('TRAVEL_SPEED', default=120.0, minval=20.0)
+    x_pos = gcmd.get_float('X_POS', default=None)
+    y_pos = gcmd.get_float('Y_POS', default=None)
     z_height = gcmd.get_float('Z_HEIGHT', default=None, minval=1)
     accel_chip = gcmd.get('ACCEL_CHIP', default=None)
 
@@ -79,14 +81,19 @@ def excitate_axis_at_freq(gcmd, klipper_config, st_process: ShakeTuneProcess) ->
         # Use center of bed in case the test point in [resonance_tester] is set to -1,-1,-1
         # This is usefull to get something automatic and is also used in the Klippain modular config
         kin_info = toolhead.kin.get_status(systime)
-        mid_x = (kin_info['axis_minimum'].x + kin_info['axis_maximum'].x) / 2
-        mid_y = (kin_info['axis_minimum'].y + kin_info['axis_maximum'].y) / 2
-        point = (mid_x, mid_y, z_height)
+        x = (kin_info['axis_minimum'].x + kin_info['axis_maximum'].x) / 2
+        y = (kin_info['axis_minimum'].y + kin_info['axis_maximum'].y) / 2
+        z = z_height
     else:
         x, y, z = test_points[0]
         if z_height is not None:
             z = z_height
-        point = (x, y, z)
+
+    if x_pos is not None:
+        x = x_pos
+    if y_pos is not None:
+        y = y_pos
+    point = (x, y, z)
 
     toolhead.manual_move(point, feedrate_travel)
     toolhead.dwell(0.5)

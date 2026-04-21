@@ -15,6 +15,8 @@ Here are the parameters available:
 |ACCEL_PER_HZ|None (default to `[resonance_tester]` value)|accel per Hz value used for the test|
 |AXIS|x|axis you want to excitate. Can be set to either "x", "y", "a", "b"|
 |TRAVEL_SPEED|120|speed in mm/s used for all the travel movements (to go to the start position prior to the test)|
+|X_POS|None|X position wanted for the test. This value can be used if needed to override the X value of the probe_point set in your `[resonance_tester]` config section|
+|Y_POS|None|Y position wanted for the test. This value can be used if needed to override the Y value of the probe_point set in your `[resonance_tester]` config section|
 |Z_HEIGHT|None|Z height wanted for the test. This value can be used if needed to override the Z value of the probe_point set in your `[resonance_tester]` config section|
 |ACCEL_CHIP|None|accelerometer chip name from your Klipper config that you want to force for the test|
 
@@ -34,5 +36,5 @@ The energy accumulation plot shows the cumulative energy over time, integrated o
   - From the 4th to the 8th second of the test, I touched the toolhead, which has the most vibration reduction because it's the main component vibrating at that frequency and touching it dampens it a lot.
   - From the 14th to the 18th second, I touched the belts and this reduced the vibration a bit, but not as much as touching the toolhead.
   - From the 23rd to the 27th second, I touched the left XY joint of my machine and it didn't have any noticeable effect on the vibrations.
-  
+
 But as mentioned above, **remember that this doesn't mean that the left XY joint doesn't contribute to the vibrations**. It means that its vibrations aren't causing a problem in the recorded toolhead vibrations (because the accelerometer was mounted on the toolhead!!!), but if you find that this actually also reduces the global noise to your ears, you may want to start a new recording by sticking the accelerometer directly on the XY joint (or the problematic component) instead to continue diagnosing.
