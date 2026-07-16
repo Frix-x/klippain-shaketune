@@ -117,7 +117,15 @@ class ShaperComputation:
                 # (a mismatch here used to reach matplotlib as an opaque "x and y must have the same
                 # first dimension" crash -- see issue with max_freq=300 on KalicoCrew/kalico).
                 n = len(calibration_data.freqs)
-                if len(shaper.vals) < n:
+                if len(shaper.vals) == 0:
+                    # No edge element to replicate -- np.pad(mode='edge') would raise ValueError here
+                    ConsoleOutput.print(
+                        f'Warning: {shaper.name} returned no frequency bins at all; using zeros. This may '
+                        'indicate an unsupported Klipper/Kalico version -- the graph will show no data '
+                        'for this shaper.'
+                    )
+                    vals_resampled = np.zeros(n)
+                elif len(shaper.vals) < n:
                     ConsoleOutput.print(
                         f'Warning: {shaper.name} returned fewer frequency bins than expected '
                         f'({len(shaper.vals)} < {n}); padding with its last value. This may indicate '
