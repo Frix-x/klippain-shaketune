@@ -129,7 +129,7 @@ class ShakeTuneProcess:
             ConsoleOutput.print(f'Timeout error: {e}')
             return
         except Exception as e:
-            ConsoleOutput.print(f'Error while generating the graphs: {e}\n{traceback.print_exc()}')
+            ConsoleOutput.print(f'Error while generating the graphs: {e}\n{traceback.format_exc()}')
             return
 
         graph_creator.clean_old_files(self._config.keep_n_results)
