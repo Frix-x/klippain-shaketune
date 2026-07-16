@@ -108,9 +108,33 @@ class ShaperComputation:
                 # New Klipper (Oct 2025+): shaper has its own freq_bins, resample to filtered freqs
                 vals_resampled = np.interp(calibration_data.freqs, shaper.freq_bins, shaper.vals)
             else:
-                # Older Klipper: vals is already filtered in fit_shaper to match freq_bins <= max_freq
-                # It should directly match calibration_data.freqs which was filtered the same way
-                vals_resampled = shaper.vals
+                # Older Klipper: fit_shaper filters vals against freq_bins <= max_freq internally,
+                # but its internal max_freq is `max(max_freq, test_freqs.max())` -- it can silently
+                # search past the max_freq we passed in (e.g. up to its own MAX_SHAPER_FREQ), which
+                # makes shaper.vals longer than calibration_data.freqs. Since freq_bins is sorted
+                # ascending, both arrays are prefixes of the same data, so truncating to the length
+                # we actually want recovers the correct values instead of assuming an exact match
+                # (a mismatch here used to reach matplotlib as an opaque "x and y must have the same
+                # first dimension" crash -- see issue with max_freq=300 on KalicoCrew/kalico).
+                n = len(calibration_data.freqs)
+                if len(shaper.vals) == 0:
+                    # No edge element to replicate -- np.pad(mode='edge') would raise ValueError here
+                    ConsoleOutput.print(
+                        f'Warning: {shaper.name} returned no frequency bins at all; using zeros. This may '
+                        'indicate an unsupported Klipper/Kalico version -- the graph will show no data '
+                        'for this shaper.'
+                    )
+                    vals_resampled = np.zeros(n)
+                elif len(shaper.vals) < n:
+                    ConsoleOutput.print(
+                        f'Warning: {shaper.name} returned fewer frequency bins than expected '
+                        f'({len(shaper.vals)} < {n}); padding with its last value. This may indicate '
+                        'an unsupported Klipper/Kalico version -- results near the high end of the '
+                        'graph may be inaccurate.'
+                    )
+                    vals_resampled = np.pad(shaper.vals, (0, n - len(shaper.vals)), mode='edge')
+                else:
+                    vals_resampled = shaper.vals[:n]
 
             shaper_info = {
                 'type': shaper.name.upper(),
