@@ -57,14 +57,17 @@ class MeasurementsManager:
 
         self.measurements: List[Measurement] = []
 
-        # Create a dedicated process with a Queue to manage all the writing operations
+        # Create a dedicated process with a Queue to manage all the writing operations. The number of
+        # measurements sent to it and the number of measurements it has written are both tracked, in
+        # order to be able to know for sure when the writer process is done with everything it was given
         self._writer_queue = Queue()
-        self._is_writing = Value('b', False)
+        self._queued_count = 0
+        self._written_count = Value('L', 0)
         self._writer_process: Optional[Process] = None
 
     # Dedicated writer process: opens the output file in binary write mode and wraps it with a Zstandard compressor
     # stream. It then continuously reads measurement objects from the queue and writes each as a JSON line
-    def _writer_loop(self, output_file: Path, write_queue: Queue, is_writing: Value):
+    def _writer_loop(self, output_file: Path, write_queue: Queue, written_count: Value):
         try:
             with open(output_file, 'wb') as f:
                 cctx = ZstdCompressor(level=COMPRESSION_LEVEL)
@@ -73,15 +76,44 @@ class MeasurementsManager:
                         meas = write_queue.get()
                         if meas == STOP_SENTINEL:
                             break
-                        with is_writing.get_lock():
-                            is_writing.value = True
                         line = (json.dumps(meas) + '\n').encode('utf-8')
                         compressor.write(line)
-                        with is_writing.get_lock():
-                            is_writing.value = False
+                        with written_count.get_lock():
+                            written_count.value += 1
                     compressor.flush(FLUSH_FRAME)
         except Exception as e:
             ConsoleOutput.print(f'Error writing to file {output_file}: {e}')
+
+    # Send measurements to the dedicated writer process. Each one is sent as a single JSON-serializable object
+    def _queue_measurements(self, measurements: List[Measurement]):
+        for meas in measurements:
+            self._writer_queue.put(meas)
+            self._queued_count += 1
+
+    # Wait for the writer process to be done with all the measurements that were sent to it. This relies on
+    # counting them instead of looking at Queue.empty(): right after a put() the queue can still report being
+    # empty for as long as its feeder thread is busy pickling the measurement, which takes a while for large ones
+    def _wait_for_writer(self, timeout: float):
+        if self._k_reactor is None:
+            return  # In case no reactor is available, we can't wait for the writer to finish
+        eventtime = self._k_reactor.monotonic()
+        endtime = eventtime + timeout
+        while eventtime < endtime:
+            with self._written_count.get_lock():
+                if self._written_count.value >= self._queued_count:
+                    return  # writer process is done with everything, so we can continue...
+            if not self._writer_process.is_alive():
+                raise RuntimeError('the writer process stopped before writing all the measurements to disk!')
+            eventtime = self._k_reactor.pause(eventtime + 0.05)
+
+        # Raise an error with some statistics about the writer process
+        with self._written_count.get_lock():
+            remaining = self._queued_count - self._written_count.value
+        raise TimeoutError(
+            'timeout while waiting for the writer process to finish writing measurements '
+            f'to disk!\nWriter process is still running after {timeout} seconds and '
+            f'has {remaining} measurements left to write!'
+        )
 
     def clear_measurements(self, keep_last: bool = False):
         self.measurements = [self.measurements[-1]] if keep_last and self.measurements else []
@@ -100,7 +132,7 @@ class MeasurementsManager:
         if self._writer_process is None:
             self._writer_process = Process(
                 target=self._writer_loop,
-                args=(self._temp_file, self._writer_queue, self._is_writing),
+                args=(self._temp_file, self._writer_queue, self._written_count),
                 daemon=False,
             )
             self._writer_process.start()
@@ -113,32 +145,28 @@ class MeasurementsManager:
             # Force wait for the writer process to finish writing in order to avoid being able
             # to start a new measurement while the previous one is still being written on disk
             # This is necessary to avoid Timer too close errors in Klipper...
-            if self._k_reactor is None:
-                return  # In case no reactor is available, we can't wait for the writer to finish
-            eventtime = self._k_reactor.monotonic()
-            endtime = eventtime + timeout
-            while eventtime < endtime:
-                with self._is_writing.get_lock():
-                    if self._writer_queue.empty() and not self._is_writing.value:
-                        return  # writer process is idle, so we can continue...
-                eventtime = self._k_reactor.pause(eventtime + 0.05)
-
-            # Raise an error with some statistics about the writer process
-            raise TimeoutError(
-                'timeout while waiting for the writer process to finish writing measurements '
-                f'chunk to disk!\nWriter process is still running after {timeout} seconds and '
-                f'has {self._writer_queue.qsize()} items in the queue!'
-            )
+            self._wait_for_writer(timeout)
 
     # Flush all measurements except the last one (which can still receive appended samples) to the dedicated
     # writer process. Each measurement is sent as a single JSON-serializable object via the Queue
     def _flush_chunk(self):
         if len(self.measurements) <= 1:
             return
-        flush_list = self.measurements[:-1]
-        for meas in flush_list:
-            self._writer_queue.put(meas)
+        self._queue_measurements(self.measurements[:-1])
         self.clear_measurements(keep_last=True)
+
+    # Flush all the measurements held in memory (including the last one) to the dedicated writer process and wait
+    # for them to be written. This must only be called while no recording is running, i.e. after stop_recording().
+    # It allows a command to get rid of a large measurement before starting the next one, instead of keeping it in
+    # Klipper's process until the chunk size is reached. Keeping it around is a problem on low power hosts: Python's
+    # garbage collector then has all these samples to go through during the next measurement, which can stall
+    # Klipper long enough to trigger a Timer too close error.
+    def flush_measurements(self, timeout: float = WRITE_TIMEOUT):
+        if self._writer_process is None or len(self.measurements) == 0:
+            return
+        self._queue_measurements(self.measurements)
+        self.clear_measurements()
+        self._wait_for_writer(timeout)
 
     def save_stdata(self, timeout: int = WRITE_TIMEOUT):
         # Klipper reactor is required to save the data to disk (but optional for the CLI mode that never saves any .stdata)
@@ -151,8 +179,7 @@ class MeasurementsManager:
 
         # Flush any remaining in-memory measurements
         if len(self.measurements) > 0:
-            for meas in self.measurements:
-                self._writer_queue.put(meas)
+            self._queue_measurements(self.measurements)
             self.clear_measurements()
 
         # Signal the writer process to finish its task

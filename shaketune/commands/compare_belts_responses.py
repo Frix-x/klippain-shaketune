@@ -137,6 +137,12 @@ def compare_belts_responses(gcmd, klipper_config, st_process: ShakeTuneProcess) 
             klipper_config,
         )
         accelerometer.stop_recording()
+
+        # Write the samples of this belt to disk now instead of keeping them in memory while the next belt is
+        # measured. With the default chunk size, nothing would be flushed before the end of this command and
+        # this leads to Timer too close errors during the second belt on low power hosts computers
+        measurements_manager.flush_measurements()
+
         toolhead.dwell(5)  # Wait 5 seconds to let the printer settle down (needed for low power hosts computers)
         toolhead.wait_moves()
 
